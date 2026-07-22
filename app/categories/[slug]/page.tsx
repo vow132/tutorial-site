@@ -5,8 +5,6 @@ import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
 
-export const dynamic = "force-dynamic";
-
 const PAGE_SIZE = 9;
 
 export async function generateMetadata({

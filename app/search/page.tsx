@@ -5,8 +5,6 @@ import { stripHtml } from "@/lib/article";
 import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = { title: "搜索" };
 
 function Highlight({ text, keyword }: { text: string; keyword: string }) {

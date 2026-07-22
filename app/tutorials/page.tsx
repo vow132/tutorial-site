@@ -4,8 +4,6 @@ import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = { title: "全部教程" };
 
 const PAGE_SIZE = 9;

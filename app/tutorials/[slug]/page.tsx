@@ -6,8 +6,6 @@ import { processArticle } from "@/lib/article";
 import Toc from "@/components/toc";
 import Reveal from "@/components/reveal";
 
-export const dynamic = "force-dynamic";
-
 export async function generateMetadata({
   params,
 }: {

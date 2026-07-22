@@ -5,8 +5,6 @@ import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 
-export const dynamic = "force-dynamic";
-
 export default async function HomePage() {
   const [settings, categories, latest, tutorialCount, viewAgg] = await Promise.all([
     getSettings(),
