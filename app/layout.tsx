@@ -29,7 +29,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="h-full antialiased">
+    <html
+      lang="zh-CN"
+      className="h-full antialiased"
+      data-theme="light"
+      suppressHydrationWarning
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var k="tutorial-site-theme";var root=document.documentElement;function theme(){try{return localStorage.getItem(k)==="dark"?"dark":"light"}catch(e){return"light"}}function sync(t,persist){root.dataset.theme=t;root.style.colorScheme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#0d1117":"#f7f8fa");if(persist){try{localStorage.setItem(k,t)}catch(e){}}}sync(theme(),false);document.addEventListener("click",function(e){var el=e.target instanceof Element?e.target.closest("[data-theme-toggle]"):null;if(!el)return;sync(root.dataset.theme==="dark"?"light":"dark",true)});window.addEventListener("storage",function(e){if(e.key===k)sync(e.newValue==="dark"?"dark":"light",false)})})()`,
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col">
         <SiteHeader />
         <main className="flex-1">{children}</main>

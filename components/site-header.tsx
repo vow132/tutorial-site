@@ -4,6 +4,7 @@ import { getPublicCategories } from "@/lib/public-data";
 import CapsuleNav from "./capsule-nav";
 import Mascot from "./mascot";
 import SearchInput from "./search-input";
+import ThemeToggle from "./theme-toggle";
 
 export default async function SiteHeader() {
   const [categories, settings] = await Promise.all([
@@ -42,6 +43,7 @@ export default async function SiteHeader() {
           <CapsuleNav items={items} />
         </div>
 
+        <ThemeToggle />
         <SearchInput />
       </div>
     </header>
