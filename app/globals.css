@@ -23,6 +23,10 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* 兼容带刘海/圆角屏幕，避免内容贴到安全区。 */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 ::selection {
@@ -60,6 +64,27 @@ body {
 }
 .nav-shine {
   animation: shine-sweep 3.4s ease-in-out infinite;
+}
+
+/* ---------- 移动端抽屉：原生 checkbox 兜底 ---------- */
+/*
+ * 页面客户端代码尚未完成加载时，label 也能立即切换抽屉；
+ * React 接管后继续负责滚动锁定、Esc 和焦点管理。
+ */
+.mobile-drawer-toggle:focus-visible + .mobile-drawer-trigger {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.mobile-drawer-toggle:checked ~ .mobile-drawer-shell {
+  pointer-events: auto;
+}
+.mobile-drawer-toggle:checked
+  ~ .mobile-drawer-shell
+  .mobile-drawer-backdrop {
+  opacity: 1;
+}
+.mobile-drawer-toggle:checked ~ .mobile-drawer-shell .mobile-drawer-panel {
+  transform: translateX(0);
 }
 
 /* ---------- 无 JS 也可见的渐显 ---------- */
