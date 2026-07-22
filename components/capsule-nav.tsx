@@ -109,7 +109,14 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         className="mobile-drawer-toggle sr-only lg:hidden"
         aria-hidden="true"
         tabIndex={-1}
-        onChange={(event) => setOpen(event.currentTarget.checked)}
+        onChange={(event) => {
+          const nextOpen = event.currentTarget.checked;
+          setOpen(nextOpen);
+
+          if (!nextOpen) {
+            requestAnimationFrame(() => triggerRef.current?.focus());
+          }
+        }}
       />
 
       <label
@@ -135,9 +142,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
 
       {/* 移动端左侧侧滑抽屉 */}
       <div
-        className={`mobile-drawer-shell fixed inset-0 z-[70] lg:hidden ${
-          open ? "pointer-events-auto" : "pointer-events-none"
-        }`}
+        className="mobile-drawer-shell pointer-events-none fixed inset-0 z-[70] lg:hidden"
         aria-hidden={!open}
       >
         <label
@@ -145,13 +150,13 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
           aria-label="关闭菜单"
           role="button"
           tabIndex={open ? 0 : -1}
-          onClick={closeDrawer}
           onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") closeDrawer();
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              closeDrawer();
+            }
           }}
-          className={`mobile-drawer-backdrop absolute inset-0 touch-none bg-ink/35 backdrop-blur-[2px] transition-opacity duration-300 ${
-            open ? "opacity-100" : "opacity-0"
-          }`}
+          className="mobile-drawer-backdrop absolute inset-0 touch-none bg-ink/35 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
         />
 
         <aside
@@ -159,9 +164,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
           role="dialog"
           aria-modal="true"
           aria-label="网站菜单"
-          className={`mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,22rem)] flex-col overscroll-contain border-r border-line bg-white shadow-2xl transition-transform duration-300 ease-out ${
-            open ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className="mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,22rem)] flex-col overscroll-contain border-r border-line bg-white shadow-2xl transition-transform duration-300 ease-out"
         >
           <div className="flex items-center justify-between border-b border-line px-5 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
             <div>
