@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  name        String
+  slug        String     @unique
+  description String?
+  icon        String?
+  color       String     @default("#6366f1")
+  order       Int        @default(0)
+  tutorials   Tutorial[]
+  createdAt   DateTime   @default(now())
+}
+
+model Tutorial {
+  id         Int      @id @default(autoincrement())
+  title      String
+  slug       String   @unique
+  excerpt    String?
+  content    String
+  cover      String?
+  published  Boolean  @default(false)
+  views      Int      @default(0)
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([published, createdAt])
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
