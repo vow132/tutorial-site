@@ -23,7 +23,15 @@ export default async function TutorialsPage({
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { category: true },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        views: true,
+        createdAt: true,
+        category: { select: { name: true, color: true } },
+      },
     }),
   ]);
   const totalPages = Math.ceil(total / PAGE_SIZE);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
+import { getHomeCategories } from "@/lib/public-data";
 import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
@@ -8,15 +9,20 @@ import TutorialCard from "@/components/tutorial-card";
 export default async function HomePage() {
   const [settings, categories, latest, tutorialCount, viewAgg] = await Promise.all([
     getSettings(),
-    prisma.category.findMany({
-      orderBy: { order: "asc" },
-      include: { _count: { select: { tutorials: { where: { published: true } } } } },
-    }),
+    getHomeCategories(),
     prisma.tutorial.findMany({
       where: { published: true },
       orderBy: { createdAt: "desc" },
       take: 6,
-      include: { category: true },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        views: true,
+        createdAt: true,
+        category: { select: { name: true, color: true } },
+      },
     }),
     prisma.tutorial.count({ where: { published: true } }),
     prisma.tutorial.aggregate({ _sum: { views: true } }),

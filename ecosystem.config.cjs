@@ -2,6 +2,7 @@ module.exports = {
   apps: [
     {
       name: "教程网",
+      cwd: __dirname,
       script: "node_modules/next/dist/bin/next",
       args: "start",
       env: {

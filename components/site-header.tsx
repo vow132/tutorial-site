@@ -1,23 +1,20 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
+import { getPublicCategories } from "@/lib/public-data";
 import CapsuleNav from "./capsule-nav";
 import Mascot from "./mascot";
 import SearchInput from "./search-input";
 
 export default async function SiteHeader() {
   const [categories, settings] = await Promise.all([
-    prisma.category.findMany({
-      orderBy: { order: "asc" },
-      take: 4,
-    }),
+    getPublicCategories(),
     getSettings(),
   ]);
 
   const items = [
     { href: "/", label: "首页" },
     { href: "/tutorials", label: "全部教程" },
-    ...categories.map((c) => ({
+    ...categories.slice(0, 4).map((c) => ({
       href: `/categories/${c.slug}`,
       label: c.name,
     })),

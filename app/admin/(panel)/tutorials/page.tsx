@@ -11,7 +11,14 @@ export const dynamic = "force-dynamic";
 export default async function AdminTutorialsPage() {
   const tutorials = await prisma.tutorial.findMany({
     orderBy: { updatedAt: "desc" },
-    include: { category: true },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      views: true,
+      published: true,
+      category: { select: { name: true, color: true } },
+    },
   });
 
   return (

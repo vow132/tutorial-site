@@ -1,56 +1,12 @@
-"use client";
-
-import { useEffect, useRef } from "react";
-
 /**
- * 小幽灵吉祥物：常驻漂浮 + 眨眼，身体随鼠标轻微偏移（跟随设备动效）。
+ * 小幽灵吉祥物：常驻漂浮 + 眨眼。
+ *
+ * The decorative element stays server-rendered so a failed client chunk can
+ * never hide the page and no global mousemove loop runs on every route.
  */
 export default function Mascot({ className = "" }: { className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || window.matchMedia("(pointer: coarse)").matches) return;
-
-    let raf = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let curX = 0;
-    let curY = 0;
-
-    const onMove = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = e.clientX - cx;
-      const dy = e.clientY - cy;
-      const dist = Math.hypot(dx, dy) || 1;
-      const pull = Math.min(dist / 300, 1) * 10; // 最远被吸引 10px
-      targetX = (dx / dist) * pull;
-      targetY = (dy / dist) * pull;
-    };
-
-    const tick = () => {
-      curX += (targetX - curX) * 0.08;
-      curY += (targetY - curY) * 0.08;
-      el.style.translate = `${curX.toFixed(2)}px ${curY.toFixed(2)}px`;
-      raf = requestAnimationFrame(tick);
-    };
-
-    window.addEventListener("mousemove", onMove, { passive: true });
-    raf = requestAnimationFrame(tick);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
-
   return (
-    <div
-      ref={ref}
-      className={`pointer-events-none select-none ${className}`}
-      aria-hidden
-    >
+    <div className={`pointer-events-none select-none ${className}`} aria-hidden>
       <div className="mascot-float">
         <svg width="34" height="38" viewBox="0 0 34 38" fill="none">
           <path

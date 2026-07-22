@@ -17,7 +17,13 @@ export default async function AdminDashboard() {
       prisma.tutorial.findMany({
         orderBy: { updatedAt: "desc" },
         take: 5,
-        include: { category: true },
+        select: {
+          id: true,
+          title: true,
+          published: true,
+          updatedAt: true,
+          category: { select: { name: true } },
+        },
       }),
     ]);
 

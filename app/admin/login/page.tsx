@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import { getCurrentAdmin } from "@/lib/admin-auth";
 import Mascot from "@/components/mascot";
 import LoginForm from "./login-form";
 
 export const metadata: Metadata = { title: "管理员登录" };
 
 export default async function AdminLoginPage() {
-  const store = await cookies();
-  if (verifySession(store.get(SESSION_COOKIE)?.value)) {
+  if (await getCurrentAdmin()) {
     redirect("/admin");
   }
 

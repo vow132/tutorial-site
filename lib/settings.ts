@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 export type FooterLink = { label: string; href: string };
@@ -58,7 +59,7 @@ export const defaultSettings: SiteSettings = {
   ],
 };
 
-export async function getSettings(): Promise<SiteSettings> {
+export const getSettings = cache(async function getSettings(): Promise<SiteSettings> {
   try {
     const row = await prisma.setting.findUnique({
       where: { key: SETTINGS_KEY },
@@ -75,4 +76,4 @@ export async function getSettings(): Promise<SiteSettings> {
   } catch {
     return defaultSettings;
   }
-}
+});

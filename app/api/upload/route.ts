@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { cookies } from "next/headers";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import { getCurrentAdmin } from "@/lib/admin-auth";
 
 const ALLOWED = new Map([
   ["image/png", ".png"],
@@ -15,8 +14,7 @@ const ALLOWED = new Map([
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function POST(request: Request) {
-  const store = await cookies();
-  if (!verifySession(store.get(SESSION_COOKIE)?.value)) {
+  if (!(await getCurrentAdmin())) {
     return NextResponse.json({ error: "未登录或会话已过期" }, { status: 401 });
   }
 

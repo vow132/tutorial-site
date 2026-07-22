@@ -42,6 +42,14 @@ export default async function CategoryPage({
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        excerpt: true,
+        views: true,
+        createdAt: true,
+      },
     }),
   ]);
   const totalPages = Math.ceil(total / PAGE_SIZE);

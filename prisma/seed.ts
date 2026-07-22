@@ -1,21 +1,21 @@
-import path from "node:path";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { getDatabaseUrl } from "../lib/database-url";
 
-const dbPath = path.join(process.cwd(), "prisma", "dev.db");
-const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
+const adapter = new PrismaBetterSqlite3({ url: getDatabaseUrl(), timeout: 5000 });
 const prisma = new PrismaClient({ adapter });
-
 async function main() {
-  // 管理员
-  const username = process.env.ADMIN_USERNAME ?? "admin";
-  const password = process.env.ADMIN_PASSWORD ?? "admin123456";
-  await prisma.admin.upsert({
-    where: { username },
-    update: {},
-    create: { username, password: bcrypt.hashSync(password, 10) },
-  });
+  // 管理员：只在全新数据库中写入一次。之后账号由后台“账号安全”页面管理，
+  // 避免每次部署因用户名已修改而重新创建一个默认 admin。
+  const existingAdmin = await prisma.admin.findFirst({ select: { id: true } });
+  if (!existingAdmin) {
+    const username = process.env.ADMIN_USERNAME ?? "admin";
+    const password = process.env.ADMIN_PASSWORD ?? "admin123456";
+    await prisma.admin.create({
+      data: { username, password: bcrypt.hashSync(password, 10) },
+    });
+  }
 
   // 分类
   const categories = [

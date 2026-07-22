@@ -1,40 +1,36 @@
-#!/bin/bash
-# ==============================================
-# 教程网 · Linux 服务器一键部署脚本
-# 使用方法: bash deploy.sh
-# 前提条件: Node.js >= 20.9, npm, git, pm2
-# ==============================================
-set -e
+#!/usr/bin/env bash
+# 教程网生产部署脚本（Node.js >= 20.9、npm、pm2）
+set -euo pipefail
 
-echo "=== 1. 克隆/更新代码 ==="
-# 请改为你的仓库地址，或用 scp/rsync 直接上传
-# git pull origin main
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT_DIR"
+export NODE_ENV=production
 
-echo "=== 2. 安装依赖（包含 devDependencies，用于构建） ==="
+echo "=== 1. 安装依赖 ==="
 npm ci
 
-echo "=== 3. 生成 Prisma 客户端 ==="
+echo "=== 2. 生成 Prisma 客户端 ==="
 npx prisma generate
 
-echo "=== 4. 构建 ==="
-npm run build
-
-echo "=== 5. 初始化/迁移数据库 ==="
+echo "=== 3. 应用数据库迁移（必须在构建前） ==="
 npx prisma migrate deploy
 
-echo "=== 6. 写入种子数据（首次部署必用，重复执行安全） ==="
+echo "=== 4. 写入种子数据（可重复执行） ==="
 npx prisma db seed
 
-echo "=== 7. 确保 uploads 目录存在 ==="
+echo "=== 5. 准备上传目录 ==="
 mkdir -p public/uploads
 
-echo "=== 8. 启动 PM2 ==="
-pm2 start ecosystem.config.cjs --update-env
+echo "=== 6. 生产构建 ==="
+# 先迁移/种子再构建，避免静态主页把空数据库内容烘焙进 .next。
+npm run build
+
+echo "=== 7. 启动或平滑重载 PM2 ==="
+pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 
 echo ""
-echo "✅ 部署完成！"
-echo "   访问 http://服务器IP:3000"
-echo "   后台 http://服务器IP:3000/admin"
-echo "   日志查看: pm2 logs 教程网"
-echo "   重启应用: pm2 restart 教程网"
+echo "✅ 部署完成"
+echo "   访问: http://服务器IP:3000"
+echo "   后台: http://服务器IP:3000/admin"
+echo "   日志: pm2 logs 教程网"

@@ -9,16 +9,18 @@ export const metadata: Metadata = { title: "搜索" };
 
 function Highlight({ text, keyword }: { text: string; keyword: string }) {
   if (!keyword) return <>{text}</>;
-  const parts = text.split(new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+  const parts = text.split(
+    new RegExp(`(${keyword.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")})`, "gi")
+  );
   return (
     <>
-      {parts.map((p, i) =>
-        p.toLowerCase() === keyword.toLowerCase() ? (
+      {parts.map((part, i) =>
+        part.toLowerCase() === keyword.toLowerCase() ? (
           <mark key={i} className="rounded bg-yellow-100 px-0.5 text-ink">
-            {p}
+            {part}
           </mark>
         ) : (
-          p
+          part
         )
       )}
     </>
@@ -45,7 +47,15 @@ export default async function SearchPage({
         },
         orderBy: { views: "desc" },
         take: 50,
-        include: { category: true },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          excerpt: true,
+          content: true,
+          views: true,
+          category: { select: { name: true, color: true } },
+        },
       })
     : [];
 
@@ -86,9 +96,7 @@ export default async function SearchPage({
                     className="h-2 w-2 rounded-full"
                     style={{ backgroundColor: t.category.color }}
                   />
-                  <span style={{ color: t.category.color }}>
-                    {t.category.name}
-                  </span>
+                  <span style={{ color: t.category.color }}>{t.category.name}</span>
                   <span>·</span>
                   <span>{t.views} 阅读</span>
                 </div>

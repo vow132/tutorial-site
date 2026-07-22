@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 教程网
 
-## Getting Started
+基于 Next.js 16.2（App Router + webpack）、React 19、Tailwind CSS v4、Prisma 7 + SQLite 的商业级图文教程平台。
 
-First, run the development server:
+## 本地运行
 
 ```bash
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npx prisma db seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 `http://localhost:3000`，后台为 `/admin`。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 生产部署
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+服务器要求：Node.js >= 20.9、npm、PM2。推荐使用项目根目录的脚本：
 
-## Learn More
+```bash
+bash deploy.sh
+```
 
-To learn more about Next.js, take a look at the following resources:
+脚本会按“安装依赖 → Prisma generate → migrate → seed → build → PM2 平滑重载”的顺序执行。迁移和种子数据必须在 `npm run build` 之前完成，否则静态主页可能把空数据库内容生成到 `.next` 中。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 环境变量
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+在服务器设置 `.env.production`：
 
-## Deploy on Vercel
+```dotenv
+DATABASE_URL="file:./prisma/dev.db"
+ADMIN_USERNAME="admin"
+ADMIN_PASSWORD="请修改为强密码"
+AUTH_SECRET="请替换为随机长字符串"
+# 只有站点全程 HTTPS 时才设为 true；直接用 http://IP:3000 时保持 false
+SESSION_COOKIE_SECURE="false"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`DATABASE_URL` 的相对路径以项目根目录为基准。PM2 配置已经固定 `cwd`，运行时和 Prisma CLI 会使用同一个数据库文件。
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 管理员账号修改
+
+登录后台后进入侧栏 **账号安全**（`/admin/account`）：
+
+- 修改用户名时需要输入当前密码确认；
+- 新密码至少 8 位，可只修改用户名而不改密码；
+- 保存后当前浏览器自动换发会话，旧凭据指纹对应的会话会失效。
+
+## 主页空白/卡顿修复说明
+
+此前首页内容由 Framer Motion 在客户端 hydration 后从 `opacity: 0` 显示。如果服务器反向代理延迟或丢失 JS chunk，就会只剩页头和页尾。现在渐显改为 CSS 增强，服务端 HTML 默认可见，即使 JS 未加载也能正常阅读；公共卡片、吉祥物和搜索框也改为轻量服务端/CSS 实现。列表查询只选择展示字段，不再把整篇正文带入首页。
+
+若使用 Nginx，确保 `/_next/static`等静态资源路径完整转发到 Next，并在发布新版本时整体替换 `.next` 后再重载 PM2。

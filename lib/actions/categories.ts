@@ -1,18 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import { requireAuth } from "@/lib/admin-auth";
 
 export type CategoryFormState = { error?: string; success?: string };
 
-async function requireAuth() {
-  const store = await cookies();
-  if (!verifySession(store.get(SESSION_COOKIE)?.value)) {
-    throw new Error("未登录或会话已过期");
-  }
-}
 
 function revalidate() {
   revalidatePath("/");

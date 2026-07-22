@@ -1,10 +1,12 @@
-"use client";
-
-import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
- * 滚动显现：进入视口时淡入上浮。
+ * 首屏渐显。
+ *
+ * This is intentionally a server component. The previous Framer Motion
+ * implementation rendered every block with opacity: 0 and depended on
+ * hydration. If a proxy delayed a JS chunk, the home page looked blank.
+ * CSS keeps the enhancement while the markup remains readable without JS.
  */
 export default function Reveal({
   children,
@@ -17,15 +19,14 @@ export default function Reveal({
   y?: number;
   className?: string;
 }) {
+  const style = {
+    animationDelay: `${delay}s`,
+    "--reveal-y": `${y}px`,
+  } as CSSProperties;
+
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
-    >
+    <div className={`reveal ${className}`} style={style}>
       {children}
-    </motion.div>
+    </div>
   );
 }

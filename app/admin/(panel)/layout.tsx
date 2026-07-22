@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import { getCurrentAdmin } from "@/lib/admin-auth";
 import AdminSidebar from "./sidebar";
 
 export default async function AdminPanelLayout({
@@ -9,8 +8,7 @@ export default async function AdminPanelLayout({
   children: React.ReactNode;
 }) {
   // 双保险：proxy 之外的二次校验
-  const store = await cookies();
-  if (!verifySession(store.get(SESSION_COOKIE)?.value)) {
+  if (!(await getCurrentAdmin())) {
     redirect("/admin/login");
   }
 

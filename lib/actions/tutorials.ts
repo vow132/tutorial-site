@@ -2,18 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import { requireAuth } from "@/lib/admin-auth";
 
 export type TutorialFormState = { error?: string };
 
-async function requireAuth() {
-  const store = await cookies();
-  if (!verifySession(store.get(SESSION_COOKIE)?.value)) {
-    throw new Error("未登录或会话已过期");
-  }
-}
 
 function normalizeSlug(input: string, title: string) {
   const raw = (input || title).toLowerCase().trim();

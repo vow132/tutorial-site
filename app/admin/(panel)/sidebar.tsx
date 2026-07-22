@@ -8,23 +8,17 @@ const items = [
   {
     href: "/admin",
     label: "仪表盘",
-    icon: (
-      <path d="M3 3h7v7H3zM11 3h7v4h-7zM11 10h7v7h-7zM3 13h7v4H3z" />
-    ),
+    icon: <path d="M3 3h7v7H3zM11 3h7v4h-7zM11 10h7v7h-7zM3 13h7v4H3z" />,
   },
   {
     href: "/admin/tutorials",
     label: "教程管理",
-    icon: (
-      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15.5H6.5A2.5 2.5 0 0 0 4 20zM4 17.5V4.5M20 17.5V20H6.5" />
-    ),
+    icon: <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15.5H6.5A2.5 2.5 0 0 0 4 20zM4 17.5V4.5M20 17.5V20H6.5" />,
   },
   {
     href: "/admin/categories",
     label: "分类管理",
-    icon: (
-      <path d="M3.5 3.5h6v6h-6zM11.5 3.5h6v6h-6zM3.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z" />
-    ),
+    icon: <path d="M3.5 3.5h6v6h-6zM11.5 3.5h6v6h-6zM3.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z" />,
   },
   {
     href: "/admin/settings",
@@ -33,6 +27,17 @@ const items = [
       <>
         <circle cx="11" cy="11" r="3" />
         <path d="M11 2.5v2.2M11 17.3v2.2M2.5 11h2.2M17.3 11h2.2M5 5l1.6 1.6M15.4 15.4L17 17M17 5l-1.6 1.6M6.6 15.4L5 17" />
+      </>
+    ),
+  },
+  {
+    href: "/admin/account",
+    label: "账号安全",
+    icon: (
+      <>
+        <rect x="4" y="3" width="14" height="16" rx="2" />
+        <circle cx="11" cy="8" r="2" />
+        <path d="M7.5 15c.8-1.7 2-2.5 3.5-2.5s2.7.8 3.5 2.5" />
       </>
     ),
   },

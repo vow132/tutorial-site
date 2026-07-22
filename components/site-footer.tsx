@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
+import { getPublicCategories } from "@/lib/public-data";
 
 export default async function SiteFooter() {
   const [categories, settings] = await Promise.all([
-    prisma.category.findMany({ orderBy: { order: "asc" } }),
+    getPublicCategories(),
     getSettings(),
   ]);
 

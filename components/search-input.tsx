@@ -1,21 +1,8 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
 export default function SearchInput() {
-  const router = useRouter();
-  const [q, setQ] = useState("");
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = q.trim();
-    if (query) router.push(`/search?q=${encodeURIComponent(query)}`);
-  };
-
   return (
     <form
-      onSubmit={submit}
+      action="/search"
+      method="get"
       className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-white/85 pl-4 pr-1.5 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md"
     >
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="#9ca3af" strokeWidth="1.6" strokeLinecap="round">
@@ -23,8 +10,7 @@ export default function SearchInput() {
         <path d="M10 10l3.5 3.5" />
       </svg>
       <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
+        name="q"
         placeholder="搜索教程…"
         className="w-24 bg-transparent text-sm outline-none placeholder:text-ink-3 focus:w-40 transition-all sm:w-32"
       />
