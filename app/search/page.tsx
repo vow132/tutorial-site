@@ -79,6 +79,47 @@ export default async function SearchPage({
         </p>
       </Reveal>
 
+      {/* 手机端顶部搜索框：点击导航搜索图标后可以直接输入并提交。 */}
+      <form
+        action="/search"
+        method="get"
+        className="mt-6 flex items-center gap-2 rounded-2xl border border-line bg-white/85 p-2 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] sm:hidden"
+      >
+        <label htmlFor="mobile-search-query" className="sr-only">
+          搜索教程
+        </label>
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 17 17"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          className="ml-2 shrink-0 text-ink-3"
+          aria-hidden="true"
+        >
+          <circle cx="7.25" cy="7.25" r="4.75" />
+          <path d="m10.75 10.75 3.75 3.75" />
+        </svg>
+        <input
+          id="mobile-search-query"
+          name="q"
+          type="search"
+          inputMode="search"
+          enterKeyHint="search"
+          defaultValue={query}
+          placeholder="搜索教程…"
+          className="min-w-0 flex-1 bg-transparent px-1.5 py-2 text-sm text-ink outline-none placeholder:text-ink-3"
+        />
+        <button
+          type="submit"
+          className="h-9 shrink-0 rounded-xl bg-ink px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          搜索
+        </button>
+      </form>
+
       {query && results.length === 0 && (
         <div className="mt-16 rounded-3xl border border-dashed border-line bg-white/60 py-20 text-center">
           <p className="text-4xl">🔍</p>

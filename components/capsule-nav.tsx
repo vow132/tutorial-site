@@ -16,7 +16,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const toggleId = useId();
   const toggleRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLLabelElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLLabelElement>(null);
   const mountedRef = useRef(false);
 
   const isActive = (href: string) =>
@@ -173,18 +173,24 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
               </p>
               <p className="mt-1 text-lg font-bold text-ink">菜单导航</p>
             </div>
-            <button
+            <label
               ref={closeButtonRef}
-              type="button"
-              onClick={closeDrawer}
+              htmlFor={toggleId}
+              role="button"
               tabIndex={open ? 0 : -1}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  closeDrawer();
+                }
+              }}
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
               aria-label="关闭菜单"
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <path d="M4 4l10 10M14 4 4 14" />
               </svg>
-            </button>
+            </label>
           </div>
 
           <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="移动端导航">
