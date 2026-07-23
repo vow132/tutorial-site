@@ -2,8 +2,18 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import type { TutorialFormState } from "@/lib/actions/tutorials";
-import RichTextEditor from "@/components/editor/rich-text-editor";
+
+const RichTextEditor = dynamic(
+  () => import("@/components/editor/rich-text-editor"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-[460px] animate-pulse rounded-2xl border border-line bg-paper" />
+    ),
+  },
+);
 
 type Category = { id: number; name: string };
 

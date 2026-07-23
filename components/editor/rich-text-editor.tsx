@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
+import Underline from "@tiptap/extension-underline";
 import { Placeholder } from "@tiptap/extensions";
 
 async function uploadImage(file: File): Promise<string> {
@@ -36,6 +37,7 @@ function insertFiles(editor: Editor, files: File[], pos?: number) {
       .run();
 
     const replacePlaceholder = (content: object | string) => {
+      if (editor.isDestroyed) return;
       const { doc } = editor.state;
       let target: number | null = null;
       doc.descendants((node, p) => {
@@ -86,7 +88,7 @@ export default function RichTextEditor({
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const lastInitialContent = useRef(initialContent);
+  const editorRef = useRef<Editor | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -95,12 +97,19 @@ export default function RichTextEditor({
         heading: { levels: [2, 3] },
         link: { openOnClick: false },
       }),
+      Underline,
       Image.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({
         placeholder: "开始撰写正文… 支持直接拖拽或粘贴图片",
       }),
     ],
     content: initialContent,
+    onCreate: ({ editor }) => {
+      editorRef.current = editor;
+    },
+    onDestroy: () => {
+      editorRef.current = null;
+    },
     onUpdate: ({ editor }) => setHtml(editor.getHTML()),
     editorProps: {
       handleDrop: (view, event, _slice, moved) => {
@@ -114,7 +123,7 @@ export default function RichTextEditor({
         const pos =
           view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ??
           view.state.selection.to;
-        if (editor) insertFiles(editor, files, pos);
+        if (editorRef.current) insertFiles(editorRef.current, files, pos);
         return true;
       },
       handlePaste: (_view, event) => {
@@ -123,24 +132,11 @@ export default function RichTextEditor({
         );
         if (files.length === 0) return false;
         event.preventDefault();
-        if (editor) insertFiles(editor, files);
+        if (editorRef.current) insertFiles(editorRef.current, files);
         return true;
       },
     },
   });
-
-  // 在后台连续切换不同教程时，同步编辑器内容，避免残留上一篇正文。
-  useEffect(() => {
-    if (!editor) return;
-    if (
-      initialContent !== lastInitialContent.current &&
-      initialContent !== editor.getHTML()
-    ) {
-      editor.commands.setContent(initialContent, { emitUpdate: false });
-      setHtml(initialContent);
-    }
-    lastInitialContent.current = initialContent;
-  }, [editor, initialContent]);
 
   // 拖拽经过时高亮编辑区
   useEffect(() => {
@@ -173,14 +169,10 @@ export default function RichTextEditor({
 
   if (!editor) {
     return (
-      <textarea
-        name={name}
-        defaultValue={html}
-        required
-        aria-label="正文"
-        placeholder="开始撰写正文…"
-        className="min-h-[460px] w-full resize-y rounded-2xl border border-line bg-white px-5 py-4 font-mono text-sm leading-7 text-ink outline-none transition-colors focus:border-accent"
-      />
+      <div className="rounded-2xl border border-line bg-white">
+        <div className="h-[460px] animate-pulse rounded-2xl bg-paper" />
+        <input type="hidden" name={name} value={html} />
+      </div>
     );
   }
 
@@ -204,7 +196,7 @@ export default function RichTextEditor({
       }`}
     >
       {/* 工具栏 */}
-      <div className="relative z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-white/95 px-2 py-1.5 backdrop-blur md:sticky md:top-4">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-white/95 px-2 py-1.5 backdrop-blur">
         <button
           type="button"
           title="撤销"

@@ -5,6 +5,7 @@ import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
+import ThemeToggle from "@/components/theme-toggle";
 
 type AdminItem = {
   href: string;
@@ -193,22 +194,24 @@ export default function AdminSidebar() {
               {currentItem.label}
             </p>
           </div>
-          <label
-            ref={triggerRef}
-            htmlFor={toggleId}
-            role="button"
-            tabIndex={0}
-            aria-label="打开后台菜单"
-            aria-controls={drawerId}
-            aria-expanded="false"
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                toggleRef.current?.click();
-              }
-            }}
-            className="admin-mobile-drawer-trigger flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-paper text-ink-2 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-          >
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <label
+              ref={triggerRef}
+              htmlFor={toggleId}
+              role="button"
+              tabIndex={0}
+              aria-label="打开后台菜单"
+              aria-controls={drawerId}
+              aria-expanded="false"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggleRef.current?.click();
+                }
+              }}
+              className="admin-mobile-drawer-trigger flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line bg-paper text-ink-2 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+            >
             <svg
               width="18"
               height="18"
@@ -221,7 +224,8 @@ export default function AdminSidebar() {
             >
               <path d="M2.5 5h13M2.5 9h13M2.5 13h13" />
             </svg>
-          </label>
+            </label>
+          </div>
         </div>
 
         <div className="admin-mobile-drawer-shell pointer-events-none fixed inset-0 z-[90] md:hidden">
@@ -247,19 +251,21 @@ export default function AdminSidebar() {
                 </p>
                 <p className="mt-1 text-lg font-bold text-ink">后台管理</p>
               </div>
-              <label
-                htmlFor={toggleId}
-                role="button"
-                tabIndex={0}
-                aria-label="关闭后台菜单"
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    closeMobileMenu(true);
-                  }
-                }}
-                className="admin-mobile-drawer-close flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-              >
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <label
+                  htmlFor={toggleId}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="关闭后台菜单"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      closeMobileMenu(true);
+                    }
+                  }}
+                  className="admin-mobile-drawer-close flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
+                >
                 <svg
                   width="18"
                   height="18"
@@ -272,7 +278,8 @@ export default function AdminSidebar() {
                 >
                   <path d="M4 4l10 10M14 4 4 14" />
                 </svg>
-              </label>
+                </label>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3">
@@ -286,6 +293,10 @@ export default function AdminSidebar() {
       </div>
 
       <aside className="sticky top-6 hidden h-fit w-52 shrink-0 rounded-3xl border border-line bg-white p-3 md:block">
+        <div className="mb-3 flex items-center justify-between border-b border-line px-1 pb-3">
+          <span className="text-sm font-semibold text-ink">后台管理</span>
+          <ThemeToggle />
+        </div>
         <SidebarLinks pathname={pathname} />
       </aside>
     </>
