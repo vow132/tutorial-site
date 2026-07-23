@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { createTutorial } from "@/lib/actions/tutorials";
+import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import TutorialForm from "../tutorial-form";
 
 export const metadata: Metadata = { title: "写教程" };
@@ -8,10 +9,16 @@ export const metadata: Metadata = { title: "写教程" };
 export const dynamic = "force-dynamic";
 
 export default async function NewTutorialPage() {
-  const categories = await prisma.category.findMany({
-    orderBy: { order: "asc" },
-    select: { id: true, name: true },
+  const categoryRows = await prisma.category.findMany({
+    orderBy: [{ order: "asc" }, { id: "asc" }],
+    select: { id: true, name: true, parentId: true, order: true },
   });
+  const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
+    ({ node, depth }) => ({
+      id: node.id,
+      name: `${"　".repeat(depth)}${node.name}（${depth + 1}级）`,
+    }),
+  );
 
   return (
     <div>

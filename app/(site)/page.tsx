@@ -2,6 +2,11 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { getHomeCategories } from "@/lib/public-data";
+import {
+  categoryLinkTarget,
+  flattenCategoryTree,
+  getCategoryHref,
+} from "@/lib/categories";
 import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
@@ -28,9 +33,23 @@ export default async function HomePage() {
     prisma.tutorial.aggregate({ _sum: { views: true } }),
   ]);
 
+  const countCategoryTutorials = (
+    category: (typeof categories)[number],
+  ): number =>
+    category._count.tutorials +
+    category.children.reduce(
+      (total, child) => total + countCategoryTutorials(child),
+      0,
+    );
+
   const stats = [
     { label: "精选教程", value: tutorialCount, unit: "篇", color: "#6366f1" },
-    { label: "教程分类", value: categories.length, unit: "个", color: "#10b981" },
+    {
+      label: "教程分类",
+      value: flattenCategoryTree(categories).length,
+      unit: "个",
+      color: "#10b981",
+    },
     { label: "累计阅读", value: viewAgg._sum.views ?? 0, unit: "次", color: "#f59e0b" },
   ];
 
@@ -113,7 +132,11 @@ export default async function HomePage() {
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {categories.map((c, i) => (
             <Reveal key={c.id} delay={i * 0.06}>
-              <Link href={`/categories/${c.slug}`} className="block h-full">
+              <Link
+                href={getCategoryHref(c)}
+                {...categoryLinkTarget(getCategoryHref(c))}
+                className="block h-full"
+              >
                 <GlowCard className="flex h-full items-start gap-4 p-6">
                   <span
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl"
@@ -125,12 +148,17 @@ export default async function HomePage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-ink">{c.name}</h3>
                       <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-ink-3">
-                        {c._count.tutorials} 篇
+                        {countCategoryTutorials(c)} 篇
                       </span>
                     </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-ink-2 line-clamp-2">
                       {c.description ?? "暂无描述"}
                     </p>
+                    {c.children.length > 0 && (
+                      <p className="mt-2 text-xs text-accent">
+                        包含 {c.children.length} 个子分类
+                      </p>
+                    )}
                   </div>
                 </GlowCard>
               </Link>

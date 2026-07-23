@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { processArticle } from "@/lib/article";
+import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import Toc from "@/components/toc";
 import Reveal from "@/components/reveal";
 
@@ -71,7 +72,8 @@ export default async function TutorialDetailPage({
           <Link href="/" className="transition-colors hover:text-accent">首页</Link>
           <span>/</span>
           <Link
-            href={`/categories/${tutorial.category.slug}`}
+            href={getCategoryHref(tutorial.category)}
+            {...categoryLinkTarget(getCategoryHref(tutorial.category))}
             className="transition-colors hover:text-accent"
           >
             {tutorial.category.name}

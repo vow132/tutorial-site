@@ -1,12 +1,24 @@
 import Link from "next/link";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategories } from "@/lib/public-data";
+import {
+  buildCategoryTree,
+  categoryLinkTarget,
+  flattenCategoryTree,
+  getCategoryHref,
+} from "@/lib/categories";
 
 export default async function SiteFooter() {
   const [categories, settings] = await Promise.all([
     getPublicCategories(),
     getSettings(),
   ]);
+  const categoryLinks = flattenCategoryTree(buildCategoryTree(categories)).map(
+    ({ node, depth }) => ({
+      label: `${depth ? `${"— ".repeat(depth)}` : ""}${node.name}`,
+      href: getCategoryHref(node),
+    }),
+  );
 
   return (
     <footer className="mt-24 border-t border-line bg-white/60">
@@ -27,24 +39,18 @@ export default async function SiteFooter() {
           <div className="grid grid-cols-2 gap-12 sm:grid-cols-3">
             {settings.footerColumns.map((col, i) => {
               const links = col.autoCategories
-                ? categories.map((c) => ({
-                    label: c.name,
-                    href: `/categories/${c.slug}`,
-                  }))
+                ? categoryLinks
                 : col.links;
               return (
                 <div key={i}>
                   <h4 className="text-sm font-semibold text-ink">{col.title}</h4>
                   <ul className="mt-3 space-y-2">
                     {links.map((link, j) => {
-                      const external = /^https?:\/\//.test(link.href);
                       return (
                         <li key={j}>
                           <Link
                             href={link.href}
-                            {...(external
-                              ? { target: "_blank", rel: "noopener noreferrer" }
-                              : {})}
+                            {...categoryLinkTarget(link.href)}
                             className="text-sm text-ink-2 transition-colors hover:text-accent"
                           >
                             {link.label}

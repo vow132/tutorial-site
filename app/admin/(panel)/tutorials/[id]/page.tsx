@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateTutorial } from "@/lib/actions/tutorials";
+import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import TutorialForm from "../tutorial-form";
 
 export const metadata: Metadata = { title: "编辑教程" };
@@ -19,10 +20,16 @@ export default async function EditTutorialPage({
   });
   if (!tutorial) notFound();
 
-  const categories = await prisma.category.findMany({
-    orderBy: { order: "asc" },
-    select: { id: true, name: true },
+  const categoryRows = await prisma.category.findMany({
+    orderBy: [{ order: "asc" }, { id: "asc" }],
+    select: { id: true, name: true, parentId: true, order: true },
   });
+  const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
+    ({ node, depth }) => ({
+      id: node.id,
+      name: `${"　".repeat(depth)}${node.name}（${depth + 1}级）`,
+    }),
+  );
 
   const boundAction = updateTutorial.bind(null, tutorial.id);
 

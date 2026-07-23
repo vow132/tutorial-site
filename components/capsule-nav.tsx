@@ -3,12 +3,192 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import { categoryLinkTarget, isExternalHref } from "@/lib/categories";
 
-export type NavItem = { href: string; label: string };
+export type NavItem = {
+  key: string;
+  href: string;
+  label: string;
+  children?: NavItem[];
+};
 
-/**
- * 悬浮胶囊导航：激活项弹簧滑动 + 光晕 + 流光。
- */
+function hrefIsActive(pathname: string, href: string) {
+  if (!href.startsWith("/") || href.startsWith("//")) return false;
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
+function itemIsActive(pathname: string, item: NavItem): boolean {
+  return (
+    hrefIsActive(pathname, item.href) ||
+    Boolean(item.children?.some((child) => itemIsActive(pathname, child)))
+  );
+}
+
+function Chevron({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m4 2.5 3.5 3.5L4 9.5" />
+    </svg>
+  );
+}
+
+function DesktopSubmenu({
+  items,
+  pathname,
+}: {
+  items: NavItem[];
+  pathname: string;
+}) {
+  return (
+    <ul className="min-w-52 rounded-2xl border border-line bg-white/95 p-2 shadow-[0_18px_50px_-20px_rgba(23,24,28,0.28)] backdrop-blur-xl">
+      {items.map((item) => {
+        const active = itemIsActive(pathname, item);
+        const hasChildren = Boolean(item.children?.length);
+        const external = isExternalHref(item.href);
+
+        return (
+          <li key={item.key} className="group/submenu relative">
+            <Link
+              href={item.href}
+              {...categoryLinkTarget(item.href)}
+              aria-haspopup={hasChildren ? "menu" : undefined}
+              className={`flex min-h-10 items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors ${
+                active
+                  ? "bg-accent-soft font-semibold text-accent"
+                  : "text-ink-2 hover:bg-paper hover:text-ink"
+              }`}
+            >
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {external ? (
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                  className="shrink-0 opacity-50"
+                >
+                  <path d="M4.5 2.5h5v5M9.5 2.5l-7 7" />
+                </svg>
+              ) : hasChildren ? (
+                <Chevron className="shrink-0 opacity-50 transition-transform group-hover/submenu:translate-x-0.5" />
+              ) : null}
+            </Link>
+
+            {hasChildren && (
+              <div className="invisible absolute -top-2 left-full z-40 pl-2 opacity-0 transition-[opacity,visibility] duration-150 group-hover/submenu:visible group-hover/submenu:opacity-100 group-focus-within/submenu:visible group-focus-within/submenu:opacity-100">
+                <DesktopSubmenu items={item.children!} pathname={pathname} />
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function MobileNavItem({
+  item,
+  index,
+  level,
+  open,
+  pathname,
+  closeDrawer,
+}: {
+  item: NavItem;
+  index?: number;
+  level: number;
+  open: boolean;
+  pathname: string;
+  closeDrawer: () => void;
+}) {
+  const active = itemIsActive(pathname, item);
+  const hasChildren = Boolean(item.children?.length);
+  const external = isExternalHref(item.href);
+  const [expanded, setExpanded] = useState(active);
+
+  return (
+    <div>
+      <div className="flex items-center gap-1">
+        <Link
+          href={item.href}
+          {...categoryLinkTarget(item.href)}
+          tabIndex={open ? 0 : -1}
+          onClick={closeDrawer}
+          className={`group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
+            active
+              ? "bg-accent-soft text-ink"
+              : "text-ink-2 hover:bg-paper hover:text-ink"
+          }`}
+        >
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
+              active
+                ? "bg-accent text-white"
+                : "bg-paper text-ink-3 group-hover:text-ink-2"
+            }`}
+          >
+            {index === undefined ? "↳" : String(index + 1).padStart(2, "0")}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          {external ? (
+            <span className="text-xs opacity-45">↗</span>
+          ) : !hasChildren ? (
+            <Chevron className="shrink-0 opacity-45" />
+          ) : null}
+        </Link>
+        {hasChildren && (
+          <button
+            type="button"
+            tabIndex={open ? 0 : -1}
+            aria-label={`${expanded ? "收起" : "展开"}${item.label}子分类`}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <Chevron
+              className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+            />
+          </button>
+        )}
+      </div>
+
+      {hasChildren && expanded && (
+        <div
+          className="ml-7 mt-1 space-y-1 border-l border-line pl-2"
+          style={{ marginLeft: `${Math.min(level + 1, 2) * 1.25 + 0.5}rem` }}
+        >
+          {item.children!.map((child) => (
+            <MobileNavItem
+              key={child.key}
+              item={child}
+              level={level + 1}
+              open={open}
+              pathname={pathname}
+              closeDrawer={closeDrawer}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 悬浮胶囊导航：桌面端悬停多级菜单，移动端侧滑树形菜单。 */
 export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -19,12 +199,8 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const closeButtonRef = useRef<HTMLLabelElement>(null);
   const mountedRef = useRef(false);
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
-
   useEffect(() => {
-    // 保留用户在 hydration 完成前通过原生 checkbox 打开的状态，
-    // 避免慢设备上首击菜单没有反应。
+    // 保留用户在 hydration 完成前通过原生 checkbox 打开的状态。
     if (!mountedRef.current) {
       mountedRef.current = true;
       if (toggleRef.current?.checked) {
@@ -34,7 +210,6 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
     }
 
     if (toggleRef.current) toggleRef.current.checked = open;
-
     if (!open) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -57,7 +232,6 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
     };
   }, [open]);
 
-  // 旋转屏幕或连接键盘后进入桌面布局时，自动收起抽屉并恢复页面滚动。
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 1024) setOpen(false);
@@ -75,33 +249,55 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
 
   return (
     <>
-      {/* 桌面端胶囊 */}
       <nav className="hidden items-center gap-1 rounded-full border border-line bg-white/85 p-1.5 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md lg:flex">
         {items.map((item) => {
-          const active = isActive(item.href);
+          const active = itemIsActive(pathname, item);
+          const hasChildren = Boolean(item.children?.length);
+
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`relative rounded-full px-3 py-2 text-sm font-medium transition-colors xl:px-5 ${
-                active ? "text-ink" : "text-ink-2 hover:text-ink"
-              }`}
-            >
-              {active && (
-                <span
-                  className="absolute inset-0 overflow-hidden rounded-full bg-accent-soft"
-                >
-                  <span className="nav-aura absolute inset-0 rounded-full bg-accent/10 blur-[6px]" />
-                  <span className="nav-shine absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
-                </span>
+            <div key={item.key} className="group/nav relative">
+              <Link
+                href={item.href}
+                {...categoryLinkTarget(item.href)}
+                aria-haspopup={hasChildren ? "menu" : undefined}
+                className={`relative flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors xl:px-5 ${
+                  active ? "text-ink" : "text-ink-2 hover:text-ink"
+                }`}
+              >
+                {active && (
+                  <span className="absolute inset-0 overflow-hidden rounded-full bg-accent-soft">
+                    <span className="nav-aura absolute inset-0 rounded-full bg-accent/10 blur-[6px]" />
+                    <span className="nav-shine absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+                  </span>
+                )}
+                <span className="relative z-10">{item.label}</span>
+                {hasChildren && (
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 11 11"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    className="relative z-10 transition-transform group-hover/nav:rotate-180"
+                    aria-hidden="true"
+                  >
+                    <path d="m2.5 4 3 3 3-3" />
+                  </svg>
+                )}
+              </Link>
+
+              {hasChildren && (
+                <div className="invisible absolute left-1/2 top-full z-30 -translate-x-1/2 pt-3 opacity-0 transition-[opacity,visibility] duration-150 group-hover/nav:visible group-hover/nav:opacity-100 group-focus-within/nav:visible group-focus-within/nav:opacity-100">
+                  <DesktopSubmenu items={item.children!} pathname={pathname} />
+                </div>
               )}
-              <span className="relative z-10">{item.label}</span>
-            </Link>
+            </div>
           );
         })}
       </nav>
 
-      {/* 移动端汉堡 */}
       <input
         ref={toggleRef}
         id={toggleId}
@@ -112,10 +308,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         onChange={(event) => {
           const nextOpen = event.currentTarget.checked;
           setOpen(nextOpen);
-
-          if (!nextOpen) {
-            requestAnimationFrame(() => triggerRef.current?.focus());
-          }
+          if (!nextOpen) requestAnimationFrame(() => triggerRef.current?.focus());
         }}
       />
 
@@ -140,7 +333,6 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         </svg>
       </label>
 
-      {/* 移动端左侧侧滑抽屉 */}
       <div
         className="mobile-drawer-shell pointer-events-none fixed inset-0 z-[70] lg:hidden"
         aria-hidden={!open}
@@ -195,48 +387,17 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
 
           <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="移动端导航">
             <div className="space-y-1.5">
-              {items.map((item, index) => {
-                const active = isActive(item.href);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    tabIndex={open ? 0 : -1}
-                    onClick={closeDrawer}
-                    className={`group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-accent-soft text-ink"
-                        : "text-ink-2 hover:bg-paper hover:text-ink"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
-                        active
-                          ? "bg-accent text-white"
-                          : "bg-paper text-ink-3 group-hover:text-ink-2"
-                      }`}
-                    >
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="shrink-0 opacity-45"
-                      aria-hidden="true"
-                    >
-                      <path d="m5 3.5 3.5 3.5L5 10.5" />
-                    </svg>
-                  </Link>
-                );
-              })}
+              {items.map((item, index) => (
+                <MobileNavItem
+                  key={item.key}
+                  item={item}
+                  index={index}
+                  level={0}
+                  open={open}
+                  pathname={pathname}
+                  closeDrawer={closeDrawer}
+                />
+              ))}
             </div>
           </nav>
 

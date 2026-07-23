@@ -86,6 +86,7 @@ export default function RichTextEditor({
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastInitialContent = useRef(initialContent);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -128,6 +129,19 @@ export default function RichTextEditor({
     },
   });
 
+  // 在后台连续切换不同教程时，同步编辑器内容，避免残留上一篇正文。
+  useEffect(() => {
+    if (!editor) return;
+    if (
+      initialContent !== lastInitialContent.current &&
+      initialContent !== editor.getHTML()
+    ) {
+      editor.commands.setContent(initialContent, { emitUpdate: false });
+      setHtml(initialContent);
+    }
+    lastInitialContent.current = initialContent;
+  }, [editor, initialContent]);
+
   // 拖拽经过时高亮编辑区
   useEffect(() => {
     const el = document.querySelector(".tiptap-shell");
@@ -161,6 +175,7 @@ export default function RichTextEditor({
     return (
       <div className="rounded-2xl border border-line bg-white">
         <div className="h-[460px] animate-pulse rounded-2xl bg-paper" />
+        <input type="hidden" name={name} value={html} />
       </div>
     );
   }

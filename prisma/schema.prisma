@@ -15,8 +15,14 @@ model Category {
   icon        String?
   color       String     @default("#6366f1")
   order       Int        @default(0)
+  linkUrl     String?
+  parentId    Int?
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryHierarchy")
   tutorials   Tutorial[]
   createdAt   DateTime   @default(now())
+
+  @@index([parentId, order])
 }
 
 model Tutorial {
