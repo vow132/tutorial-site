@@ -119,69 +119,112 @@ function MobileNavItem({
   const active = itemIsActive(pathname, item);
   const hasChildren = Boolean(item.children?.length);
   const external = isExternalHref(item.href);
-  const [expanded, setExpanded] = useState(active);
+  const submenuToggleId = useId();
 
   return (
     <div>
+      {hasChildren && (
+        <input
+          id={submenuToggleId}
+          type="checkbox"
+          defaultChecked={active}
+          className="peer sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+      )}
       <div className="flex items-center gap-1">
-        <Link
-          href={item.href}
-          {...categoryLinkTarget(item.href)}
-          tabIndex={open ? 0 : -1}
-          onClick={closeDrawer}
-          className={`group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
-            active
-              ? "bg-accent-soft text-ink"
-              : "text-ink-2 hover:bg-paper hover:text-ink"
-          }`}
-        >
-          <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
+        {hasChildren ? (
+          <label
+            htmlFor={submenuToggleId}
+            role="button"
+            tabIndex={open ? 0 : -1}
+            aria-label={`展开或收起${item.label}子分类`}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                document.getElementById(submenuToggleId)?.click();
+              }
+            }}
+            className={`group flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium transition-colors peer-checked:bg-accent-soft ${
               active
-                ? "bg-accent text-white"
-                : "bg-paper text-ink-3 group-hover:text-ink-2"
+                ? "bg-accent-soft text-ink"
+                : "text-ink-2 hover:bg-paper hover:text-ink"
             }`}
           >
-            {index === undefined ? "↳" : String(index + 1).padStart(2, "0")}
-          </span>
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          {external ? (
-            <span className="text-xs opacity-45">↗</span>
-          ) : !hasChildren ? (
-            <Chevron className="shrink-0 opacity-45" />
-          ) : null}
-        </Link>
-        {hasChildren && (
-          <button
-            type="button"
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
+                active
+                  ? "bg-accent text-white"
+                  : "bg-paper text-ink-3 group-hover:text-ink-2"
+              }`}
+            >
+              {index === undefined ? "↳" : String(index + 1).padStart(2, "0")}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] text-ink-3">
+              {item.children!.length}
+            </span>
+            <Chevron className="shrink-0 opacity-55" />
+          </label>
+        ) : (
+          <Link
+            href={item.href}
+            {...categoryLinkTarget(item.href)}
             tabIndex={open ? 0 : -1}
-            aria-label={`${expanded ? "收起" : "展开"}${item.label}子分类`}
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+            onClick={closeDrawer}
+            className={`group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium transition-colors ${
+              active
+                ? "bg-accent-soft text-ink"
+                : "text-ink-2 hover:bg-paper hover:text-ink"
+            }`}
           >
-            <Chevron
-              className={`transition-transform ${expanded ? "rotate-90" : ""}`}
-            />
-          </button>
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold ${
+                active
+                  ? "bg-accent text-white"
+                  : "bg-paper text-ink-3 group-hover:text-ink-2"
+              }`}
+            >
+              {index === undefined ? "↳" : String(index + 1).padStart(2, "0")}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {external ? (
+              <span className="text-xs opacity-45">↗</span>
+            ) : (
+              <Chevron className="shrink-0 opacity-45" />
+            )}
+          </Link>
         )}
       </div>
 
-      {hasChildren && expanded && (
-        <div
-          className="ml-7 mt-1 space-y-1 border-l border-line pl-2"
-          style={{ marginLeft: `${Math.min(level + 1, 2) * 1.25 + 0.5}rem` }}
-        >
-          {item.children!.map((child) => (
-            <MobileNavItem
-              key={child.key}
-              item={child}
-              level={level + 1}
-              open={open}
-              pathname={pathname}
-              closeDrawer={closeDrawer}
-            />
-          ))}
+      {hasChildren && (
+        <div className="hidden peer-checked:block">
+          <div
+            className="mt-1 space-y-1 border-l border-line pl-2"
+            style={{ marginLeft: `${Math.min(level + 1, 2) * 1.25 + 0.5}rem` }}
+          >
+            <Link
+              href={item.href}
+              {...categoryLinkTarget(item.href)}
+              tabIndex={open ? 0 : -1}
+              onClick={closeDrawer}
+              className="flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
+            >
+              查看此分类
+              {external && <span aria-hidden="true">↗</span>}
+            </Link>
+            {item.children!.map((child) => (
+              <MobileNavItem
+                key={child.key}
+                item={child}
+                level={level + 1}
+                open={open}
+                pathname={pathname}
+                closeDrawer={closeDrawer}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

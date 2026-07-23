@@ -173,10 +173,14 @@ export default function RichTextEditor({
 
   if (!editor) {
     return (
-      <div className="rounded-2xl border border-line bg-white">
-        <div className="h-[460px] animate-pulse rounded-2xl bg-paper" />
-        <input type="hidden" name={name} value={html} />
-      </div>
+      <textarea
+        name={name}
+        defaultValue={html}
+        required
+        aria-label="正文"
+        placeholder="开始撰写正文…"
+        className="min-h-[460px] w-full resize-y rounded-2xl border border-line bg-white px-5 py-4 font-mono text-sm leading-7 text-ink outline-none transition-colors focus:border-accent"
+      />
     );
   }
 
@@ -200,7 +204,7 @@ export default function RichTextEditor({
       }`}
     >
       {/* 工具栏 */}
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-white/95 px-2 py-1.5 backdrop-blur">
+      <div className="relative z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-white/95 px-2 py-1.5 backdrop-blur md:sticky md:top-4">
         <button
           type="button"
           title="撤销"
