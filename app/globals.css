@@ -161,6 +161,32 @@ body:has(.mobile-drawer-toggle:checked) {
   overflow: hidden;
 }
 
+/* ---------- 后台移动端抽屉 ---------- */
+.admin-mobile-drawer-shell {
+  visibility: hidden;
+}
+.admin-mobile-drawer-panel {
+  transform: translate3d(-100%, 0, 0);
+  will-change: transform;
+}
+.admin-mobile-drawer-toggle:checked ~ .admin-mobile-drawer-shell {
+  visibility: visible;
+  pointer-events: auto;
+}
+.admin-mobile-drawer-toggle:checked
+  ~ .admin-mobile-drawer-shell
+  .admin-mobile-drawer-backdrop {
+  opacity: 1;
+}
+.admin-mobile-drawer-toggle:checked
+  ~ .admin-mobile-drawer-shell
+  .admin-mobile-drawer-panel {
+  transform: translate3d(0, 0, 0);
+}
+body:has(.admin-mobile-drawer-toggle:checked) {
+  overflow: hidden;
+}
+
 /* ---------- 无 JS 也可见的渐显 ---------- */
 @keyframes reveal-in {
   from { opacity: 0; transform: translateY(var(--reveal-y, 22px)); }
