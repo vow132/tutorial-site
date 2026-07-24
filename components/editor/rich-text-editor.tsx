@@ -5,6 +5,8 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extensions";
 
 async function uploadImage(file: File): Promise<string> {
@@ -78,6 +80,20 @@ function Divider() {
   return <span className="mx-1 h-5 w-px bg-line" />;
 }
 
+// 正文可选文字颜色（null 表示恢复默认色）
+const TEXT_COLORS: { label: string; value: string | null }[] = [
+  { label: "默认", value: null },
+  { label: "红色", value: "#e5484d" },
+  { label: "橙色", value: "#f76b15" },
+  { label: "黄色", value: "#eab308" },
+  { label: "绿色", value: "#30a46c" },
+  { label: "青色", value: "#12a594" },
+  { label: "蓝色", value: "#3b82f6" },
+  { label: "紫色", value: "#8b5cf6" },
+  { label: "粉色", value: "#e93d82" },
+  { label: "灰色", value: "#8b8d98" },
+];
+
 export default function RichTextEditor({
   name,
   initialContent = "",
@@ -87,8 +103,10 @@ export default function RichTextEditor({
 }) {
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
+  const colorRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -98,6 +116,8 @@ export default function RichTextEditor({
         link: { openOnClick: false },
       }),
       Underline,
+      TextStyle,
+      Color,
       Image.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({
         placeholder: "开始撰写正文… 支持直接拖拽或粘贴图片",
@@ -167,6 +187,18 @@ export default function RichTextEditor({
     };
   }, []);
 
+  // 点击调色板外部时关闭
+  useEffect(() => {
+    if (!colorOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (colorRef.current && !colorRef.current.contains(e.target as Node)) {
+        setColorOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [colorOpen]);
+
   if (!editor) {
     return (
       <div className="rounded-2xl border border-line bg-white">
@@ -188,6 +220,9 @@ export default function RichTextEditor({
   };
 
   const pickImage = () => fileInputRef.current?.click();
+
+  const currentColor =
+    (editor.getAttributes("textStyle").color as string | undefined) ?? null;
 
   return (
     <div
@@ -306,6 +341,67 @@ export default function RichTextEditor({
         >
           代码块
         </button>
+        {/* 文字颜色调色板 */}
+        <div ref={colorRef} className="relative">
+          <button
+            type="button"
+            title="文字颜色"
+            onClick={() => setColorOpen((v) => !v)}
+            className={btn(colorOpen || !!currentColor)}
+          >
+            <span
+              className="h-4 w-4 rounded-full border border-line"
+              style={{ backgroundColor: currentColor ?? "currentColor" }}
+            />
+          </button>
+          {colorOpen && (
+            <div className="absolute left-0 top-full z-20 mt-1 w-max rounded-xl border border-line bg-white p-2 shadow-lg">
+              <div className="grid grid-cols-5 gap-1">
+                {TEXT_COLORS.map((c) => {
+                  const active =
+                    c.value === null ? !currentColor : currentColor === c.value;
+                  return (
+                    <button
+                      key={c.label}
+                      type="button"
+                      title={c.label}
+                      onClick={() => {
+                        const chain = editor.chain().focus();
+                        if (c.value === null) chain.unsetColor().run();
+                        else chain.setColor(c.value).run();
+                        setColorOpen(false);
+                      }}
+                      className={`flex h-7 w-7 items-center justify-center rounded-lg border transition-transform hover:scale-110 ${
+                        active ? "border-accent ring-2 ring-accent/30" : "border-line"
+                      }`}
+                      style={c.value ? { backgroundColor: c.value } : undefined}
+                    >
+                      {c.value === null && (
+                        <span className="text-xs text-ink-3">✕</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* 自定义取色器 */}
+              <label className="mt-2 flex cursor-pointer items-center gap-2 border-t border-line pt-2 text-xs text-ink-2">
+                <span
+                  className="h-6 w-6 shrink-0 rounded-lg border border-line"
+                  style={{ backgroundColor: currentColor ?? "#000000" }}
+                />
+                <span>自定义颜色</span>
+                <input
+                  type="color"
+                  value={currentColor ?? "#000000"}
+                  onChange={(e) =>
+                    editor.chain().focus().setColor(e.target.value).run()
+                  }
+                  className="ml-auto h-6 w-8 cursor-pointer rounded border border-line bg-transparent p-0"
+                />
+              </label>
+            </div>
+          )}
+        </div>
         <Divider />
         <button
           type="button"
