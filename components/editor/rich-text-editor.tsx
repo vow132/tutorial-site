@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
-import Underline from "@tiptap/extension-underline";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extensions";
@@ -115,7 +114,6 @@ export default function RichTextEditor({
         heading: { levels: [2, 3] },
         link: { openOnClick: false },
       }),
-      Underline,
       TextStyle,
       Color,
       Image.configure({ inline: false, allowBase64: false }),
@@ -223,6 +221,21 @@ export default function RichTextEditor({
 
   const currentColor =
     (editor.getAttributes("textStyle").color as string | undefined) ?? null;
+  const toRgb = (c: string) => {
+    const div = document.createElement("div");
+    div.style.color = c;
+    document.body!.appendChild(div);
+    const rgb = getComputedStyle(div).color;
+    document.body!.removeChild(div);
+    return rgb;
+  };
+  const rgbToHex = (rgb: string) => {
+    const m = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (!m) return rgb;
+    return `#${[m[1], m[2], m[3]].map(x => parseInt(x).toString(16).padStart(2, "0")).join("")}`;
+  };
+  const normalizedCurrent = currentColor ? toRgb(currentColor) : null;
+  const hexCurrent = currentColor ? rgbToHex(normalizedCurrent!) : null;
 
   return (
     <div
@@ -351,7 +364,7 @@ export default function RichTextEditor({
           >
             <span
               className="h-4 w-4 rounded-full border border-line"
-              style={{ backgroundColor: currentColor ?? "currentColor" }}
+              style={{ backgroundColor: hexCurrent ?? "currentColor" }}
             />
           </button>
           {colorOpen && (
@@ -359,7 +372,7 @@ export default function RichTextEditor({
               <div className="grid grid-cols-5 gap-1">
                 {TEXT_COLORS.map((c) => {
                   const active =
-                    c.value === null ? !currentColor : currentColor === c.value;
+                    c.value === null ? !currentColor : normalizedCurrent === toRgb(c.value);
                   return (
                     <button
                       key={c.label}
@@ -387,12 +400,12 @@ export default function RichTextEditor({
               <label className="mt-2 flex cursor-pointer items-center gap-2 border-t border-line pt-2 text-xs text-ink-2">
                 <span
                   className="h-6 w-6 shrink-0 rounded-lg border border-line"
-                  style={{ backgroundColor: currentColor ?? "#000000" }}
+                  style={{ backgroundColor: hexCurrent ?? "#000000" }}
                 />
                 <span>自定义颜色</span>
                 <input
                   type="color"
-                  value={currentColor ?? "#000000"}
+                  value={hexCurrent ?? "#000000"}
                   onChange={(e) =>
                     editor.chain().focus().setColor(e.target.value).run()
                   }

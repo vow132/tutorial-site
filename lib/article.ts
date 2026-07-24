@@ -25,7 +25,7 @@ export function processArticle(html: string): {
   let i = 0;
 
   let out = html.replace(
-    /<h([23])>([\s\S]*?)<\/h\1>/g,
+    /<h([23])(?:\s[^>]*)?>([\s\S]*?)<\/h\1>/g,
     (_m, level: string, inner: string) => {
       const text = inner.replace(/<[^>]+>/g, "").trim();
       const id = `h-${i++}`;

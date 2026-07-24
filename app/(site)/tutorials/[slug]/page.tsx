@@ -33,8 +33,8 @@ export default async function TutorialDetailPage({
   });
   if (!tutorial || !tutorial.published) notFound();
 
-  // 阅读量 +1（异步执行，不阻塞渲染）
-  prisma.tutorial
+  // 阅读量 +1（不阻塞渲染，与下面查询并行）
+  const viewUpdate = prisma.tutorial
     .update({ where: { id: tutorial.id }, data: { views: { increment: 1 } } })
     .catch(() => {});
 
@@ -59,6 +59,7 @@ export default async function TutorialDetailPage({
       select: { title: true, slug: true },
     }),
   ]);
+  await viewUpdate;
 
   const { html, toc } = processArticle(tutorial.content);
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;

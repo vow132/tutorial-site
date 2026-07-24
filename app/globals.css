@@ -263,7 +263,7 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .article-body ol { list-style: decimal; }
 .article-body li { margin: 0.4em 0; }
 .article-body a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
-.article-body strong { color: #17181c; font-weight: 650; }
+.article-body strong { font-weight: 650; }
 .article-body code {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   font-size: 0.875em;
