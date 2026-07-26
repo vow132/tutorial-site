@@ -20,10 +20,11 @@ export default async function SiteHeader() {
     children: category.children.map(toNavItem),
   });
 
+  // 后台有多少一级分类就全部输出，桌面端由胶囊导航分页展示。
   const items: NavItem[] = [
     { key: "home", href: "/", label: "首页" },
     { key: "tutorials", href: "/tutorials", label: "全部教程" },
-    ...categories.slice(0, 4).map(toNavItem),
+    ...categories.map(toNavItem),
   ];
 
   return (

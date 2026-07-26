@@ -231,6 +231,227 @@ function MobileNavItem({
   );
 }
 
+function DesktopNavItem({
+  item,
+  pathname,
+}: {
+  item: NavItem;
+  pathname: string;
+}) {
+  const active = itemIsActive(pathname, item);
+  const hasChildren = Boolean(item.children?.length);
+
+  return (
+    <div className="group/nav relative">
+      <Link
+        href={item.href}
+        {...categoryLinkTarget(item.href)}
+        aria-haspopup={hasChildren ? "menu" : undefined}
+        className={`relative flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors xl:px-5 ${
+          active ? "text-ink" : "text-ink-2 hover:text-ink"
+        }`}
+      >
+        {active && (
+          <span className="absolute inset-0 overflow-hidden rounded-full bg-accent-soft">
+            <span className="nav-aura absolute inset-0 rounded-full bg-accent/10 blur-[6px]" />
+            <span className="nav-shine absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+          </span>
+        )}
+        <span className="relative z-10 whitespace-nowrap">{item.label}</span>
+        {hasChildren && (
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 11 11"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="relative z-10 transition-transform group-hover/nav:rotate-180"
+            aria-hidden="true"
+          >
+            <path d="m2.5 4 3 3 3-3" />
+          </svg>
+        )}
+      </Link>
+
+      {hasChildren && (
+        <div className="invisible absolute left-1/2 top-full z-30 -translate-x-1/2 pt-3 opacity-0 transition-[opacity,visibility] duration-150 group-hover/nav:visible group-hover/nav:opacity-100 group-focus-within/nav:visible group-focus-within/nav:opacity-100">
+          <DesktopSubmenu items={item.children!} pathname={pathname} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DesktopNavArrow({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: "prev" | "next";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={direction === "prev" ? "上一组分类" : "下一组分类"}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className={direction === "prev" ? "rotate-180" : ""}
+      >
+        <path d="m4 2.5 3.5 3.5L4 9.5" />
+      </svg>
+    </button>
+  );
+}
+
+/** 桌面端可视分类数量：窄屏少、宽屏多，随视口自适应。 */
+function useDesktopPageSize() {
+  const [size, setSize] = useState(4);
+
+  useEffect(() => {
+    const compute = () => {
+      const width = window.innerWidth;
+      if (width >= 1536) setSize(6);
+      else if (width >= 1280) setSize(5);
+      else setSize(3);
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, []);
+
+  return size;
+}
+
+/**
+ * 把分类均分成每页最多 pageSize 项。
+ *
+ * 直接 slice 会让最后一页只剩一两项（8 项 / 每页 5 → 5+3），胶囊宽度骤缩、
+ * 而且点一次就到底变灰，像是「按钮没反应」。均分后是 4+4，翻页手感稳定。
+ */
+function balancedPages(items: NavItem[], pageSize: number): NavItem[][] {
+  if (items.length === 0) return [[]];
+  if (items.length <= pageSize) return [items];
+
+  const pageCount = Math.ceil(items.length / pageSize);
+  const base = Math.floor(items.length / pageCount);
+  const remainder = items.length % pageCount;
+  const pages: NavItem[][] = [];
+
+  let cursor = 0;
+  for (let index = 0; index < pageCount; index += 1) {
+    const size = base + (index < remainder ? 1 : 0);
+    pages.push(items.slice(cursor, cursor + size));
+    cursor += size;
+  }
+  return pages;
+}
+
+/** 桌面胶囊导航：固定「首页 / 全部教程」，其余分类分页并用左右箭头点击切换。 */
+function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  const pinned = items.filter(
+    (item) => item.key === "home" || item.key === "tutorials",
+  );
+  const pageable = items.filter(
+    (item) => item.key !== "home" && item.key !== "tutorials",
+  );
+  const pageSize = useDesktopPageSize();
+  const pages = balancedPages(pageable, pageSize);
+  const [page, setPage] = useState(0);
+
+  // 每次点击箭头就换一次 seq，让整组分类重新挂载并播放滑入动画；
+  // dir 为 null 时（首次渲染、自动跟随当前分类）不播放，避免无谓闪动。
+  const [slide, setSlide] = useState<{ dir: "prev" | "next" | null; seq: number }>(
+    { dir: null, seq: 0 },
+  );
+
+  const activeIndex = pages.findIndex((group) =>
+    group.some((item) => itemIsActive(pathname, item)),
+  );
+
+  /*
+   * 路由或可视数量变化时同步页码：优先跟到当前分类所在页，否则把页码收回合法范围。
+   *
+   * 用渲染期调整 state 而非 useEffect —— 页码若停留在越界值上，下一次点箭头会
+   * 从越界值开始加减，算出的目标页和当前显示的页相同，那一下点击就完全没反应。
+   */
+  const syncKey = `${pathname}|${pages.length}`;
+  const [syncedKey, setSyncedKey] = useState(syncKey);
+  if (syncKey !== syncedKey) {
+    setSyncedKey(syncKey);
+    const next =
+      activeIndex >= 0 ? activeIndex : Math.min(page, pages.length - 1);
+    if (next !== page) setPage(next);
+  }
+
+  // 始终以收进范围后的页码为准，避免越界值影响显示与翻页计算。
+  const current = Math.min(Math.max(page, 0), pages.length - 1);
+
+  const go = (delta: 1 | -1) => {
+    const target = Math.min(pages.length - 1, Math.max(0, current + delta));
+    if (target === current) return;
+    setPage(target);
+    setSlide((previous) => ({
+      dir: delta > 0 ? "next" : "prev",
+      seq: previous.seq + 1,
+    }));
+  };
+
+  const showArrows = pages.length > 1;
+  const visible = pages[current] ?? [];
+
+  return (
+    <nav className="hidden items-center gap-1 rounded-full border border-line bg-white/85 p-1.5 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md lg:flex">
+      {pinned.map((item) => (
+        <DesktopNavItem key={item.key} item={item} pathname={pathname} />
+      ))}
+      {showArrows && (
+        <DesktopNavArrow
+          direction="prev"
+          disabled={current === 0}
+          onClick={() => go(-1)}
+        />
+      )}
+      <div
+        key={slide.seq}
+        className={`flex items-center gap-1 ${
+          slide.dir === "next"
+            ? "nav-page-next"
+            : slide.dir === "prev"
+              ? "nav-page-prev"
+              : ""
+        }`}
+      >
+        {visible.map((item) => (
+          <DesktopNavItem key={item.key} item={item} pathname={pathname} />
+        ))}
+      </div>
+      {showArrows && (
+        <DesktopNavArrow
+          direction="next"
+          disabled={current >= pages.length - 1}
+          onClick={() => go(1)}
+        />
+      )}
+    </nav>
+  );
+}
+
 /** 悬浮胶囊导航：桌面端悬停多级菜单，移动端侧滑树形菜单。 */
 export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
@@ -292,54 +513,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
 
   return (
     <>
-      <nav className="hidden items-center gap-1 rounded-full border border-line bg-white/85 p-1.5 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md lg:flex">
-        {items.map((item) => {
-          const active = itemIsActive(pathname, item);
-          const hasChildren = Boolean(item.children?.length);
-
-          return (
-            <div key={item.key} className="group/nav relative">
-              <Link
-                href={item.href}
-                {...categoryLinkTarget(item.href)}
-                aria-haspopup={hasChildren ? "menu" : undefined}
-                className={`relative flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium transition-colors xl:px-5 ${
-                  active ? "text-ink" : "text-ink-2 hover:text-ink"
-                }`}
-              >
-                {active && (
-                  <span className="absolute inset-0 overflow-hidden rounded-full bg-accent-soft">
-                    <span className="nav-aura absolute inset-0 rounded-full bg-accent/10 blur-[6px]" />
-                    <span className="nav-shine absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent" />
-                  </span>
-                )}
-                <span className="relative z-10">{item.label}</span>
-                {hasChildren && (
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 11 11"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    className="relative z-10 transition-transform group-hover/nav:rotate-180"
-                    aria-hidden="true"
-                  >
-                    <path d="m2.5 4 3 3 3-3" />
-                  </svg>
-                )}
-              </Link>
-
-              {hasChildren && (
-                <div className="invisible absolute left-1/2 top-full z-30 -translate-x-1/2 pt-3 opacity-0 transition-[opacity,visibility] duration-150 group-hover/nav:visible group-hover/nav:opacity-100 group-focus-within/nav:visible group-focus-within/nav:opacity-100">
-                  <DesktopSubmenu items={item.children!} pathname={pathname} />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
+      <DesktopNav items={items} pathname={pathname} />
 
       <input
         ref={toggleRef}

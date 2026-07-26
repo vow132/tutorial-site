@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import {
   buildCategoryTree,
   categoryLinkTarget,
   flattenCategoryTree,
-  getCategoryDescendantIds,
   getCategoryHref,
 } from "@/lib/categories";
 import TutorialCard from "@/components/tutorial-card";
@@ -15,13 +14,19 @@ import Reveal from "@/components/reveal";
 
 const PAGE_SIZE = 9;
 
+/** 取路径最后一段作为分类 slug：兼容用户填写的 /categories/父/子 形式。 */
+function resolveSlug(segments: string[]): string {
+  const last = segments[segments.length - 1] ?? "";
+  return decodeURIComponent(last);
+}
+
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string[] }>;
 }): Promise<Metadata> {
-  const { slug: rawSlug } = await params;
-  const slug = decodeURIComponent(rawSlug);
+  const { slug: segments } = await params;
+  const slug = resolveSlug(segments);
   const category = await prisma.category.findUnique({ where: { slug } });
   return { title: category ? `${category.name}教程` : "分类" };
 }
@@ -30,13 +35,19 @@ export default async function CategoryPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string[] }>;
   searchParams: Promise<{ page?: string }>;
 }) {
-  const { slug: rawSlug } = await params;
-  const slug = decodeURIComponent(rawSlug);
+  const { slug: segments } = await params;
+  const slug = resolveSlug(segments);
   const { page: pageStr } = await searchParams;
   const page = Math.max(1, Number(pageStr) || 1);
+
+  // 用户可能把链接填成 /categories/父/子；统一收敛到规范的单段地址。
+  if (segments.length > 1) {
+    const query = pageStr ? `?page=${encodeURIComponent(pageStr)}` : "";
+    redirect(`/categories/${encodeURIComponent(slug)}${query}`);
+  }
 
   const allCategories = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
@@ -73,13 +84,13 @@ export default async function CategoryPage({
     parentId = parent.parentId;
   }
 
-  const categoryIds = [category.id, ...getCategoryDescendantIds(categoryNode)];
+  // 教程只在其所属分类展示，父分类不再聚合子分类下的教程。
   const [total, tutorials] = await Promise.all([
     prisma.tutorial.count({
-      where: { published: true, categoryId: { in: categoryIds } },
+      where: { published: true, categoryId: category.id },
     }),
     prisma.tutorial.findMany({
-      where: { published: true, categoryId: { in: categoryIds } },
+      where: { published: true, categoryId: category.id },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -96,9 +107,9 @@ export default async function CategoryPage({
   ]);
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  // 子分类卡片只显示该分类自身的教程数，不再累加其后代。
   const countTutorials = (node: typeof categoryNode): number =>
-    node._count.tutorials +
-    node.children.reduce((sum, child) => sum + countTutorials(child), 0);
+    node._count.tutorials;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
@@ -181,7 +192,7 @@ export default async function CategoryPage({
 
       {tutorials.length === 0 ? (
         <div className="mt-12 rounded-3xl border border-dashed border-line bg-white/60 py-20 text-center text-ink-3">
-          该分类及子分类下暂无教程
+          该分类下暂无教程
         </div>
       ) : (
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

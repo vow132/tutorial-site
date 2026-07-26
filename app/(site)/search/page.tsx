@@ -7,11 +7,19 @@ import Reveal from "@/components/reveal";
 
 export const metadata: Metadata = { title: "搜索" };
 
+/**
+ * 转义正则元字符。
+ *
+ * 字符类里 `]` 必须写成 `\]`，否则字符类会提前闭合、转义整体失效——
+ * 搜索 `c++`、`(from`、`cache)` 这类关键词就会让 new RegExp 抛错，整页 500。
+ */
+function escapeRegExp(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function Highlight({ text, keyword }: { text: string; keyword: string }) {
   if (!keyword) return <>{text}</>;
-  const parts = text.split(
-    new RegExp(`(${keyword.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")})`, "gi")
-  );
+  const parts = text.split(new RegExp(`(${escapeRegExp(keyword)})`, "gi"));
   return (
     <>
       {parts.map((part, i) =>

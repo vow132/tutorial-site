@@ -33,14 +33,10 @@ export default async function HomePage() {
     prisma.tutorial.aggregate({ _sum: { views: true } }),
   ]);
 
+  // 教程只归属自身分类，卡片仅显示该分类自身的教程数。
   const countCategoryTutorials = (
     category: (typeof categories)[number],
-  ): number =>
-    category._count.tutorials +
-    category.children.reduce(
-      (total, child) => total + countCategoryTutorials(child),
-      0,
-    );
+  ): number => category._count.tutorials;
 
   const stats = [
     { label: "精选教程", value: tutorialCount, unit: "篇", color: "#6366f1" },

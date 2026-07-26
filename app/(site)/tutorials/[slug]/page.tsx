@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { processArticle } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
-import Toc from "@/components/toc";
+import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
 
 export async function generateMetadata({
@@ -119,6 +119,9 @@ export default async function TutorialDetailPage({
               </div>
             </header>
           </Reveal>
+
+          {/* 移动端本页目录（可自行开关） */}
+          <MobileToc items={toc} />
 
           {/* 正文 */}
           <Reveal delay={0.1}>

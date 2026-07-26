@@ -133,6 +133,24 @@ body {
   animation: shine-sweep 3.4s ease-in-out infinite;
 }
 
+/* ---------- 桌面导航分类翻页：点一次滑一页 ---------- */
+/* 不能给胶囊加 overflow:hidden，否则会裁掉二级下拉菜单，*/
+/* 所以用「滑入 + 渐显」表达方向，而非真正的横向裁切滚动。 */
+@keyframes nav-page-slide-next {
+  from { opacity: 0; transform: translate3d(22px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes nav-page-slide-prev {
+  from { opacity: 0; transform: translate3d(-22px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.nav-page-next {
+  animation: nav-page-slide-next 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.nav-page-prev {
+  animation: nav-page-slide-prev 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* ---------- 移动端抽屉：原生 checkbox 兜底 ---------- */
 /*
  * 页面客户端代码尚未完成加载时，label 也能立即切换抽屉；
@@ -159,6 +177,27 @@ body {
 }
 body:has(.mobile-drawer-toggle:checked) {
   overflow: hidden;
+}
+
+/* ---------- 移动端「本页目录」折叠卡片 ---------- */
+/* 仅移动端出现，由原生 checkbox 驱动，未 hydration 也能开关。 */
+.mobile-toc-toggle:focus-visible + .mobile-toc-trigger {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.mobile-toc-toggle:checked + .mobile-toc-trigger {
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mobile-toc-toggle:checked + .mobile-toc-trigger .mobile-toc-caret {
+  transform: rotate(180deg);
+}
+.mobile-toc-toggle:checked + .mobile-toc-trigger .mobile-toc-current {
+  display: none;
+}
+.mobile-toc-toggle:checked ~ .mobile-toc-panel {
+  display: block;
 }
 
 /* ---------- 后台移动端抽屉 ---------- */
@@ -201,7 +240,9 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   .mascot-float,
   .mascot-eyes,
   .nav-aura,
-  .nav-shine {
+  .nav-shine,
+  .nav-page-next,
+  .nav-page-prev {
     animation: none !important;
   }
 }
