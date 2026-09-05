@@ -33,7 +33,7 @@ export default async function AdminCategoriesPage() {
       <h1 className="text-2xl font-bold text-ink">分类管理</h1>
       <p className="mt-1 text-sm text-ink-3">共 {categories.length} 个分类</p>
 
-      <div className="mt-6 rounded-3xl border border-line bg-white p-6">
+      <div className="mt-6 rounded-3xl border border-line bg-surface p-6">
         <h2 className="text-sm font-bold text-ink">新建分类</h2>
         <p className="mt-1 text-xs text-ink-3">
           最多三级；选择父分类即可创建二级或三级分类。

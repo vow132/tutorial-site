@@ -48,7 +48,7 @@ export default function TutorialCard({
         </p>
         <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-ink-3">
           <span className="flex items-center gap-1">
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
               <path d="M1 7s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" />
               <circle cx="7" cy="7" r="1.8" />
             </svg>
@@ -56,7 +56,7 @@ export default function TutorialCard({
           </span>
           <span className="flex items-center gap-1 font-medium text-ink-2">
             开始阅读
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
               <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
             </svg>
           </span>

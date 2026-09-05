@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { stripHtml } from "@/lib/article";
 import GlowCard from "@/components/glow-card";
+import Mascot from "@/components/mascot";
 import Reveal from "@/components/reveal";
 
 export const metadata: Metadata = { title: "搜索" };
@@ -24,7 +25,7 @@ function Highlight({ text, keyword }: { text: string; keyword: string }) {
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === keyword.toLowerCase() ? (
-          <mark key={i} className="rounded bg-yellow-100 px-0.5 text-ink">
+          <mark key={i} className="rounded bg-accent-soft px-0.5 text-accent">
             {part}
           </mark>
         ) : (
@@ -54,7 +55,7 @@ export default async function SearchPage({
           ],
         },
         orderBy: { views: "desc" },
-        take: 50,
+        take: 20,
         select: {
           id: true,
           title: true,
@@ -70,10 +71,7 @@ export default async function SearchPage({
   return (
     <div className="mx-auto max-w-4xl px-4 pt-14">
       <Reveal>
-        <span className="text-xs font-semibold uppercase tracking-widest text-accent">
-          Search
-        </span>
-        <h1 className="mt-2 text-3xl font-extrabold text-ink md:text-4xl">
+        <h1 className="text-3xl font-extrabold text-ink md:text-4xl">
           {query ? (
             <>
               「<span className="text-accent">{query}</span>」的搜索结果
@@ -91,7 +89,7 @@ export default async function SearchPage({
       <form
         action="/search"
         method="get"
-        className="mt-6 flex items-center gap-2 rounded-2xl border border-line bg-white/85 p-2 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] sm:hidden"
+        className="mt-6 flex items-center gap-2 rounded-2xl border border-line bg-surface/85 p-2 shadow-capsule sm:hidden"
       >
         <label htmlFor="mobile-search-query" className="sr-only">
           搜索教程
@@ -102,7 +100,7 @@ export default async function SearchPage({
           viewBox="0 0 17 17"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.7"
+          strokeWidth="1.6"
           strokeLinecap="round"
           className="ml-2 shrink-0 text-ink-3"
           aria-hidden="true"
@@ -118,20 +116,20 @@ export default async function SearchPage({
           enterKeyHint="search"
           defaultValue={query}
           placeholder="搜索教程…"
-          className="min-w-0 flex-1 bg-transparent px-1.5 py-2 text-sm text-ink outline-none placeholder:text-ink-3"
+          className="min-w-0 flex-1 bg-transparent px-1.5 py-2 text-sm text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 rounded-lg placeholder:text-ink-3"
         />
         <button
           type="submit"
-          className="h-9 shrink-0 rounded-xl bg-ink px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="h-9 shrink-0 rounded-xl bg-btn px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           搜索
         </button>
       </form>
 
       {query && results.length === 0 && (
-        <div className="mt-16 rounded-3xl border border-dashed border-line bg-white/60 py-20 text-center">
-          <p className="text-4xl">🔍</p>
-          <p className="mt-4 text-ink-2">没有找到相关教程，换个关键词试试</p>
+        <div className="mt-16 flex flex-col items-center rounded-3xl border border-dashed border-line bg-surface/60 py-16 text-center">
+          <Mascot />
+          <p className="mt-6 text-ink-2">没有找到相关教程，换个关键词试试</p>
         </div>
       )}
 

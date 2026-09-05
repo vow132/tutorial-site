@@ -33,7 +33,7 @@ export default async function SiteHeader() {
         {/* Logo */}
         <Link
           href="/"
-          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-line bg-white/85 px-2.5 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md lg:flex-none lg:justify-start lg:px-4"
+          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-line bg-surface/85 px-2.5 shadow-capsule backdrop-blur-md lg:flex-none lg:justify-start lg:px-4"
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">
             {settings.logoText}

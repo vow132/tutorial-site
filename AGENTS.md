@@ -8,10 +8,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 技术栈
 - **Next.js 16.2 (App Router) + React 19 + TypeScript**，dev/build 均使用 **webpack**（Turbopack 在中文路径下会间歇 500，勿切回）
-- **Tailwind CSS v4**（CSS 变量主题，见 `app/globals.css` 的 `@theme`）
+- **Tailwind CSS v4**（CSS 变量主题，见 `app/globals.css` 的 `@theme`；语义类 `bg-surface`/`bg-btn`/`bg-scrim`/`shadow-capsule`，`dark:` 变体跟随 `data-theme`）
 - **Prisma 7 + SQLite**（driver adapter 模式，无 Rust 引擎）
 - **Tiptap 3** 富文本编辑器（后台发文）
-- **framer-motion** 动效（滚动显现/导航滑块）
+- 动效为纯 CSS + `components/pointer-aura.tsx` 单个全局指针监听器（聚光灯跟随/3D 倾斜/吉祥物跟随；滚动渐显用 CSS scroll-driven animation 渐进增强；不依赖 framer-motion）
 
 ## 常用命令
 ```bash

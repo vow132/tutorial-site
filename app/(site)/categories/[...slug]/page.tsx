@@ -28,7 +28,9 @@ export async function generateMetadata({
   const { slug: segments } = await params;
   const slug = resolveSlug(segments);
   const category = await prisma.category.findUnique({ where: { slug } });
-  return { title: category ? `${category.name}教程` : "分类" };
+  // metadata 阶段就触发 404，保证流式传输开始前拿到真实 404 状态码。
+  if (!category) notFound();
+  return { title: `${category.name}教程` };
 }
 
 export default async function CategoryPage({
@@ -85,27 +87,27 @@ export default async function CategoryPage({
   }
 
   // 教程只在其所属分类展示，父分类不再聚合子分类下的教程。
-  const [total, tutorials] = await Promise.all([
-    prisma.tutorial.count({
-      where: { published: true, categoryId: category.id },
-    }),
-    prisma.tutorial.findMany({
-      where: { published: true, categoryId: category.id },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        excerpt: true,
-        views: true,
-        createdAt: true,
-        category: { select: { name: true, color: true } },
-      },
-    }),
-  ]);
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  // 先算总数收敛页码，避免 ?page=999 渲染出误导性的空状态。
+  const total = await prisma.tutorial.count({
+    where: { published: true, categoryId: category.id },
+  });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const tutorials = await prisma.tutorial.findMany({
+    where: { published: true, categoryId: category.id },
+    orderBy: { createdAt: "desc" },
+    skip: (safePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      views: true,
+      createdAt: true,
+      category: { select: { name: true, color: true } },
+    },
+  });
 
   // 子分类卡片只显示该分类自身的教程数，不再累加其后代。
   const countTutorials = (node: typeof categoryNode): number =>
@@ -163,7 +165,7 @@ export default async function CategoryPage({
                 <Link
                   href={getCategoryHref(child)}
                   {...categoryLinkTarget(getCategoryHref(child))}
-                  className="flex h-full items-center gap-3 rounded-2xl border border-line bg-white p-4 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-accent"
+                  className="flex h-full items-center gap-3 rounded-2xl border border-line bg-surface p-4 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-accent"
                 >
                   <span
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
@@ -191,7 +193,7 @@ export default async function CategoryPage({
       )}
 
       {tutorials.length === 0 ? (
-        <div className="mt-12 rounded-3xl border border-dashed border-line bg-white/60 py-20 text-center text-ink-3">
+        <div className="mt-12 rounded-3xl border border-dashed border-line bg-surface/60 py-20 text-center text-ink-3">
           该分类下暂无教程
         </div>
       ) : (
@@ -213,7 +215,7 @@ export default async function CategoryPage({
       )}
 
       <Pagination
-        page={page}
+        page={safePage}
         totalPages={totalPages}
         basePath={`/categories/${slug}`}
       />

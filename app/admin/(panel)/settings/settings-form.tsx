@@ -5,7 +5,7 @@ import { updateSettings, type SettingsFormState } from "@/lib/actions/settings";
 import type { SiteSettings, FooterColumn } from "@/lib/settings";
 
 const inputCls =
-  "h-10 w-full rounded-xl border border-line bg-white px-3.5 text-sm outline-none transition-colors focus:border-accent";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
 
 function Field({
   label,
@@ -36,7 +36,7 @@ function Field({
           rows={2}
           defaultValue={defaultValue}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-accent"
+          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60"
         />
       ) : (
         <input
@@ -60,7 +60,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-3xl border border-line bg-white p-6">
+    <section className="rounded-3xl border border-line bg-surface p-6">
       <h2 className="text-base font-bold text-ink">{title}</h2>
       {desc && <p className="mt-1 text-xs text-ink-3">{desc}</p>}
       <div className="mt-5 space-y-4">{children}</div>
@@ -142,7 +142,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
           {columns.map((col, i) => (
             <div key={i} className="rounded-2xl border border-line bg-paper/50 p-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-bold text-ink-3 border border-line">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface text-xs font-bold text-ink-3 border border-line">
                   {i + 1}
                 </span>
                 <input
@@ -156,7 +156,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
                     type="checkbox"
                     checked={col.autoCategories ?? false}
                     onChange={(e) => updateCol(i, { autoCategories: e.target.checked })}
-                    className="h-3.5 w-3.5 accent-[#6366f1]"
+                    className="h-3.5 w-3.5 accent-accent"
                   />
                   自动分类
                 </label>
@@ -165,7 +165,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
                     type="button"
                     title="上移"
                     onClick={() => moveCol(i, -1)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-3 hover:bg-white hover:text-ink"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-3 hover:bg-surface hover:text-ink"
                   >
                     ↑
                   </button>
@@ -173,7 +173,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
                     type="button"
                     title="下移"
                     onClick={() => moveCol(i, 1)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-3 hover:bg-white hover:text-ink"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-3 hover:bg-surface hover:text-ink"
                   >
                     ↓
                   </button>
@@ -181,7 +181,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
                     type="button"
                     title="删除栏目"
                     onClick={() => setColumns((c) => c.filter((_, idx) => idx !== i))}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-red-400 hover:bg-red-50"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-red-400 hover:bg-red-500/10"
                   >
                     ✕
                   </button>
@@ -221,7 +221,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
                         onClick={() =>
                           updateCol(i, { links: col.links.filter((_, idx) => idx !== j) })
                         }
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-red-400 hover:bg-red-50"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-red-400 hover:bg-red-500/10"
                       >
                         ✕
                       </button>
@@ -251,7 +251,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
       </Section>
 
       {/* ---------- 提交栏 ---------- */}
-      <div className="sticky bottom-4 flex items-center justify-between rounded-2xl border border-line bg-white/95 px-5 py-4 shadow-lg backdrop-blur">
+      <div className="sticky bottom-4 flex items-center justify-between rounded-2xl border border-line bg-surface/95 px-5 py-4 shadow-lg backdrop-blur">
         <div className="text-sm">
           {state.error && <span className="text-red-500">{state.error}</span>}
           {state.success && <span className="text-emerald-600">{state.success}</span>}
@@ -259,7 +259,7 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-ink px-8 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="rounded-full bg-btn px-8 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "保存中…" : "保存设置"}
         </button>

@@ -6,7 +6,10 @@
  */
 export default function Mascot({ className = "" }: { className?: string }) {
   return (
-    <div className={`pointer-events-none select-none ${className}`} aria-hidden>
+    <div
+      className={`site-mascot pointer-events-none select-none ${className}`}
+      aria-hidden
+    >
       <div className="mascot-float">
         <svg width="34" height="38" viewBox="0 0 34 38" fill="none">
           <path

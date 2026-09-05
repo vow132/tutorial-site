@@ -83,7 +83,7 @@ function SidebarLinks({
               viewBox="0 0 22 22"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.7"
+              strokeWidth="1.6"
               strokeLinejoin="round"
               aria-hidden="true"
             >
@@ -107,7 +107,7 @@ function SidebarLinks({
             viewBox="0 0 22 22"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.7"
+            strokeWidth="1.6"
             strokeLinecap="round"
             aria-hidden="true"
           >
@@ -118,7 +118,7 @@ function SidebarLinks({
         <form action={logout}>
           <button
             type="submit"
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
           >
             <svg
               width="16"
@@ -126,7 +126,7 @@ function SidebarLinks({
               viewBox="0 0 22 22"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.7"
+              strokeWidth="1.6"
               strokeLinecap="round"
               aria-hidden="true"
             >
@@ -146,6 +146,7 @@ export default function AdminSidebar() {
   const drawerId = useId();
   const toggleRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLLabelElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
 
   const currentItem =
     items.find((item) => isActivePath(pathname, item.href)) ?? items[0];
@@ -160,6 +161,29 @@ export default function AdminSidebar() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && toggleRef.current?.checked) {
         closeMobileMenu(true);
+        return;
+      }
+      // 焦点圈禁：抽屉打开时 Tab 循环限制在内
+      if (event.key === "Tab" && toggleRef.current?.checked && shellRef.current) {
+        const focusables = Array.from(
+          shellRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), [tabindex="0"]',
+          ),
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        const inside = active instanceof Node && shellRef.current.contains(active);
+        if (event.shiftKey) {
+          if (active === first || !inside) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !inside) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
 
@@ -185,7 +209,7 @@ export default function AdminSidebar() {
           }}
         />
 
-        <div className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-white/90 py-2 pl-4 pr-2 shadow-[0_10px_32px_-18px_rgba(23,24,28,0.24)] backdrop-blur-md">
+        <div className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-surface/90 py-2 pl-4 pr-2 shadow-capsule backdrop-blur-md">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-ink-3">
               Admin Panel
@@ -218,7 +242,7 @@ export default function AdminSidebar() {
               viewBox="0 0 18 18"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="1.6"
               strokeLinecap="round"
               aria-hidden="true"
             >
@@ -228,13 +252,16 @@ export default function AdminSidebar() {
           </div>
         </div>
 
-        <div className="admin-mobile-drawer-shell pointer-events-none fixed inset-0 z-[90] md:hidden">
+        <div
+          ref={shellRef}
+          className="admin-mobile-drawer-shell pointer-events-none fixed inset-0 z-[90] md:hidden"
+        >
           <label
             htmlFor={toggleId}
             role="button"
             tabIndex={0}
             aria-label="关闭后台菜单"
-            className="admin-mobile-drawer-backdrop absolute inset-0 cursor-pointer bg-ink/45 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
+            className="admin-mobile-drawer-backdrop absolute inset-0 cursor-pointer bg-scrim/45 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
           />
 
           <aside
@@ -242,7 +269,7 @@ export default function AdminSidebar() {
             role="dialog"
             aria-modal="true"
             aria-label="后台菜单"
-            className="admin-mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,20rem)] flex-col border-r border-line bg-white shadow-2xl transition-transform duration-300 ease-out"
+            className="admin-mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,20rem)] flex-col border-r border-line bg-surface shadow-2xl transition-transform duration-300 ease-out"
           >
             <div className="flex items-center justify-between border-b border-line px-5 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <div>
@@ -272,7 +299,7 @@ export default function AdminSidebar() {
                   viewBox="0 0 18 18"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.8"
+                  strokeWidth="1.6"
                   strokeLinecap="round"
                   aria-hidden="true"
                 >
@@ -292,7 +319,7 @@ export default function AdminSidebar() {
         </div>
       </div>
 
-      <aside className="sticky top-6 hidden h-fit w-52 shrink-0 rounded-3xl border border-line bg-white p-3 md:block">
+      <aside className="sticky top-6 hidden h-fit w-52 shrink-0 rounded-3xl border border-line bg-surface p-3 md:block">
         <div className="mb-3 flex items-center justify-between border-b border-line px-1 pb-3">
           <span className="text-sm font-semibold text-ink">后台管理</span>
           <ThemeToggle />

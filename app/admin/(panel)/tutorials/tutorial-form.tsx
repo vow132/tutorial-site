@@ -31,7 +31,7 @@ type Props = {
 };
 
 const inputCls =
-  "h-11 w-full rounded-xl border border-line bg-white px-4 text-sm outline-none transition-colors focus:border-accent";
+  "h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
 
 export default function TutorialForm({ categories, action, initial }: Props) {
   const [state, formAction, pending] = useActionState<TutorialFormState, FormData>(
@@ -97,7 +97,7 @@ export default function TutorialForm({ categories, action, initial }: Props) {
             rows={2}
             defaultValue={initial?.excerpt ?? ""}
             placeholder="一两句话概括这篇教程讲什么…"
-            className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-accent"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60"
           />
         </div>
       </div>
@@ -113,18 +113,18 @@ export default function TutorialForm({ categories, action, initial }: Props) {
       </div>
 
       {state.error && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+        <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-500 dark:text-red-400">
           {state.error}
         </p>
       )}
 
-      <div className="flex items-center justify-between rounded-2xl border border-line bg-white px-5 py-4">
+      <div className="flex items-center justify-between rounded-2xl border border-line bg-surface px-5 py-4">
         <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-ink-2">
           <input
             type="checkbox"
             name="published"
             defaultChecked={initial?.published ?? true}
-            className="h-4 w-4 accent-[#6366f1]"
+            className="h-4 w-4 accent-accent"
           />
           立即发布（不勾选则保存为草稿）
         </label>
@@ -138,7 +138,7 @@ export default function TutorialForm({ categories, action, initial }: Props) {
           <button
             type="submit"
             disabled={pending}
-            className="rounded-full bg-ink px-7 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="rounded-full bg-btn px-7 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending ? "保存中…" : "保存教程"}
           </button>

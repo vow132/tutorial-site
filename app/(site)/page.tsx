@@ -18,7 +18,7 @@ export default async function HomePage() {
     prisma.tutorial.findMany({
       where: { published: true },
       orderBy: { createdAt: "desc" },
-      take: 6,
+      take: 5,
       select: {
         id: true,
         title: true,
@@ -39,23 +39,32 @@ export default async function HomePage() {
   ): number => category._count.tutorials;
 
   const stats = [
-    { label: "精选教程", value: tutorialCount, unit: "篇", color: "#6366f1" },
+    { label: "精选教程", value: tutorialCount, unit: "篇", color: "var(--chart-indigo)" },
     {
       label: "教程分类",
       value: flattenCategoryTree(categories).length,
       unit: "个",
-      color: "#10b981",
+      color: "var(--chart-green)",
     },
-    { label: "累计阅读", value: viewAgg._sum.views ?? 0, unit: "次", color: "#f59e0b" },
+    { label: "累计阅读", value: viewAgg._sum.views ?? 0, unit: "次", color: "var(--chart-amber)" },
   ];
 
   return (
     <div className="mx-auto max-w-6xl px-4">
       {/* ---------- Hero ---------- */}
-      <section className="flex flex-col items-center pb-16 pt-20 text-center md:pt-28">
+      <section className="relative flex flex-col items-center pb-16 pt-20 text-center md:pt-28">
+        {/* 低饱和靛蓝光晕，随主题取色；纯装饰 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-24 left-1/2 h-80 w-[36rem] max-w-full -translate-x-1/2 rounded-full bg-accent/[0.07] blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-10 right-[12%] h-40 w-64 max-w-full rounded-full bg-accent/[0.05] blur-3xl max-lg:hidden"
+        />
         <Reveal>
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-1.5 text-xs font-medium text-ink-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-medium text-ink-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-live" />
             {settings.heroBadge}
           </span>
         </Reveal>
@@ -66,8 +75,8 @@ export default async function HomePage() {
             {settings.heroTitleB}
             <span className="relative inline-block text-accent">
               {settings.heroAccent}
-              <svg className="absolute -bottom-2 left-0 w-full" height="8" viewBox="0 0 200 8" preserveAspectRatio="none">
-                <path d="M2 6C60 1 140 1 198 6" stroke="#c7d2fe" strokeWidth="4" strokeLinecap="round" fill="none" />
+              <svg className="absolute -bottom-2 left-0 w-full text-accent/45" height="8" viewBox="0 0 200 8" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M2 6C60 1 140 1 198 6" stroke="currentColor" strokeWidth="4" strokeLinecap="round" fill="none" />
               </svg>
             </span>
           </h1>
@@ -80,16 +89,16 @@ export default async function HomePage() {
         <Reveal delay={0.24} className="mt-9 flex items-center gap-3">
           <Link
             href="/tutorials"
-            className="flex h-12 items-center gap-2 rounded-full bg-ink px-7 text-sm font-semibold text-white transition-transform hover:scale-[1.03]"
+            className="group flex h-12 items-center gap-2 rounded-full bg-btn px-7 text-sm font-semibold text-white shadow-capsule transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lifted active:translate-y-0 active:scale-[0.98]"
           >
             开始学习
-            <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <svg className="transition-transform duration-200 group-hover:translate-x-1" width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
               <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
             </svg>
           </Link>
           <Link
             href="#categories"
-            className="flex h-12 items-center rounded-full border border-line bg-white px-7 text-sm font-semibold text-ink transition-colors hover:border-accent hover:text-accent"
+            className="flex h-12 items-center rounded-full border border-line bg-surface px-7 text-sm font-semibold text-ink transition-all duration-200 hover:border-accent hover:text-accent active:scale-[0.98]"
           >
             浏览分类
           </Link>
@@ -117,7 +126,7 @@ export default async function HomePage() {
 
       {/* ---------- 分类宫格 ---------- */}
       <section id="categories" className="scroll-mt-24 pt-20">
-        <Reveal>
+        <Reveal mode="scroll">
           <div className="flex items-end justify-between">
             <div>
               <h2 className="text-2xl font-bold text-ink md:text-3xl">教程分类</h2>
@@ -126,8 +135,8 @@ export default async function HomePage() {
           </div>
         </Reveal>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((c, i) => (
-            <Reveal key={c.id} delay={i * 0.06}>
+          {categories.map((c) => (
+            <Reveal key={c.id} mode="scroll">
               <Link
                 href={getCategoryHref(c)}
                 {...categoryLinkTarget(getCategoryHref(c))}
@@ -165,7 +174,7 @@ export default async function HomePage() {
 
       {/* ---------- 最新教程 ---------- */}
       <section className="pt-20">
-        <Reveal>
+        <Reveal mode="scroll">
           <div className="flex items-end justify-between">
             <div>
               <h2 className="text-2xl font-bold text-ink md:text-3xl">最新教程</h2>
@@ -176,15 +185,57 @@ export default async function HomePage() {
               className="hidden items-center gap-1.5 text-sm font-medium text-ink-2 transition-colors hover:text-accent sm:flex"
             >
               查看全部
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
               </svg>
             </Link>
           </div>
         </Reveal>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {latest.map((t, i) => (
-            <Reveal key={t.id} delay={i * 0.06}>
+        {/* 最新一篇作为横向大卡，其余 2×2 紧凑卡，与上方分类宫格区分层级 */}
+        {latest[0] && (
+          <Reveal mode="scroll" className="mt-8">
+            <Link href={`/tutorials/${latest[0].slug}`} className="block">
+              <GlowCard className="group flex h-full flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between md:p-8">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-xs text-ink-3">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: latest[0].category.color }}
+                    />
+                    <span
+                      className="font-medium"
+                      style={{ color: latest[0].category.color }}
+                    >
+                      {latest[0].category.name}
+                    </span>
+                    <span>·</span>
+                    <time>
+                      {latest[0].createdAt.toLocaleDateString("zh-CN", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </time>
+                  </div>
+                  <h3 className="mt-3 truncate text-xl font-bold text-ink transition-colors group-hover:text-accent md:text-2xl">
+                    {latest[0].title}
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2 line-clamp-2">
+                    {latest[0].excerpt ?? "暂无摘要"}
+                  </p>
+                </div>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line text-ink-2 transition-colors group-hover:border-accent group-hover:bg-accent-soft group-hover:text-accent">
+                  <svg className="transition-transform duration-200 group-hover:translate-x-0.5" width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                    <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
+                  </svg>
+                </span>
+              </GlowCard>
+            </Link>
+          </Reveal>
+        )}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {latest.slice(1).map((t) => (
+            <Reveal key={t.id} mode="scroll">
               <TutorialCard
                 title={t.title}
                 slug={t.slug}

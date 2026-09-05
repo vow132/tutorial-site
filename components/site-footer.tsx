@@ -21,7 +21,7 @@ export default async function SiteFooter() {
   );
 
   return (
-    <footer className="mt-24 border-t border-line bg-white/60">
+    <footer className="mt-24 border-t border-line bg-surface/60">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="flex flex-col gap-10 md:flex-row md:justify-between">
           <div className="max-w-xs">
@@ -70,7 +70,7 @@ export default async function SiteFooter() {
             © {new Date().getFullYear()} {settings.copyright}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-live" />
             持续更新中
           </span>
         </div>

@@ -7,7 +7,7 @@ import {
 } from "@/lib/actions/account";
 
 const inputClass =
-  "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus:bg-white";
+  "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
 
 export default function AccountForm({ username }: { username: string }) {
   const [state, action, pending] = useActionState<
@@ -76,12 +76,12 @@ export default function AccountForm({ username }: { username: string }) {
       </div>
 
       {state.error && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+        <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-500 dark:text-red-400">
           {state.error}
         </p>
       )}
       {state.success && (
-        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-600">
+        <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
           {state.success}
         </p>
       )}
@@ -89,7 +89,7 @@ export default function AccountForm({ username }: { username: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="h-11 rounded-xl bg-ink px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="h-11 rounded-xl bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {pending ? "保存中…" : "保存账号设置"}
       </button>

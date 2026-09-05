@@ -19,7 +19,7 @@ export default function DeleteButton({
       <input type="hidden" name="id" value={id} />
       <button
         type="submit"
-        className="rounded-lg px-2.5 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-50"
+        className="rounded-lg px-2.5 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/10"
       >
         删除
       </button>

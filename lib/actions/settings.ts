@@ -25,6 +25,16 @@ export async function updateSettings(
       if (typeof col.title !== "string" || !Array.isArray(col.links)) {
         throw new Error();
       }
+      // href 只允许站内路径与常见安全协议，堵住 javascript: 注入
+      for (const link of col.links) {
+        if (
+          typeof link.label !== "string" ||
+          typeof link.href !== "string" ||
+          !/^(?:\/|#|https?:\/\/|mailto:)/i.test(link.href)
+        ) {
+          throw new Error();
+        }
+      }
     }
   } catch {
     return { error: "底部栏目数据格式有误" };

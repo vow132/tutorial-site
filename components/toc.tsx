@@ -57,7 +57,7 @@ function Caret({ className = "" }: { className?: string }) {
       viewBox="0 0 12 12"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -201,10 +201,10 @@ export function MobileToc({ items }: { items: TocItem[] }) {
             toggleRef.current?.click();
           }
         }}
-        className="mobile-toc-trigger flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 text-left transition-colors hover:bg-paper"
+        className="mobile-toc-trigger flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left transition-colors hover:bg-paper"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
             <path d="M2.5 4h11M2.5 8h8M2.5 12h5" />
           </svg>
         </span>
@@ -223,7 +223,7 @@ export function MobileToc({ items }: { items: TocItem[] }) {
       <nav
         id={panelId}
         aria-label="本页目录"
-        className="mobile-toc-panel hidden max-h-[60vh] overflow-y-auto overscroll-contain rounded-b-2xl border border-t-0 border-line bg-white px-3 pb-3 pt-1"
+        className="mobile-toc-panel hidden max-h-[60vh] overflow-y-auto overscroll-contain rounded-b-2xl border border-t-0 border-line bg-surface px-3 pb-3 pt-1"
       >
         <ul className="space-y-0.5 border-l border-line">
           {items.map((item) => (

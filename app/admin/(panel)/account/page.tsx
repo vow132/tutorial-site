@@ -16,7 +16,7 @@ export default async function AdminAccountPage() {
       <p className="mt-1 text-sm text-ink-3">
         修改管理员用户名或密码，保存后当前浏览器会自动保持登录。
       </p>
-      <div className="mt-6 rounded-3xl border border-line bg-white p-6 sm:p-8">
+      <div className="mt-6 rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <AccountForm username={admin.username} />
       </div>
     </div>

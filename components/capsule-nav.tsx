@@ -51,7 +51,7 @@ function DesktopSubmenu({
   pathname: string;
 }) {
   return (
-    <ul className="min-w-52 rounded-2xl border border-line bg-white/95 p-2 shadow-[0_18px_50px_-20px_rgba(23,24,28,0.28)] backdrop-blur-xl">
+    <ul className="min-w-52 rounded-2xl border border-line bg-surface/95 p-2 shadow-lifted backdrop-blur-xl">
       {items.map((item) => {
         const active = itemIsActive(pathname, item);
         const hasChildren = Boolean(item.children?.length);
@@ -77,7 +77,7 @@ function DesktopSubmenu({
                   viewBox="0 0 12 12"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.5"
+                  strokeWidth="1.6"
                   strokeLinecap="round"
                   aria-hidden="true"
                   className="shrink-0 opacity-50"
@@ -265,7 +265,7 @@ function DesktopNavItem({
             viewBox="0 0 11 11"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.5"
+            strokeWidth="1.6"
             strokeLinecap="round"
             className="relative z-10 transition-transform group-hover/nav:rotate-180"
             aria-hidden="true"
@@ -307,7 +307,7 @@ function DesktopNavArrow({
         viewBox="0 0 12 12"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
@@ -416,7 +416,7 @@ function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string })
   const visible = pages[current] ?? [];
 
   return (
-    <nav className="hidden items-center gap-1 rounded-full border border-line bg-white/85 p-1.5 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md lg:flex">
+    <nav className="hidden items-center gap-1 rounded-full border border-line bg-surface/85 p-1.5 shadow-capsule backdrop-blur-md lg:flex">
       {pinned.map((item) => (
         <DesktopNavItem key={item.key} item={item} pathname={pathname} />
       ))}
@@ -461,6 +461,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const toggleRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLLabelElement>(null);
   const closeButtonRef = useRef<HTMLLabelElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
 
   useEffect(() => {
@@ -485,6 +486,29 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         if (toggleRef.current) toggleRef.current.checked = false;
         setOpen(false);
         triggerRef.current?.focus();
+        return;
+      }
+      // 焦点圈禁：Tab 循环限制在抽屉内
+      if (event.key === "Tab" && shellRef.current) {
+        const focusables = Array.from(
+          shellRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), [tabindex="0"]',
+          ),
+        ).filter((el) => el.offsetParent !== null);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        const inside = active instanceof Node && shellRef.current.contains(active);
+        if (event.shiftKey) {
+          if (active === first || !inside) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !inside) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
 
@@ -497,12 +521,14 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
   }, [open]);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) setOpen(false);
+    // 跨过桌面断点时收起抽屉；matchMedia 只在状态翻转时触发，优于 resize 高频监听。
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setOpen(false);
     };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   const closeDrawer = () => {
@@ -532,7 +558,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
       <label
         ref={triggerRef}
         htmlFor={toggleId}
-        className="mobile-drawer-trigger flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line bg-white/90 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md transition-colors hover:bg-paper lg:hidden"
+        className="mobile-drawer-trigger flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line bg-surface/90 shadow-capsule backdrop-blur-md transition-colors hover:bg-paper lg:hidden"
         role="button"
         tabIndex={0}
         aria-label="打开菜单"
@@ -545,12 +571,13 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
           }
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
           <path d="M2.5 5h13M2.5 9h13M2.5 13h13" />
         </svg>
       </label>
 
       <div
+        ref={shellRef}
         className="mobile-drawer-shell pointer-events-none fixed inset-0 z-[70] lg:hidden"
         aria-hidden={!open}
       >
@@ -565,7 +592,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
               closeDrawer();
             }
           }}
-          className="mobile-drawer-backdrop absolute inset-0 touch-none bg-ink/35 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
+          className="mobile-drawer-backdrop absolute inset-0 touch-none bg-scrim/35 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
         />
 
         <aside
@@ -573,7 +600,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
           role="dialog"
           aria-modal="true"
           aria-label="网站菜单"
-          className="mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,22rem)] flex-col overscroll-contain border-r border-line bg-white shadow-2xl transition-transform duration-300 ease-out"
+          className="mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,22rem)] flex-col overscroll-contain border-r border-line bg-surface shadow-2xl transition-transform duration-300 ease-out"
         >
           <div className="flex items-center justify-between border-b border-line px-5 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
             <div>
@@ -596,7 +623,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
               aria-label="关闭菜单"
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M4 4l10 10M14 4 4 14" />
               </svg>
             </label>

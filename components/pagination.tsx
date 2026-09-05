@@ -27,7 +27,7 @@ export default function Pagination({
       {page > 1 && (
         <Link
           href={href(page - 1)}
-          className="flex h-9 items-center rounded-full border border-line bg-white px-4 text-sm text-ink-2 transition-colors hover:border-accent hover:text-accent"
+          className="flex h-9 items-center rounded-full border border-line bg-surface px-4 text-sm text-ink-2 transition-colors hover:border-accent hover:text-accent"
         >
           上一页
         </Link>
@@ -41,8 +41,8 @@ export default function Pagination({
               href={href(p)}
               className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium transition-colors ${
                 p === page
-                  ? "bg-ink text-white"
-                  : "border border-line bg-white text-ink-2 hover:border-accent hover:text-accent"
+                  ? "bg-btn text-white"
+                  : "border border-line bg-surface text-ink-2 hover:border-accent hover:text-accent"
               }`}
             >
               {p}
@@ -53,7 +53,7 @@ export default function Pagination({
       {page < totalPages && (
         <Link
           href={href(page + 1)}
-          className="flex h-9 items-center rounded-full border border-line bg-white px-4 text-sm text-ink-2 transition-colors hover:border-accent hover:text-accent"
+          className="flex h-9 items-center rounded-full border border-line bg-surface px-4 text-sm text-ink-2 transition-colors hover:border-accent hover:text-accent"
         >
           下一页
         </Link>

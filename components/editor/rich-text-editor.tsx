@@ -199,7 +199,7 @@ export default function RichTextEditor({
 
   if (!editor) {
     return (
-      <div className="rounded-2xl border border-line bg-white">
+      <div className="rounded-2xl border border-line bg-surface">
         <div className="h-[460px] animate-pulse rounded-2xl bg-paper" />
         <input type="hidden" name={name} value={html} />
       </div>
@@ -239,12 +239,12 @@ export default function RichTextEditor({
 
   return (
     <div
-      className={`tiptap-shell overflow-hidden rounded-2xl border bg-white transition-colors ${
+      className={`tiptap-shell overflow-hidden rounded-2xl border bg-surface transition-colors ${
         dragging ? "border-accent ring-2 ring-accent/20" : "border-line"
       }`}
     >
       {/* 工具栏 */}
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-white/95 px-2 py-1.5 backdrop-blur">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-surface/95 px-2 py-1.5 backdrop-blur">
         <button
           type="button"
           title="撤销"
@@ -368,7 +368,7 @@ export default function RichTextEditor({
             />
           </button>
           {colorOpen && (
-            <div className="absolute left-0 top-full z-20 mt-1 w-max rounded-xl border border-line bg-white p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-20 mt-1 w-max rounded-xl border border-line bg-surface p-2 shadow-lg">
               <div className="grid grid-cols-5 gap-1">
                 {TEXT_COLORS.map((c) => {
                   const active =
@@ -447,7 +447,7 @@ export default function RichTextEditor({
         <EditorContent editor={editor} />
         {dragging && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-accent-soft/60">
-            <p className="rounded-full bg-white px-5 py-2 text-sm font-medium text-accent shadow">
+            <p className="rounded-full bg-surface px-5 py-2 text-sm font-medium text-accent shadow">
               松开鼠标插入图片
             </p>
           </div>

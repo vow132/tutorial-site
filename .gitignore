@@ -46,3 +46,6 @@ next-env.d.ts
 /generated/
 /prisma/dev.db*
 /public/uploads/
+
+# zcode 本地工作区
+/.zcode/

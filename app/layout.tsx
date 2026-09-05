@@ -1,15 +1,23 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
+import { SITE_URL } from "@/lib/site-url";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
   return {
+    metadataBase: new URL(SITE_URL),
     title: {
       default: settings.siteTitle,
       template: `%s · ${settings.siteName}`,
     },
     description: settings.siteDescription,
+    openGraph: {
+      type: "website",
+      siteName: settings.siteName,
+      title: settings.siteTitle,
+      description: settings.siteDescription,
+    },
   };
 }
 

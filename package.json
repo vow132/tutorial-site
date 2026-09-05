@@ -11,7 +11,6 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.0",
     "@prisma/client": "^7.9.0",
-    "@tailwindcss/typography": "^0.5.20",
     "@tiptap/extension-color": "^3.28.0",
     "@tiptap/extension-image": "^3.28.0",
     "@tiptap/extension-text-style": "^3.28.0",
@@ -20,9 +19,8 @@
     "@tiptap/react": "^3.28.0",
     "@tiptap/starter-kit": "^3.28.0",
     "bcryptjs": "^3.0.3",
-    "framer-motion": "^12.42.2",
     "highlight.js": "^11.11.1",
-    "lucide-react": "^1.26.0",
+    "image-size": "^2.0.2",
     "next": "16.2.11",
     "prisma": "^7.9.0",
     "react": "19.2.4",

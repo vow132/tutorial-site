@@ -5,7 +5,7 @@ export default function ThemeToggle() {
       data-theme-toggle
       aria-label="切换主题"
       title="切换主题"
-      className="theme-toggle flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-white/90 text-ink-2 shadow-[0_8px_30px_-12px_rgba(23,24,28,0.18)] backdrop-blur-md transition-colors hover:bg-paper hover:text-ink"
+      className="theme-toggle flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface/90 text-ink-2 shadow-capsule backdrop-blur-md transition-colors hover:bg-paper hover:text-ink"
     >
       <svg
         data-theme-icon="moon"
@@ -14,7 +14,7 @@ export default function ThemeToggle() {
         viewBox="0 0 18 18"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.7"
+        strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"

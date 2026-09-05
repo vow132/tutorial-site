@@ -9,7 +9,7 @@ import {
 } from "@/lib/actions/categories";
 
 const inputCls =
-  "h-10 w-full rounded-xl border border-line bg-white px-3.5 text-sm outline-none transition-colors focus:border-accent";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
 
 export type ParentOption = {
   id: number;
@@ -22,7 +22,7 @@ function Message({ state }: { state: CategoryFormState }) {
     return <span className="text-xs text-red-500">{state.error}</span>;
   }
   if (state.success) {
-    return <span className="text-xs text-emerald-600">{state.success}</span>;
+    return <span className="text-xs text-emerald-600 dark:text-emerald-400">{state.success}</span>;
   }
   return null;
 }
@@ -116,7 +116,7 @@ export function CreateCategoryForm({
               name="color"
               type="color"
               defaultValue="#6366f1"
-              className="h-10 w-14 cursor-pointer rounded-xl border border-line bg-white p-1"
+              className="h-10 w-14 cursor-pointer rounded-xl border border-line bg-surface p-1"
             />
           </Field>
         </div>
@@ -145,7 +145,7 @@ export function CreateCategoryForm({
         <button
           type="submit"
           disabled={pending}
-          className="h-10 shrink-0 rounded-full bg-ink px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="h-10 shrink-0 rounded-full bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {pending ? "创建中…" : "创建分类"}
         </button>
@@ -204,7 +204,7 @@ export function CategoryRow({
 
   return (
     <div
-      className="rounded-3xl border border-line bg-white p-4 sm:p-5"
+      className="rounded-3xl border border-line bg-surface p-4 sm:p-5"
       style={{ marginLeft: category.depth ? `${category.depth * 1.25}rem` : 0 }}
     >
       <input
@@ -271,7 +271,7 @@ export function CategoryRow({
             <input type="hidden" name="id" value={category.id} />
             <button
               type="submit"
-              className="rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-50"
+              className="rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/10"
             >
               删除
             </button>
@@ -280,7 +280,7 @@ export function CategoryRow({
       </div>
 
       {delState.error && (
-        <p className="mt-3 rounded-xl bg-red-50 px-4 py-2 text-xs text-red-600">
+        <p className="mt-3 rounded-xl bg-red-500/10 px-4 py-2 text-xs text-red-500 dark:text-red-400">
           {delState.error}
         </p>
       )}
@@ -335,7 +335,7 @@ export function CategoryRow({
                   name="color"
                   type="color"
                   defaultValue={category.color}
-                  className="h-10 w-14 cursor-pointer rounded-xl border border-line bg-white p-1"
+                  className="h-10 w-14 cursor-pointer rounded-xl border border-line bg-surface p-1"
                 />
               </Field>
             </div>
@@ -366,7 +366,7 @@ export function CategoryRow({
             <button
               type="submit"
               disabled={pending}
-              className="h-10 rounded-full bg-ink px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="h-10 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {pending ? "保存中…" : "保存修改"}
             </button>

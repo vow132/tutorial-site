@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { processArticle } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
+import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
 
@@ -15,7 +17,9 @@ export async function generateMetadata({
   const { slug: rawSlug } = await params;
   const slug = decodeURIComponent(rawSlug);
   const t = await prisma.tutorial.findUnique({ where: { slug } });
-  if (!t) return { title: "教程不存在" };
+  // 在 metadata 阶段就触发 404：此时响应尚未开始流式传输，
+  // 才能返回真实的 404 状态码（否则 loading.tsx 先行输出 200）。
+  if (!t || !t.published) notFound();
   return { title: t.title, description: t.excerpt ?? undefined };
 }
 
@@ -33,10 +37,12 @@ export default async function TutorialDetailPage({
   });
   if (!tutorial || !tutorial.published) notFound();
 
-  // 阅读量 +1（不阻塞渲染，与下面查询并行）
-  const viewUpdate = prisma.tutorial
-    .update({ where: { id: tutorial.id }, data: { views: { increment: 1 } } })
-    .catch(() => {});
+  // 阅读量 +1：放到响应之后执行，不阻塞首屏渲染
+  after(async () => {
+    await prisma.tutorial
+      .update({ where: { id: tutorial.id }, data: { views: { increment: 1 } } })
+      .catch(() => {});
+  });
 
   // 上一篇 / 下一篇（同分类内按时间）
   const [prev, next] = await Promise.all([
@@ -59,7 +65,6 @@ export default async function TutorialDetailPage({
       select: { title: true, slug: true },
     }),
   ]);
-  await viewUpdate;
 
   const { html, toc } = processArticle(tutorial.content);
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;
@@ -84,7 +89,7 @@ export default async function TutorialDetailPage({
         </nav>
       </Reveal>
 
-      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px]">
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px] xl:grid-cols-[minmax(0,1fr)_260px]">
         <div>
           {/* 头部 */}
           <Reveal>
@@ -132,32 +137,32 @@ export default async function TutorialDetailPage({
           </Reveal>
 
           {/* 上一篇 / 下一篇 */}
-          <nav className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {prev ? (
-              <Link
-                href={`/tutorials/${prev.slug}`}
-                className="glow-card group p-5"
-              >
-                <span className="text-xs text-ink-3">← 上一篇</span>
-                <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
-                  {prev.title}
-                </p>
-              </Link>
-            ) : (
-              <span />
-            )}
-            {next && (
-              <Link
-                href={`/tutorials/${next.slug}`}
-                className="glow-card group p-5 text-right"
-              >
-                <span className="text-xs text-ink-3">下一篇 →</span>
-                <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
-                  {next.title}
-                </p>
-              </Link>
-            )}
-          </nav>
+          <Reveal mode="scroll">
+            <nav className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {prev ? (
+                <Link href={`/tutorials/${prev.slug}`} className="block h-full">
+                  <GlowCard className="group h-full p-5">
+                    <span className="text-xs text-ink-3">← 上一篇</span>
+                    <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
+                      {prev.title}
+                    </p>
+                  </GlowCard>
+                </Link>
+              ) : (
+                <span />
+              )}
+              {next && (
+                <Link href={`/tutorials/${next.slug}`} className="block h-full">
+                  <GlowCard className="group h-full p-5 text-right">
+                    <span className="text-xs text-ink-3">下一篇 →</span>
+                    <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
+                      {next.title}
+                    </p>
+                  </GlowCard>
+                </Link>
+              )}
+            </nav>
+          </Reveal>
         </div>
 
         {/* 目录 */}

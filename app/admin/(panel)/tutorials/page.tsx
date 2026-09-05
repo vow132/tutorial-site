@@ -30,22 +30,23 @@ export default async function AdminTutorialsPage() {
         </div>
         <Link
           href="/admin/tutorials/new"
-          className="flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="flex h-10 items-center gap-2 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
             <path d="M7 1v12M1 7h12" />
           </svg>
           写教程
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-white">
+      <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-surface">
         {tutorials.length === 0 ? (
           <p className="py-20 text-center text-sm text-ink-3">
             还没有教程，点击右上角开始创作
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-3">
                 <th className="px-6 py-3.5 font-medium">标题</th>
@@ -90,8 +91,8 @@ export default async function AdminTutorialsPage() {
                         title="点击切换状态"
                         className={`rounded-full px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-70 ${
                           t.published
-                            ? "bg-emerald-50 text-emerald-600"
-                            : "bg-amber-50 text-amber-600"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                         }`}
                       >
                         {t.published ? "已发布" : "草稿"}
@@ -120,6 +121,7 @@ export default async function AdminTutorialsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

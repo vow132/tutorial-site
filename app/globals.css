@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
 
 @theme {
   --color-ink: #17181c;
@@ -9,15 +8,28 @@
   --color-paper: #f7f8fa;
   --color-accent: #6366f1;
   --color-accent-soft: #eef2ff;
+  --color-live: #10b981;
+  /* 阴影层级：胶囊悬浮件 / 浮层（下拉、卡片抬升） */
+  --shadow-capsule: 0 8px 30px -12px rgb(var(--shadow-rgb) / 0.18);
+  --shadow-lifted: 0 18px 50px -20px rgb(var(--shadow-rgb) / 0.28);
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     system-ui, -apple-system, sans-serif;
 }
+
+/* 语义色：值随主题切换（dark 由下方变量覆盖驱动） */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-btn: var(--button-bg);
+  --color-scrim: var(--scrim);
+}
+
+/* 让 dark: 变体跟随 data-theme 而非系统偏好 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
   --background: #f7f8fa;
   --foreground: #17181c;
   --surface: #ffffff;
-  --surface-rgb: 255 255 255;
   --content: #2b2f36;
   --content-muted: #3f4254;
   --code-bg: #f1f3f7;
@@ -26,7 +38,14 @@
   --selection: #c7d2fe;
   --button-bg: #17181c;
   --button-fg: #ffffff;
+  --scrim: #17181c;
   --shadow-rgb: 23 24 28;
+  /* 统计/图表点缀色 */
+  --chart-indigo: #6366f1;
+  --chart-green: #10b981;
+  --chart-amber: #f59e0b;
+  --chart-sky: #0ea5e9;
+  --chart-pink: #ec4899;
   color-scheme: light;
 }
 
@@ -34,7 +53,6 @@
   --background: #0d1117;
   --foreground: #f3f4f6;
   --surface: #161d27;
-  --surface-rgb: 22 29 39;
   --content: #d8dee9;
   --content-muted: #b7c0ce;
   --code-bg: #111821;
@@ -43,6 +61,7 @@
   --selection: #373b70;
   --button-bg: #4f46e5;
   --button-fg: #ffffff;
+  --scrim: #000000;
   --shadow-rgb: 0 0 0;
   --color-ink: #f3f4f6;
   --color-ink-2: #c2cad6;
@@ -51,6 +70,7 @@
   --color-paper: #111821;
   --color-accent: #818cf8;
   --color-accent-soft: #27264a;
+  --color-live: #34d399;
   color-scheme: dark;
 }
 
@@ -59,25 +79,13 @@
   display: none;
 }
 
-[data-theme="dark"] .bg-ink {
-  background-color: var(--button-bg);
+/* ---------- 跳到正文（键盘可达性） ---------- */
+.skip-link {
+  transform: translateY(-6rem);
+  transition: transform 0.2s ease;
 }
-
-[data-theme="dark"] [class*="bg-ink/"] {
-  background-color: rgb(0 0 0 / 0.48);
-}
-
-[data-theme="dark"] [class~="bg-white"] {
-  background-color: var(--surface);
-}
-
-[data-theme="dark"] [class*="bg-white/"] {
-  background-color: rgb(var(--surface-rgb) / 0.9);
-}
-
-[data-theme="dark"] [class*="hover:bg-white"]:hover,
-[data-theme="dark"] [class*="focus:bg-white"]:focus {
-  background-color: var(--surface);
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 html {
@@ -108,6 +116,11 @@ body {
 @keyframes mascot-blink {
   0%, 92%, 100% { transform: scaleY(1); }
   96% { transform: scaleY(0.1); }
+}
+/* 外层位移由 pointer-aura 写入 --gx/--gy（无 JS 时为 0，保持栖位） */
+.site-mascot {
+  transform: translate3d(var(--gx, 0px), var(--gy, 0px), 0);
+  will-change: transform;
 }
 .mascot-float {
   animation: mascot-float 3.2s ease-in-out infinite;
@@ -234,9 +247,26 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .reveal {
   animation: reveal-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/*
+ * 首屏以下的内容改为滚动触发：进入视口才浮现。
+ * 仅支持 CSS 滚动时间线的浏览器启用；不支持的保持可见（无 JS 也可见）。
+ */
+.reveal-scroll {
+  opacity: 1;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal-scroll {
+      animation: reveal-in 0.6s linear both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 45%;
+    }
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
+  .reveal-scroll,
   .mascot-float,
   .mascot-eyes,
   .nav-aura,
@@ -247,6 +277,10 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   }
 }
 /* ---------- 微光卡片 ---------- */
+/*
+ * 聚光灯与倾斜由 components/pointer-aura.tsx 写入 --mx/--my/--rx/--ry；
+ * 无 JS 时回落到「顶部居中聚光灯 + 纯上浮」的静态呈现。
+ */
 .glow-card {
   position: relative;
   background: var(--surface);
@@ -257,8 +291,12 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   transform-style: preserve-3d;
   will-change: transform;
 }
+.glow-card-tilt {
+  transform: perspective(900px) rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg)) translateY(var(--lift, 0px));
+}
 .glow-card-tilt:hover {
-  transform: translateY(-2px);
+  --lift: -2px;
 }
 .glow-card:hover {
   border-color: var(--line-strong);
@@ -270,7 +308,11 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(420px circle at 50% 0%, rgba(99,102,241,0.08), transparent 65%);
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(99, 102, 241, 0.1),
+    transparent 65%
+  );
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -331,9 +373,9 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   font-size: inherit;
 }
 .article-body blockquote {
-  border-left: 3px solid var(--color-accent);
   background: var(--color-accent-soft);
-  border-radius: 0 0.75rem 0.75rem 0;
+  border: 1px solid color-mix(in oklab, var(--color-accent) 18%, transparent);
+  border-radius: 0.75rem;
   padding: 0.9rem 1.2rem;
   margin: 1.4em 0;
   color: var(--content-muted);
@@ -385,9 +427,9 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .tiptap-shell .ProseMirror ul { list-style: disc; padding-left: 1.5em; margin: 0.7em 0; }
 .tiptap-shell .ProseMirror ol { list-style: decimal; padding-left: 1.5em; margin: 0.7em 0; }
 .tiptap-shell .ProseMirror blockquote {
-  border-left: 3px solid var(--color-accent);
   background: var(--color-accent-soft);
-  border-radius: 0 0.6rem 0.6rem 0;
+  border: 1px solid color-mix(in oklab, var(--color-accent) 18%, transparent);
+  border-radius: 0.6rem;
   padding: 0.6rem 1rem;
   margin: 0.9em 0;
 }
