@@ -1,6 +1,6 @@
 # 教程网
 
-基于 Next.js 16.2（App Router + webpack）、React 19、Tailwind CSS v4、Prisma 7 + SQLite 的商业级图文教程平台。
+基于 Next.js 16.2（App Router + webpack）、React 19、Tailwind CSS v4、Prisma 7 + SQLite 的图文教程平台。
 
 ## 项目预览
 
