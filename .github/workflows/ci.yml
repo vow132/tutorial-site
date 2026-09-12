@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # CI 使用一次性 SQLite 文件数据库，验证完整构建链路
+      DATABASE_URL: "file:./prisma/ci.db"
+      AUTH_SECRET: "ci-only-never-use-in-production"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "ci-admin-password"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 生成 Prisma 客户端
+        run: npx prisma generate
+
+      - name: 数据库迁移
+        run: npx prisma migrate deploy
+
+      - name: 写入种子数据
+        run: npx prisma db seed
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: 生产构建
+        run: npm run build

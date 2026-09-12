@@ -17,6 +17,16 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: settings.siteName,
       title: settings.siteTitle,
       description: settings.siteDescription,
+      images: [{ url: "/og.png", width: 1200, height: 630, alt: settings.siteTitle }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: settings.siteTitle,
+      description: settings.siteDescription,
+      images: ["/og.png"],
+    },
+    alternates: {
+      types: { "application/rss+xml": `${SITE_URL.replace(/\/$/, "")}/feed.xml` },
     },
   };
 }
