@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { stripHtml } from "@/lib/article";
+import { searchPublishedTutorials } from "@/lib/search";
 import GlowCard from "@/components/glow-card";
 import Mascot from "@/components/mascot";
 import Reveal from "@/components/reveal";
@@ -42,31 +42,8 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const query = (q ?? "").trim();
-
-  const results = query
-    ? await prisma.tutorial.findMany({
-        where: {
-          published: true,
-          OR: [
-            { title: { contains: query } },
-            { excerpt: { contains: query } },
-            { content: { contains: query } },
-          ],
-        },
-        orderBy: { views: "desc" },
-        take: 20,
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          excerpt: true,
-          content: true,
-          views: true,
-          category: { select: { name: true, color: true } },
-        },
-      })
-    : [];
+  const query = (q ?? "").trim().slice(0, 100);
+  const results = await searchPublishedTutorials(query);
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-14">

@@ -12,7 +12,7 @@ import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 
 export default async function HomePage() {
-  const [settings, categories, latest, tutorialCount, viewAgg] = await Promise.all([
+  const [settings, categories, latest, tutorialStats] = await Promise.all([
     getSettings(),
     getHomeCategories(),
     prisma.tutorial.findMany({
@@ -29,8 +29,11 @@ export default async function HomePage() {
         category: { select: { name: true, color: true } },
       },
     }),
-    prisma.tutorial.count({ where: { published: true } }),
-    prisma.tutorial.aggregate({ _sum: { views: true } }),
+    prisma.tutorial.aggregate({
+      where: { published: true },
+      _count: { _all: true },
+      _sum: { views: true },
+    }),
   ]);
 
   // 教程只归属自身分类，卡片仅显示该分类自身的教程数。
@@ -39,14 +42,24 @@ export default async function HomePage() {
   ): number => category._count.tutorials;
 
   const stats = [
-    { label: "精选教程", value: tutorialCount, unit: "篇", color: "var(--chart-indigo)" },
+    {
+      label: "精选教程",
+      value: tutorialStats._count._all,
+      unit: "篇",
+      color: "var(--chart-indigo)",
+    },
     {
       label: "教程分类",
       value: flattenCategoryTree(categories).length,
       unit: "个",
       color: "var(--chart-green)",
     },
-    { label: "累计阅读", value: viewAgg._sum.views ?? 0, unit: "次", color: "var(--chart-amber)" },
+    {
+      label: "累计阅读",
+      value: tutorialStats._sum.views ?? 0,
+      unit: "次",
+      color: "var(--chart-amber)",
+    },
   ];
 
   return (

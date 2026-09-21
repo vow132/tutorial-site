@@ -289,7 +289,6 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   transition: border-color 0.25s ease, box-shadow 0.25s ease,
     transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   transform-style: preserve-3d;
-  will-change: transform;
 }
 .glow-card-tilt {
   transform: perspective(900px) rotateX(var(--rx, 0deg))
@@ -297,6 +296,7 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 }
 .glow-card-tilt:hover {
   --lift: -2px;
+  will-change: transform;
 }
 .glow-card:hover {
   border-color: var(--line-strong);

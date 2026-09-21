@@ -51,6 +51,16 @@ export default function PointerAura() {
       if (!raf) raf = requestAnimationFrame(frame);
     };
 
+    const measureMascotBase = () => {
+      if (!mascot || mascotBase) return;
+      const rect = mascot.getBoundingClientRect();
+      if (rect.width === 0) return;
+      mascotBase = {
+        x: rect.left + rect.width / 2 - gx,
+        y: rect.top + rect.height / 2 - gy,
+      };
+    };
+
     const onMove = (e: PointerEvent) => {
       const target = e.target instanceof Element
         ? e.target.closest<HTMLElement>(".glow-card")
@@ -61,9 +71,11 @@ export default function PointerAura() {
           card = target;
           cardRect = card.getBoundingClientRect();
         }
-      } else if (card) {
+      } else if (card && !cardRect) {
         cardRect = card.getBoundingClientRect();
       }
+      measureMascotBase();
+
       if (card && cardRect) {
         const x = e.clientX - cardRect.left;
         const y = e.clientY - cardRect.top;
@@ -81,11 +93,6 @@ export default function PointerAura() {
       }
 
       if (mascot) {
-        // 首次移动时记录未变换的栖位中心；display:none（窄屏）则不跟随。
-        const rect = mascot.getBoundingClientRect();
-        if (!mascotBase && rect.width > 0) {
-          mascotBase = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-        }
         if (mascotBase) {
           tgx = e.clientX - mascotBase.x;
           tgy = e.clientY - mascotBase.y - 30; // 悬停在指针上方一点
@@ -101,6 +108,11 @@ export default function PointerAura() {
       ensureLoop();
     };
 
+    const onViewportChange = () => {
+      cardRect = null;
+      mascotBase = null;
+    };
+
     const onLeave = () => {
       tgx = 0;
       tgy = 0;
@@ -109,9 +121,16 @@ export default function PointerAura() {
     };
 
     window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("resize", onViewportChange, { passive: true });
+    window.addEventListener("scroll", onViewportChange, {
+      capture: true,
+      passive: true,
+    });
     document.documentElement.addEventListener("pointerleave", onLeave);
     return () => {
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
       document.documentElement.removeEventListener("pointerleave", onLeave);
       cancelAnimationFrame(raf);
       clearTimeout(idleTimer);

@@ -2,15 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { deleteTutorial, togglePublish } from "@/lib/actions/tutorials";
+import Pagination from "@/components/pagination";
 import DeleteButton from "./delete-button";
 
 export const metadata: Metadata = { title: "教程管理" };
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminTutorialsPage() {
+const PAGE_SIZE = 20;
+
+export default async function AdminTutorialsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: rawPage } = await searchParams;
+  const requestedPage = Number.parseInt(rawPage ?? "1", 10);
+  const total = await prisma.tutorial.count();
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Number.isFinite(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), totalPages)
+    : 1;
+
   const tutorials = await prisma.tutorial.findMany({
     orderBy: { updatedAt: "desc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     select: {
       id: true,
       title: true,
@@ -26,7 +43,7 @@ export default async function AdminTutorialsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">教程管理</h1>
-          <p className="mt-1 text-sm text-ink-3">共 {tutorials.length} 篇</p>
+          <p className="mt-1 text-sm text-ink-3">共 {total} 篇</p>
         </div>
         <Link
           href="/admin/tutorials/new"
@@ -124,6 +141,11 @@ export default async function AdminTutorialsPage() {
           </div>
         )}
       </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        basePath="/admin/tutorials"
+      />
     </div>
   );
 }
