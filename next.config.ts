@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
+import { execFileSync } from "node:child_process";
+
+function buildRevision() {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch { return ""; }
+}
 
 const nextConfig: NextConfig = {
+  env: { SITE_BUILD_REVISION: buildRevision() },
   serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3"],
   turbopack: {
     root: process.cwd(),

@@ -14,7 +14,11 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (pathname === "/admin/login" && process.env.SITE_BUILD_REVISION) {
+    response.headers.set("x-site-revision", process.env.SITE_BUILD_REVISION);
+  }
+  return response;
 }
 
 export const config = {

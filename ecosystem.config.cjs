@@ -8,6 +8,8 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 3000,
+        SITE_UPDATE_ROOT: __dirname,
+        SITE_AUTO_UPDATE: "true",
       },
       instances: 1,
       exec_mode: "fork",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import GitHubUpdate from "./github-update";
 
 export const metadata: Metadata = { title: "仪表盘" };
 
@@ -37,20 +38,23 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-ink">仪表盘</h1>
           <p className="mt-1 text-sm text-ink-3">内容数据一览</p>
         </div>
-        <Link
-          href="/admin/tutorials/new"
-          className="flex h-10 items-center gap-2 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-        >
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-            <path d="M7 1v12M1 7h12" />
-          </svg>
-          写教程
-        </Link>
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            href="/admin/tutorials/new"
+            className="flex h-10 items-center gap-2 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+              <path d="M7 1v12M1 7h12" />
+            </svg>
+            写教程
+          </Link>
+          <GitHubUpdate />
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

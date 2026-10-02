@@ -49,3 +49,6 @@ next-env.d.ts
 
 # zcode 本地工作区
 /.zcode/
+
+# 一键更新任务、构建目录和数据库备份
+/.updates/
