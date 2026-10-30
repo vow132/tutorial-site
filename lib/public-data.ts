@@ -14,6 +14,11 @@ export const CACHE_TAGS = {
 } as const;
 
 const LIST_REVALIDATE_SECONDS = 300;
+/**
+ * 分类、设置只靠后台保存时按标签失效；绕过后台改库（恢复备份、手工 SQL）时
+ * 缓存不会知道，所以再加一个每小时自动刷新的兜底。
+ */
+export const SLOW_REVALIDATE_SECONDS = 3600;
 
 /** Lightweight category list shared by the public header and footer. */
 const cachedPublicCategories = unstable_cache(
@@ -30,7 +35,7 @@ const cachedPublicCategories = unstable_cache(
       },
     }),
   ["public-categories"],
-  { tags: [CACHE_TAGS.categories] },
+  { tags: [CACHE_TAGS.categories], revalidate: SLOW_REVALIDATE_SECONDS },
 );
 
 export const getPublicCategories = cache(() => cachedPublicCategories());

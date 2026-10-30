@@ -30,3 +30,9 @@ test("a first image far into the article is not prioritised", async () => {
   assert.doesNotMatch(html, /fetchpriority/);
   assert.doesNotMatch(html, /loading="lazy"/);
 });
+
+test("malformed numeric entities never break rendering", async () => {
+  const { toc } = await processArticle("<h2>A &#99999999; &#x110000; B</h2>");
+  assert.equal(toc.length, 1);
+  assert.match(toc[0].text, /^A .* B$/);
+});

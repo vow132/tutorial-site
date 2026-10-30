@@ -19,7 +19,8 @@ function contentSecurityPolicy(upgradeInsecureRequests: boolean) {
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    // 正文里可能引用外站 http 图片；HTTPS 下浏览器会自动升级，不构成脚本风险。
+    "img-src 'self' data: blob: https: http:",
     "font-src 'self' data:",
     `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
     "object-src 'none'",

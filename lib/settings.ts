@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { CACHE_TAGS } from "@/lib/public-data";
+import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
 
 export type FooterLink = { label: string; href: string };
 export type FooterColumn = {
@@ -66,7 +66,7 @@ const cachedSettingsValue = unstable_cache(
   async () =>
     (await prisma.setting.findUnique({ where: { key: SETTINGS_KEY } }))?.value ?? null,
   ["site-settings"],
-  { tags: [CACHE_TAGS.settings] },
+  { tags: [CACHE_TAGS.settings], revalidate: SLOW_REVALIDATE_SECONDS },
 );
 
 export const getSettings = cache(async function getSettings(): Promise<SiteSettings> {
