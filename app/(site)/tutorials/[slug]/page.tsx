@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { processArticle } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
-import { queueTutorialView } from "@/lib/view-counter";
+import { countTutorialView } from "@/lib/view-counter";
+import { getClientIp, getUserAgent } from "@/lib/client-ip";
+import { decodeSegment } from "@/lib/url";
 import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
@@ -17,8 +19,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug: rawSlug } = await params;
-  const slug = decodeURIComponent(rawSlug);
-  const t = await getPublishedTutorial(slug);
+  const slug = decodeSegment(rawSlug);
+  const t = slug ? await getPublishedTutorial(slug) : null;
   // 在 metadata 阶段就触发 404：此时响应尚未开始流式传输，
   // 才能返回真实的 404 状态码（否则 loading.tsx 先行输出 200）。
   if (!t) notFound();
@@ -31,13 +33,14 @@ export default async function TutorialDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug: rawSlug } = await params;
-  const slug = decodeURIComponent(rawSlug);
+  const slug = decodeSegment(rawSlug);
 
-  const tutorial = await getPublishedTutorial(slug);
+  const tutorial = slug ? await getPublishedTutorial(slug) : null;
   if (!tutorial) notFound();
 
-  // 阅读量 +1：放到响应之后执行，不阻塞首屏渲染
-  after(() => queueTutorialView(tutorial.id));
+  // 阅读量 +1：放到响应之后执行，不阻塞首屏渲染；爬虫和短时间重复访问不计数
+  const visitor = { ip: await getClientIp(), userAgent: await getUserAgent() };
+  after(() => countTutorialView(tutorial.id, visitor));
 
   // 上一篇 / 下一篇（同分类内按时间）
   const [prev, next, processed] = await Promise.all([

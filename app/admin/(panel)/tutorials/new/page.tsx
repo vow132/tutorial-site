@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { createTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
@@ -9,6 +10,7 @@ export const metadata: Metadata = { title: "写教程" };
 export const dynamic = "force-dynamic";
 
 export default async function NewTutorialPage() {
+  await requireAdminPage();
   const categoryRows = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
     select: { id: true, name: true, parentId: true, order: true },

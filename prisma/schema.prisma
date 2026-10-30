@@ -44,10 +44,42 @@ model Tutorial {
 }
 
 model Admin {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String
+  id           Int            @id @default(autoincrement())
+  username     String         @unique
+  password     String
+  /// Base32 TOTP secret; null means two-factor authentication is off.
+  totpSecret   String?
+  /// Last accepted TOTP time step, so a code cannot be replayed.
+  totpLastStep Int?
+  createdAt    DateTime       @default(now())
+  sessions     AdminSession[]
+}
+
+/// Server-side session record: logging out or revoking deletes the row,
+/// so a copied cookie stops working immediately.
+model AdminSession {
+  id        String   @id
+  adminId   Int
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  userAgent String?
+  ip        String?
   createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
+/// Append-only security/audit trail for admin activity.
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  actor     String?
+  ip        String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model Setting {

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { stripHtml } from "@/lib/article";
-import { searchPublishedTutorials } from "@/lib/search";
+import { getClientIp } from "@/lib/client-ip";
+import { sharedLimiter } from "@/lib/rate-limit";
+import { isShortQuery, searchPublishedTutorials } from "@/lib/search";
 import GlowCard from "@/components/glow-card";
 import Mascot from "@/components/mascot";
 import Reveal from "@/components/reveal";
@@ -43,7 +44,13 @@ export default async function SearchPage({
 }) {
   const { q } = await searchParams;
   const query = (q ?? "").trim().slice(0, 100);
-  const results = await searchPublishedTutorials(query);
+
+  // 配置了 TRUST_PROXY 能拿到真实 IP 时，单个 IP 每分钟最多 30 次搜索。
+  const ip = query ? await getClientIp() : null;
+  const limiter = sharedLimiter("search:ip", 30, 60_000);
+  const throttled = ip ? limiter.retryAfter(ip) > 0 : false;
+  if (ip && !throttled) limiter.hit(ip);
+  const results = throttled ? [] : await searchPublishedTutorials(query);
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-14">
@@ -58,8 +65,17 @@ export default async function SearchPage({
           )}
         </h1>
         <p className="mt-3 text-sm text-ink-2">
-          {query ? `共找到 ${results.length} 篇相关教程` : "在顶部输入关键词开始搜索"}
+          {throttled
+            ? "搜索太频繁了，请稍等一分钟再试"
+            : query
+              ? `共找到 ${results.length} 篇相关教程`
+              : "在顶部输入关键词开始搜索"}
         </p>
+        {query && !throttled && isShortQuery(query) && (
+          <p className="mt-1 text-xs text-ink-3">
+            少于 3 个字时只匹配标题和摘要，输入更完整的关键词可搜索正文内容。
+          </p>
+        )}
       </Reveal>
 
       {/* 手机端顶部搜索框：点击导航搜索图标后可以直接输入并提交。 */}
@@ -103,7 +119,7 @@ export default async function SearchPage({
         </button>
       </form>
 
-      {query && results.length === 0 && (
+      {query && !throttled && results.length === 0 && (
         <div className="mt-16 flex flex-col items-center rounded-3xl border border-dashed border-line bg-surface/60 py-16 text-center">
           <Mascot />
           <p className="mt-6 text-ink-2">没有找到相关教程，换个关键词试试</p>
@@ -128,10 +144,7 @@ export default async function SearchPage({
                   <Highlight text={t.title} keyword={query} />
                 </h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-ink-2 line-clamp-2">
-                  <Highlight
-                    text={t.excerpt ?? stripHtml(t.content, 140)}
-                    keyword={query}
-                  />
+                  <Highlight text={t.snippet} keyword={query} />
                 </p>
               </GlowCard>
             </Link>

@@ -33,6 +33,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { imageSizeFromFile } from "image-size/fromFile";
+import { sanitizeArticleHtml } from "@/lib/sanitize";
 
 const languages = {
   bash,
@@ -100,14 +101,17 @@ function decodeEntities(value: string) {
     .replace(/&amp;/g, "&");
 }
 
+const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
+
 async function localImageSize(src: string): Promise<ImageDimension> {
-  if (!src.startsWith("/uploads/")) return null;
-  const cached = dimensionCache.get(src);
+  // 只探测 uploads 目录下的直接文件，`/uploads/../../.env` 这类路径直接跳过。
+  const name = src.startsWith("/uploads/") ? src.slice("/uploads/".length) : "";
+  if (!name || name !== path.basename(name) || name.startsWith(".")) return null;
+  const file = path.join(UPLOADS_DIR, name);
+  const cached = dimensionCache.get(file);
   if (cached) return cached;
 
-  const task = imageSizeFromFile(
-    path.join(process.cwd(), "public", src.replace(/^\/+/, "")),
-  )
+  const task = imageSizeFromFile(file)
     .then((size) =>
       size.width && size.height
         ? { width: size.width, height: size.height }
@@ -115,7 +119,7 @@ async function localImageSize(src: string): Promise<ImageDimension> {
     )
     .catch(() => null);
 
-  remember(dimensionCache, src, task, MAX_DIMENSION_CACHE);
+  remember(dimensionCache, file, task, MAX_DIMENSION_CACHE);
   return task;
 }
 
@@ -166,7 +170,8 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
   const toc: TocItem[] = [];
   let headingIndex = 0;
 
-  let output = html.replace(
+  // 渲染前再过滤一次：覆盖本次加固之前就已入库的旧内容。
+  let output = sanitizeArticleHtml(html).replace(
     /<h([23])(?:\s[^>]*)?>([\s\S]*?)<\/h\1>/g,
     (_match, level: string, inner: string) => {
       const text = inner.replace(/<[^>]+>/g, "").trim();

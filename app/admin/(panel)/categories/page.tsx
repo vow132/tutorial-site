@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import {
   buildCategoryTree,
@@ -16,6 +17,7 @@ export const metadata: Metadata = { title: "分类管理" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
+  await requireAdminPage();
   const categories = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
     include: { _count: { select: { tutorials: true } } },

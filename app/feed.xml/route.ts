@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site-url";
 
-export const dynamic = "force-dynamic";
+// 10 分钟重新生成一次，与下方 Cache-Control 一致。
+export const revalidate = 600;
 
 function escapeXml(input: string) {
   return input

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { SITE_REPOSITORY_URL, type SiteUpdateStatus } from "@/lib/site-update-types";
 
 const ENDPOINT = "/api/admin/site-update";
@@ -21,6 +21,10 @@ const colors = {
 export default function GitHubUpdate() {
   const [status, setStatus] = useState<DisplayStatus>(initialStatus);
   const [expanded, setExpanded] = useState(false);
+  // 部署前必须再次输入管理员密码；确认框打开时弹层保持展开。
+  const [confirming, setConfirming] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const descriptionId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
   const statusRef = useRef(status);
@@ -79,9 +83,14 @@ export default function GitHubUpdate() {
     }, 3_000);
     const onFocus = () => { if (Date.now() - lastCheck.current >= 60_000) void check(); };
     const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !wrapper.current?.contains(event.target)) setExpanded(false);
+      if (event.target instanceof Node && !wrapper.current?.contains(event.target)) {
+        setExpanded(false);
+        setConfirming(false);
+      }
     };
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setExpanded(false); };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setExpanded(false); setConfirming(false); }
+    };
     window.addEventListener("focus", onFocus);
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -94,21 +103,39 @@ export default function GitHubUpdate() {
     };
   }, [check]);
 
-  const update = async () => {
-    if (posting.current || !statusRef.current.canUpdate) { setExpanded(true); return; }
-    posting.current = true;
+  const requestUpdate = () => {
     setExpanded(true);
-    acceptStatus({ ...statusRef.current, state: "updating", canUpdate: false, message: "正在提交更新任务…" });
+    if (posting.current || !statusRef.current.canUpdate) return;
+    setConfirming(true);
+    setConfirmError(null);
+  };
+
+  const update = async (event: FormEvent) => {
+    event.preventDefault();
+    if (posting.current || !statusRef.current.canUpdate || !password) return;
+    posting.current = true;
+    const previous = statusRef.current;
+    acceptStatus({ ...previous, state: "updating", canUpdate: false, message: "正在提交更新任务…" });
     try {
       const response = await fetch(ENDPOINT, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
         signal: AbortSignal.timeout(45_000),
       });
       const result = await response.json();
+      if (response.status === 403) {
+        // 密码错误或被限流：恢复原状态，留在确认框里重试。
+        acceptStatus(previous);
+        setConfirmError(result.error || "密码验证失败。");
+        return;
+      }
+      setConfirming(false);
+      setPassword("");
       if (!response.ok) throw new Error(result.error || "无法启动更新，请稍后重试。" );
       jobId.current = result.job?.jobId ?? null;
       acceptStatus(result as SiteUpdateStatus);
     } catch (error) {
+      setConfirming(false);
       acceptStatus({ ...statusRef.current, state: "error", canUpdate: false,
         message: error instanceof Error ? error.message : "无法启动更新，请稍后重试。" });
     } finally {
@@ -119,6 +146,7 @@ export default function GitHubUpdate() {
   };
 
   const busy = status.state === "updating" || status.state === "checking";
+  const open = expanded || confirming;
   const actionLabel = status.canUpdate ? "更新网站到仓库最新版本" : `查看更新状态：${labels[status.state]}`;
 
   return (
@@ -138,8 +166,8 @@ export default function GitHubUpdate() {
         </svg>
       </a>
       <button
-        type="button" onClick={() => void update()} aria-label={actionLabel}
-        aria-describedby={descriptionId} aria-expanded={expanded} aria-busy={busy}
+        type="button" onClick={requestUpdate} aria-label={actionLabel}
+        aria-describedby={descriptionId} aria-expanded={open} aria-busy={busy}
         aria-disabled={busy} title={`${labels[status.state]}：${status.message}`}
         className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       >
@@ -147,7 +175,7 @@ export default function GitHubUpdate() {
       </button>
       <div
         id={descriptionId}
-        className={`absolute right-0 top-full z-30 w-[min(20rem,calc(100vw-2rem))] pt-3 ${expanded ? "visible" : "invisible"}`}
+        className={`absolute right-0 top-full z-30 w-[min(20rem,calc(100vw-2rem))] pt-3 ${open ? "visible" : "invisible"}`}
       >
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-capsule">
           <p className="text-sm font-semibold text-ink">{labels[status.state]}</p>
@@ -155,10 +183,28 @@ export default function GitHubUpdate() {
           {status.currentRevision && (
             <p className="mt-2 text-xs text-ink-2">当前 {status.currentRevision.slice(0, 7)}{status.latestRevision && status.latestRevision !== status.currentRevision ? ` · 仓库 ${status.latestRevision.slice(0, 7)}` : ""}</p>
           )}
+          {confirming && status.canUpdate && (
+            <form onSubmit={(event) => void update(event)} className="mt-3 space-y-2">
+              <label htmlFor={`${descriptionId}-password`} className="block text-xs font-medium text-ink-2">
+                输入管理员密码确认部署
+              </label>
+              <input
+                id={`${descriptionId}-password`} type="password" required autoFocus
+                autoComplete="current-password" value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="h-9 w-full rounded-lg border border-line bg-paper px-3 text-sm outline-none focus:border-accent focus-visible:outline-2 focus-visible:outline-accent/60"
+              />
+              {confirmError && <p className="text-xs text-red-500 dark:text-red-400">{confirmError}</p>}
+              <div className="flex gap-2">
+                <button type="submit" className="rounded-lg bg-btn px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">确认更新</button>
+                <button type="button" onClick={() => setConfirming(false)} className="rounded-lg px-3 py-1.5 text-xs text-ink-2 hover:bg-paper">取消</button>
+              </div>
+            </form>
+          )}
           {status.state === "error" && (
             <button type="button" onClick={() => void check()} className="mt-3 rounded-lg px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent">重新检测</button>
           )}
-          {expanded && (
+          {open && !confirming && (
             <button type="button" onClick={() => setExpanded(false)} className="mt-3 ml-2 rounded-lg px-2 py-1 text-xs text-ink-2 hover:bg-paper focus-visible:outline-2 focus-visible:outline-accent">收起</button>
           )}
         </div>

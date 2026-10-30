@@ -11,13 +11,15 @@ import {
 import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
+import { decodeSegment } from "@/lib/url";
 
 const PAGE_SIZE = 9;
 
 /** 取路径最后一段作为分类 slug：兼容用户填写的 /categories/父/子 形式。 */
 function resolveSlug(segments: string[]): string {
   const last = segments[segments.length - 1] ?? "";
-  return decodeURIComponent(last);
+  // 畸形编码返回空串，后续查不到分类即 404。
+  return decodeSegment(last) ?? "";
 }
 
 export async function generateMetadata({

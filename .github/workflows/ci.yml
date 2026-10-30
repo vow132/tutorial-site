@@ -5,6 +5,9 @@ on:
     branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -37,5 +40,21 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      - name: 单元测试
+        run: npm test
+
       - name: 生产构建
         run: npm run build
+
+  # 依赖出现高危漏洞时单独标红，不影响上面的构建结果判断。
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: npm audit（生产依赖）
+        run: npm audit --omit=dev --audit-level=high --package-lock-only

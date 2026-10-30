@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
@@ -11,9 +12,19 @@ async function main() {
   const existingAdmin = await prisma.admin.findFirst({ select: { id: true } });
   if (!existingAdmin) {
     const username = process.env.ADMIN_USERNAME ?? "admin";
-    const password = process.env.ADMIN_PASSWORD ?? "admin123456";
+    let password = process.env.ADMIN_PASSWORD;
+    if (!password) {
+      // 生产环境绝不使用公开的默认密码：随机生成并只在部署输出里显示一次。
+      password =
+        process.env.NODE_ENV === "production"
+          ? randomBytes(12).toString("base64url")
+          : "admin123456";
+      if (process.env.NODE_ENV === "production") {
+        console.log(`\n🔐 已创建管理员 ${username}，初始密码：${password}\n   请登录后台立即修改并开启两步验证。\n`);
+      }
+    }
     await prisma.admin.create({
-      data: { username, password: bcrypt.hashSync(password, 10) },
+      data: { username, password: bcrypt.hashSync(password, 12) },
     });
   }
 
