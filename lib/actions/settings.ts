@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type SettingsFormState = { error?: string; success?: string };
 
@@ -65,6 +66,7 @@ export async function updateSettings(
   });
 
   await audit("settings.update", { actor: admin.username });
+  revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidatePath("/", "layout");
   return { success: "设置已保存，前台已生效" };
 }

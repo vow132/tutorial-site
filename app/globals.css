@@ -3,11 +3,14 @@
 @theme {
   --color-ink: #17181c;
   --color-ink-2: #4b5563;
-  --color-ink-3: #9ca3af;
+  /* 辅助文字：#6b7280 在白底/浅灰底上对比度 ≥ 4.5:1（WCAG AA） */
+  --color-ink-3: #6b7280;
   --color-line: #e9ebf0;
   --color-paper: #f7f8fa;
   --color-accent: #6366f1;
   --color-accent-soft: #eef2ff;
+  /* 小号强调文字（链接、选中项）用更深一档的靛蓝，保证可读对比度 */
+  --color-accent-ink: #4f46e5;
   --color-live: #10b981;
   /* 阴影层级：胶囊悬浮件 / 浮层（下拉、卡片抬升） */
   --shadow-capsule: 0 8px 30px -12px rgb(var(--shadow-rgb) / 0.18);
@@ -70,6 +73,7 @@
   --color-paper: #111821;
   --color-accent: #818cf8;
   --color-accent-soft: #27264a;
+  --color-accent-ink: #818cf8;
   --color-live: #34d399;
   color-scheme: dark;
 }
@@ -247,6 +251,13 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .reveal {
   animation: reveal-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+@keyframes reveal-rise {
+  from { transform: translateY(var(--reveal-y, 22px)); }
+  to { transform: translateY(0); }
+}
+.reveal-rise {
+  animation: reveal-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 /*
  * 首屏以下的内容改为滚动触发：进入视口才浮现。
  * 仅支持 CSS 滚动时间线的浏览器启用；不支持的保持可见（无 JS 也可见）。
@@ -266,6 +277,7 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal,
+  .reveal-rise,
   .reveal-scroll,
   .mascot-float,
   .mascot-eyes,
@@ -345,7 +357,7 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .article-body ul { list-style: disc; }
 .article-body ol { list-style: decimal; }
 .article-body li { margin: 0.4em 0; }
-.article-body a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
+.article-body a { color: var(--color-accent-ink); text-decoration: underline; text-underline-offset: 3px; }
 .article-body strong { font-weight: 650; }
 .article-body code {
   font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;

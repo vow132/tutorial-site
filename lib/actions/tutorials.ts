@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type TutorialFormState = { error?: string };
 
@@ -43,6 +44,7 @@ function parseForm(formData: FormData) {
 }
 
 function revalidatePublic(slug?: string) {
+  revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
   revalidatePath("/");
   revalidatePath("/tutorials");
   if (slug) revalidatePath(`/tutorials/${slug}`);

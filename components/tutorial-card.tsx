@@ -1,4 +1,4 @@
-import Link from "next/link";
+import IntentLink from "./intent-link";
 import GlowCard from "./glow-card";
 
 type Props = {
@@ -21,7 +21,7 @@ export default function TutorialCard({
   createdAt,
 }: Props) {
   return (
-    <Link href={`/tutorials/${slug}`} className="block h-full">
+    <IntentLink href={`/tutorials/${slug}`} className="group block h-full">
       <GlowCard className="flex h-full flex-col p-6">
         <div className="flex items-center gap-2 text-xs text-ink-3">
           <span
@@ -32,7 +32,7 @@ export default function TutorialCard({
             {categoryName}
           </span>
           <span>·</span>
-          <time>
+          <time dateTime={createdAt.toISOString()}>
             {createdAt.toLocaleDateString("zh-CN", {
               year: "numeric",
               month: "short",
@@ -62,6 +62,6 @@ export default function TutorialCard({
           </span>
         </div>
       </GlowCard>
-    </Link>
+    </IntentLink>
   );
 }

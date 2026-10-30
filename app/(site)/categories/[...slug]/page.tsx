@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import IntentLink from "@/components/intent-link";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getCategoriesWithCounts, getPublishedTutorialPage } from "@/lib/public-data";
 import {
   buildCategoryTree,
   categoryLinkTarget,
@@ -29,7 +29,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug: segments } = await params;
   const slug = resolveSlug(segments);
-  const category = await prisma.category.findUnique({ where: { slug } });
+  const category = (await getCategoriesWithCounts()).find((item) => item.slug === slug);
   // metadata 阶段就触发 404，保证流式传输开始前拿到真实 404 状态码。
   if (!category) notFound();
   return { title: `${category.name}教程` };
@@ -53,23 +53,7 @@ export default async function CategoryPage({
     redirect(`/categories/${encodeURIComponent(slug)}${query}`);
   }
 
-  const allCategories = await prisma.category.findMany({
-    orderBy: [{ order: "asc" }, { id: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      description: true,
-      icon: true,
-      color: true,
-      order: true,
-      linkUrl: true,
-      parentId: true,
-      _count: {
-        select: { tutorials: { where: { published: true } } },
-      },
-    },
-  });
+  const allCategories = await getCategoriesWithCounts();
   const category = allCategories.find((item) => item.slug === slug);
   if (!category) notFound();
 
@@ -89,26 +73,16 @@ export default async function CategoryPage({
   }
 
   // 教程只在其所属分类展示，父分类不再聚合子分类下的教程。
-  // 先算总数收敛页码，避免 ?page=999 渲染出误导性的空状态。
-  const total = await prisma.tutorial.count({
-    where: { published: true, categoryId: category.id },
-  });
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const tutorials = await prisma.tutorial.findMany({
-    where: { published: true, categoryId: category.id },
-    orderBy: { createdAt: "desc" },
-    skip: (safePage - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      excerpt: true,
-      views: true,
-      createdAt: true,
-      category: { select: { name: true, color: true } },
-    },
+  // 页码收敛到合法区间，避免 ?page=999 渲染出误导性的空状态；结果有缓存。
+  const {
+    total,
+    totalPages,
+    page: safePage,
+    tutorials,
+  } = await getPublishedTutorialPage({
+    categoryId: category.id,
+    page,
+    pageSize: PAGE_SIZE,
   });
 
   // 子分类卡片只显示该分类自身的教程数，不再累加其后代。
@@ -117,21 +91,21 @@ export default async function CategoryPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
-      <Reveal>
+      <Reveal fade={false}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink-3">
-          <Link href="/" className="transition-colors hover:text-accent">
+          <IntentLink href="/" className="transition-colors hover:text-accent">
             首页
-          </Link>
+          </IntentLink>
           {ancestors.map((ancestor) => (
             <span key={ancestor.id} className="contents">
               <span>/</span>
-              <Link
+              <IntentLink
                 href={getCategoryHref(ancestor)}
                 {...categoryLinkTarget(getCategoryHref(ancestor))}
                 className="transition-colors hover:text-accent"
               >
                 {ancestor.name}
-              </Link>
+              </IntentLink>
             </span>
           ))}
           <span>/</span>
@@ -164,7 +138,7 @@ export default async function CategoryPage({
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {categoryNode.children.map((child, index) => (
               <Reveal key={child.id} delay={Math.min(index, 5) * 0.04}>
-                <Link
+                <IntentLink
                   href={getCategoryHref(child)}
                   {...categoryLinkTarget(getCategoryHref(child))}
                   className="flex h-full items-center gap-3 rounded-2xl border border-line bg-surface p-4 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-accent"
@@ -187,7 +161,7 @@ export default async function CategoryPage({
                     </span>
                   </span>
                   <span className="text-ink-3">→</span>
-                </Link>
+                </IntentLink>
               </Reveal>
             ))}
           </div>

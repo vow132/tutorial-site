@@ -1,16 +1,18 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { MAX_CATEGORY_LEVELS } from "@/lib/categories";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type CategoryFormState = { error?: string; success?: string };
 
 type CategoryRelation = { id: number; parentId: number | null };
 
 function revalidate() {
+  revalidateTag(CACHE_TAGS.categories, { expire: 0 });
   revalidatePath("/", "layout");
   revalidatePath("/admin/categories");
   revalidatePath("/admin/tutorials");

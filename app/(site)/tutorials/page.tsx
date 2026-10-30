@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { getPublishedTutorialPage } from "@/lib/public-data";
 import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
@@ -15,30 +15,15 @@ export default async function TutorialsPage({
 }) {
   const { page: pageStr } = await searchParams;
 
-  // 先算总页数并把页码收敛到合法区间，避免 ?page=999 渲染出误导性的空状态。
-  const total = await prisma.tutorial.count({ where: { published: true } });
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const page = Math.min(Math.max(1, Number(pageStr) || 1), totalPages);
-
-  const tutorials = await prisma.tutorial.findMany({
-    where: { published: true },
-    orderBy: { createdAt: "desc" },
-    skip: (page - 1) * PAGE_SIZE,
-    take: PAGE_SIZE,
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      excerpt: true,
-      views: true,
-      createdAt: true,
-      category: { select: { name: true, color: true } },
-    },
+  // 页码收敛到合法区间，避免 ?page=999 渲染出误导性的空状态；结果有缓存。
+  const { total, totalPages, page, tutorials } = await getPublishedTutorialPage({
+    page: Number(pageStr) || 1,
+    pageSize: PAGE_SIZE,
   });
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
-      <Reveal>
+      <Reveal fade={false}>
         <h1 className="text-3xl font-extrabold text-ink md:text-4xl">
           全部教程
         </h1>

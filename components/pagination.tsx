@@ -1,4 +1,4 @@
-import Link from "next/link";
+import IntentLink from "./intent-link";
 
 export default function Pagination({
   page,
@@ -23,22 +23,24 @@ export default function Pagination({
   );
 
   return (
-    <nav className="mt-12 flex items-center justify-center gap-2">
+    <nav aria-label="分页" className="mt-12 flex items-center justify-center gap-2">
       {page > 1 && (
-        <Link
+        <IntentLink
           href={href(page - 1)}
           className="flex h-9 items-center rounded-full border border-line bg-surface px-4 text-sm text-ink-2 transition-colors hover:border-accent hover:text-accent"
         >
           上一页
-        </Link>
+        </IntentLink>
       )}
       {pages.map((p, idx) => {
         const prev = pages[idx - 1];
         return (
           <span key={p} className="flex items-center gap-2">
-            {prev && p - prev > 1 && <span className="text-ink-3">…</span>}
-            <Link
+            {prev && p - prev > 1 && <span className="text-ink-3" aria-hidden="true">…</span>}
+            <IntentLink
               href={href(p)}
+              aria-current={p === page ? "page" : undefined}
+              aria-label={`第 ${p} 页`}
               className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium transition-colors ${
                 p === page
                   ? "bg-btn text-white"
@@ -46,17 +48,17 @@ export default function Pagination({
               }`}
             >
               {p}
-            </Link>
+            </IntentLink>
           </span>
         );
       })}
       {page < totalPages && (
-        <Link
+        <IntentLink
           href={href(page + 1)}
           className="flex h-9 items-center rounded-full border border-line bg-surface px-4 text-sm text-ink-2 transition-colors hover:border-accent hover:text-accent"
         >
           下一页
-        </Link>
+        </IntentLink>
       )}
     </nav>
   );

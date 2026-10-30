@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import IntentLink from "@/components/intent-link";
 import { getClientIp } from "@/lib/client-ip";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { isShortQuery, searchPublishedTutorials } from "@/lib/search";
@@ -26,7 +26,7 @@ function Highlight({ text, keyword }: { text: string; keyword: string }) {
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === keyword.toLowerCase() ? (
-          <mark key={i} className="rounded bg-accent-soft px-0.5 text-accent">
+          <mark key={i} className="rounded bg-accent-soft px-0.5 text-accent-ink">
             {part}
           </mark>
         ) : (
@@ -54,7 +54,7 @@ export default async function SearchPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-14">
-      <Reveal>
+      <Reveal fade={false}>
         <h1 className="text-3xl font-extrabold text-ink md:text-4xl">
           {query ? (
             <>
@@ -129,7 +129,7 @@ export default async function SearchPage({
       <div className="mt-10 space-y-4">
         {results.map((t, i) => (
           <Reveal key={t.id} delay={Math.min(i, 5) * 0.05}>
-            <Link href={`/tutorials/${t.slug}`} className="block">
+            <IntentLink href={`/tutorials/${t.slug}`} className="block">
               <GlowCard className="p-6">
                 <div className="flex items-center gap-2 text-xs text-ink-3">
                   <span
@@ -147,7 +147,7 @@ export default async function SearchPage({
                   <Highlight text={t.snippet} keyword={query} />
                 </p>
               </GlowCard>
-            </Link>
+            </IntentLink>
           </Reveal>
         ))}
       </div>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import IntentLink from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -74,15 +74,15 @@ export default async function TutorialDetailPage({
       {/* 面包屑 */}
       <Reveal>
         <nav className="flex items-center gap-2 text-sm text-ink-3">
-          <Link href="/" className="transition-colors hover:text-accent">首页</Link>
+          <IntentLink href="/" className="transition-colors hover:text-accent">首页</IntentLink>
           <span>/</span>
-          <Link
+          <IntentLink
             href={getCategoryHref(tutorial.category)}
             {...categoryLinkTarget(getCategoryHref(tutorial.category))}
             className="transition-colors hover:text-accent"
           >
             {tutorial.category.name}
-          </Link>
+          </IntentLink>
           <span>/</span>
           <span className="truncate text-ink-2">{tutorial.title}</span>
         </nav>
@@ -91,7 +91,7 @@ export default async function TutorialDetailPage({
       <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px] xl:grid-cols-[minmax(0,1fr)_260px]">
         <div>
           {/* 头部 */}
-          <Reveal>
+          <Reveal fade={false}>
             <header>
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
@@ -112,11 +112,13 @@ export default async function TutorialDetailPage({
               <div className="mt-4 flex flex-wrap items-center gap-4 border-b border-line pb-6 text-xs text-ink-3">
                 <span>
                   发布于{" "}
-                  {tutorial.createdAt.toLocaleDateString("zh-CN", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  <time dateTime={tutorial.createdAt.toISOString()}>
+                    {tutorial.createdAt.toLocaleDateString("zh-CN", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </time>
                 </span>
                 <span>约 {minutes} 分钟读完</span>
                 <span>{tutorial.views + 1} 次阅读</span>
@@ -128,7 +130,7 @@ export default async function TutorialDetailPage({
           <MobileToc items={toc} />
 
           {/* 正文 */}
-          <Reveal delay={0.1}>
+          <Reveal delay={0.1} fade={false}>
             <article
               className="article-body mt-8"
               dangerouslySetInnerHTML={{ __html: html }}
@@ -139,26 +141,26 @@ export default async function TutorialDetailPage({
           <Reveal mode="scroll">
             <nav className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {prev ? (
-                <Link href={`/tutorials/${prev.slug}`} className="block h-full">
+                <IntentLink href={`/tutorials/${prev.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5">
                     <span className="text-xs text-ink-3">← 上一篇</span>
                     <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
                       {prev.title}
                     </p>
                   </GlowCard>
-                </Link>
+                </IntentLink>
               ) : (
                 <span />
               )}
               {next && (
-                <Link href={`/tutorials/${next.slug}`} className="block h-full">
+                <IntentLink href={`/tutorials/${next.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5 text-right">
                     <span className="text-xs text-ink-3">下一篇 →</span>
                     <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
                       {next.title}
                     </p>
                   </GlowCard>
-                </Link>
+                </IntentLink>
               )}
             </nav>
           </Reveal>

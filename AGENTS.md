@@ -32,9 +32,13 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单
-- **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ 存 `public/uploads/`
+- **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
 - **安全响应头**：CSP/HSTS/nosniff 等统一在 `next.config.ts` 的 `headers()`；HSTS 只在 `X-Forwarded-Proto: https` 时下发，`/uploads/*` 带 `sandbox` CSP
 - 后台结构：`app/admin/login`（登录页）+ `app/admin/(panel)/*`（带侧边栏的面板路由组）
+- **前台链接**：一律用 `components/intent-link.tsx`（悬停/触摸/聚焦时才预取），不要直接用 `next/link`，否则每个页面会对视口内所有链接发预取请求
+- **前台数据缓存**：分类、设置、教程列表经 `unstable_cache` 缓存（`lib/public-data.ts` 的 `CACHE_TAGS`）；后台改动后在 Server Action 里 `revalidateTag(tag, { expire: 0 })`。缓存以 JSON 存储，Date 需自行还原
+- **动效与首屏**：首屏最大的元素（首页大标题、文章标题/正文）用 `<Reveal fade={false}>` 只做位移，避免从透明淡入拖慢 LCP；桌面导航 hydration 前用 CSS 断点渲染三档分页，避免跳动
+- **颜色对比度**：辅助文字 `text-ink-3`（#6b7280）、小号强调文字用 `text-accent-ink`（#4f46e5），`text-accent` 只用于大字号、图标和背景
 - **站点设置**：`Setting` 表（key-value，单行 key=`site`，JSON 存全部设置）；类型/默认值/读取在 `lib/settings.ts`（`getSettings()` 自动回退默认值）；后台编辑在 `/admin/settings`（底部栏目是客户端 JSON 编辑器，`autoCategories: true` 的栏目自动输出分类链接）；前台 layout/页脚/首页 Hero 均从 `getSettings()` 取数
 - Server Actions 在 `lib/actions/`，每个都必须 `requireAuth()`；变更后 `revalidatePath`。`"use server"` 文件里导出的每个函数都会成为可被直接调用的接口，辅助函数放到普通模块中
 

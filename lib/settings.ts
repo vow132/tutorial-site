@@ -1,5 +1,7 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type FooterLink = { label: string; href: string };
 export type FooterColumn = {
@@ -54,18 +56,25 @@ export const defaultSettings: SiteSettings = {
     },
     {
       title: "关于",
-      links: [{ label: "管理后台", href: "/admin" }],
+      links: [{ label: "RSS 订阅", href: "/feed.xml" }],
     },
   ],
 };
 
+/** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
+const cachedSettingsValue = unstable_cache(
+  async () =>
+    (await prisma.setting.findUnique({ where: { key: SETTINGS_KEY } }))?.value ?? null,
+  ["site-settings"],
+  { tags: [CACHE_TAGS.settings] },
+);
+
 export const getSettings = cache(async function getSettings(): Promise<SiteSettings> {
   try {
-    const row = await prisma.setting.findUnique({
-      where: { key: SETTINGS_KEY },
-    });
-    if (!row) return defaultSettings;
-    const parsed = JSON.parse(row.value) as Partial<SiteSettings>;
+    // 查询失败会抛出、不会被缓存；兜底默认值只在这一次请求里生效。
+    const value = await cachedSettingsValue();
+    if (!value) return defaultSettings;
+    const parsed = JSON.parse(value) as Partial<SiteSettings>;
     return {
       ...defaultSettings,
       ...parsed,
