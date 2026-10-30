@@ -2,7 +2,7 @@
 /** Detached Linux/PM2 updater. Run only through the authenticated update API. */
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { access, copyFile, mkdir, readFile, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { access, copyFile, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -79,6 +79,46 @@ export function runCommand(command, args, { cwd, env, capture = false, timeout =
   });
 }
 
+/**
+ * 每次更新都会留下完整的发布目录（含 node_modules）、数据库备份和旧 PM2 配置。
+ * 成功后只保留最近几份，长期运行也不会占满磁盘、散落 .env 副本。
+ * protect 中的路径（正在运行的版本、回滚目标）永远不删。
+ */
+export async function pruneUpdateArtifacts(updates, { protect = [], keepReleases = 2, keepBackups = 5 } = {}) {
+  const protectedPaths = new Set();
+  for (const item of protect.filter(Boolean)) {
+    protectedPaths.add(path.resolve(item));
+    try { protectedPaths.add(await realpath(item)); } catch { /* Already gone. */ }
+  }
+  const list = async (directory, pattern, wantDirectory) => {
+    let names;
+    try { names = await readdir(directory); }
+    catch (error) { if (error.code === "ENOENT") return []; throw error; }
+    const items = [];
+    for (const name of names) {
+      if (!pattern.test(name)) continue;
+      const full = path.join(directory, name);
+      const info = await lstat(full);
+      if (info.isDirectory() === wantDirectory && !info.isSymbolicLink()) items.push({ full, mtime: info.mtimeMs });
+    }
+    return items.sort((a, b) => b.mtime - a.mtime);
+  };
+  const removed = [];
+  const prune = async (items, keep) => {
+    let kept = 0;
+    for (const item of items) {
+      if (protectedPaths.has(item.full)) continue;
+      if (kept < keep) { kept += 1; continue; }
+      await rm(item.full, { recursive: true, force: true });
+      removed.push(item.full);
+    }
+  };
+  await prune(await list(path.join(updates, "releases"), JOB, true), keepReleases);
+  await prune(await list(updates, /^database-[a-zA-Z0-9_-]+\.db$/, false), keepBackups);
+  await prune(await list(updates, /^previous-[a-zA-Z0-9_-]+\.config\.cjs$/, false), keepBackups);
+  return removed;
+}
+
 async function sqliteBackup(source, destination, moduleRoot) {
   const require = createRequire(path.join(moduleRoot, "package.json"));
   const Database = require("better-sqlite3");
@@ -129,6 +169,7 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
   const checkHealth = dependencies.health || health;
   const link = dependencies.link || symlink;
   const logError = dependencies.logError || console.error;
+  const prune = dependencies.prune || pruneUpdateArtifacts;
   const branch = environment.SITE_UPDATE_BRANCH || "master";
   if (!SHA.test(targetRevision) || !JOB.test(jobId)) throw new Error("更新任务参数无效。");
   root = await realpath(root);
@@ -206,6 +247,11 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
     try { await command("git", ["merge-base", "--is-ancestor", currentRevision, targetRevision], { cwd: release }); }
     catch { throw new Error("仓库更新与当前版本历史不兼容，已停止更新。"); }
     if (targetRevision === currentRevision) throw new Error("当前已经是最新版本。");
+    if (environment.SITE_UPDATE_REQUIRE_SIGNED === "true") {
+      // 需要服务器上配置好可信的 GPG 公钥或 SSH allowedSignersFile。
+      try { await command("git", ["verify-commit", targetRevision], { cwd: release, timeout: 30_000 }); }
+      catch { throw new Error("目标版本缺少可信签名，已停止更新。"); }
+    }
     await command("git", ["checkout", "--detach", targetRevision], { cwd: release });
     for (const filename of [".env", ".env.local", ".env.production", ".env.production.local"]) {
       if (await exists(path.join(root, filename))) await copyFile(path.join(root, filename), path.join(release, filename));
@@ -255,6 +301,9 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
     }
     await command("pm2", ["save"], { timeout: 30_000 });
     for (const suffix of ["", "-wal", "-shm"]) await rm(`${buildDatabase}${suffix}`, { force: true });
+    try {
+      await prune(updates, { protect: [release, previous.cwd, liveBackup, previousConfig] });
+    } catch (pruneError) { logError(`[site-update:${jobId}] prune`, pruneError); }
     await progress("complete", "更新成功，站点已运行最新版本。", "success");
     return { success: true, release };
   } catch (error) {

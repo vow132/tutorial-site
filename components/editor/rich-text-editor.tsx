@@ -457,7 +457,7 @@ export default function RichTextEditor({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/gif,image/webp"
         multiple
         hidden
         onChange={(e) => {

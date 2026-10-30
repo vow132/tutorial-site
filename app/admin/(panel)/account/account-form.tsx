@@ -55,10 +55,10 @@ export default function AccountForm({ username }: { username: string }) {
         <input
           name="newPassword"
           type="password"
-          minLength={8}
+          minLength={10}
           autoComplete="new-password"
           className={inputClass}
-          placeholder="至少 8 位"
+          placeholder="至少 10 位，避免常见密码"
         />
       </div>
 
@@ -69,7 +69,7 @@ export default function AccountForm({ username }: { username: string }) {
         <input
           name="confirmPassword"
           type="password"
-          minLength={8}
+          minLength={10}
           autoComplete="new-password"
           className={inputClass}
         />

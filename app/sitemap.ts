@@ -2,7 +2,11 @@ import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site-url";
 
-export const dynamic = "force-dynamic";
+// 每小时重新生成一次，爬虫频繁抓取也不会每次都查库。
+export const revalidate = 3600;
+
+/** 单个 sitemap 最多 5 万条 URL（协议上限），留出静态页和分类的余量。 */
+const MAX_TUTORIAL_URLS = 45000;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = SITE_URL.replace(/\/$/, "");
@@ -11,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.tutorial.findMany({
       where: { published: true },
       orderBy: { updatedAt: "desc" },
+      take: MAX_TUTORIAL_URLS,
       select: { slug: true, updatedAt: true },
     }),
     prisma.category.findMany({

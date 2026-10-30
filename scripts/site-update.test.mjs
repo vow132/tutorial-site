@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { access, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readdir, readFile, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { assertBranch, databaseFile, isExpectedOrigin, performUpdate } from "./site-update.mjs";
+import { assertBranch, databaseFile, isExpectedOrigin, performUpdate, pruneUpdateArtifacts } from "./site-update.mjs";
 
 const CURRENT = "a".repeat(40);
 const TARGET = "b".repeat(40);
@@ -188,3 +188,32 @@ for (const [name, options] of [
     assert.equal(f.calls.some((call) => call.command === "pm2" && ["stop", "delete", "start"].includes(call.args[0])), false);
   });
 }
+
+test("pruning keeps recent releases and backups but never the protected ones", async (t) => {
+  const updates = await mkdtemp(path.join(os.tmpdir(), "tutorial-prune-"));
+  t.after(() => rm(updates, { recursive: true, force: true }));
+  const releases = path.join(updates, "releases");
+  const stamp = (n) => new Date(Date.UTC(2026, 0, 1, 0, n));
+  for (let n = 1; n <= 6; n++) {
+    const release = path.join(releases, `release-job-${n}`);
+    await mkdir(release, { recursive: true });
+    await utimes(release, stamp(n), stamp(n));
+    const backup = path.join(updates, `database-release-job-${n}.db`);
+    await writeFile(backup, "backup");
+    await utimes(backup, stamp(n), stamp(n));
+  }
+  await writeFile(path.join(updates, "status.json"), "{}");
+  // The oldest release is still the rollback target, the newest is live.
+  const removed = await pruneUpdateArtifacts(updates, {
+    protect: [path.join(releases, "release-job-1"), path.join(releases, "release-job-6")],
+    keepReleases: 2,
+    keepBackups: 3,
+  });
+  assert.deepEqual((await readdir(releases)).sort(), ["release-job-1", "release-job-4", "release-job-5", "release-job-6"]);
+  assert.deepEqual(
+    (await readdir(updates)).filter((name) => name.startsWith("database-")).sort(),
+    ["database-release-job-4.db", "database-release-job-5.db", "database-release-job-6.db"],
+  );
+  assert.ok(await readFile(path.join(updates, "status.json"), "utf8"));
+  assert.equal(removed.length, 5);
+});

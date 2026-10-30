@@ -1,15 +1,18 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
+import { audit } from "@/lib/audit";
 import { MAX_CATEGORY_LEVELS } from "@/lib/categories";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type CategoryFormState = { error?: string; success?: string };
 
 type CategoryRelation = { id: number; parentId: number | null };
 
 function revalidate() {
+  revalidateTag(CACHE_TAGS.categories, { expire: 0 });
   revalidatePath("/", "layout");
   revalidatePath("/admin/categories");
   revalidatePath("/admin/tutorials");
@@ -157,7 +160,7 @@ export async function createCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  await requireAuth();
+  const admin = await requireAuth();
 
   const common = readCommonFields(formData);
   if (common.error || !common.data) return { error: common.error };
@@ -192,6 +195,7 @@ export async function createCategory(
       order: (maxOrder._max.order ?? 0) + 1,
     },
   });
+  await audit("category.create", { actor: admin.username, detail: `${common.data.name}（${slug}）` });
   revalidate();
   return { success: "分类已创建" };
 }
@@ -200,7 +204,7 @@ export async function updateCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  await requireAuth();
+  const admin = await requireAuth();
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { error: "分类参数不正确" };
@@ -243,6 +247,7 @@ export async function updateCategory(
       order,
     },
   });
+  await audit("category.update", { actor: admin.username, detail: `#${id} ${common.data.name}（${slug}）` });
   if (current.slug !== slug) {
     revalidatePath(`/categories/${current.slug}`);
     revalidatePath(`/categories/${slug}`);
@@ -255,7 +260,7 @@ export async function deleteCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  await requireAuth();
+  const admin = await requireAuth();
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { error: "参数错误" };
@@ -271,7 +276,8 @@ export async function deleteCategory(
     return { error: `该分类下还有 ${childCount} 个子分类，请先移动或删除它们` };
   }
 
-  await prisma.category.delete({ where: { id } });
+  const deleted = await prisma.category.delete({ where: { id } });
+  await audit("category.delete", { actor: admin.username, detail: `#${id} ${deleted.name}` });
   revalidate();
   return { success: "分类已删除" };
 }

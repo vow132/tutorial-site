@@ -1,4 +1,4 @@
-import Link from "next/link";
+import IntentLink from "@/components/intent-link";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { getHomeCategories } from "@/lib/public-data";
@@ -10,6 +10,9 @@ import {
 import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
+
+// 首页是静态页：内容变更时由后台立即刷新；阅读量等统计每 10 分钟刷新一次。
+export const revalidate = 600;
 
 export default async function HomePage() {
   const [settings, categories, latest, tutorialStats] = await Promise.all([
@@ -81,7 +84,7 @@ export default async function HomePage() {
             {settings.heroBadge}
           </span>
         </Reveal>
-        <Reveal delay={0.08}>
+        <Reveal delay={0.08} fade={false}>
           <h1 className="mt-6 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight text-ink md:text-6xl md:leading-[1.15]">
             {settings.heroTitleA}
             <br />
@@ -94,13 +97,13 @@ export default async function HomePage() {
             </span>
           </h1>
         </Reveal>
-        <Reveal delay={0.16}>
+        <Reveal delay={0.16} fade={false}>
           <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-2 md:text-lg">
             {settings.heroSubtitle}
           </p>
         </Reveal>
         <Reveal delay={0.24} className="mt-9 flex items-center gap-3">
-          <Link
+          <IntentLink
             href="/tutorials"
             className="group flex h-12 items-center gap-2 rounded-full bg-btn px-7 text-sm font-semibold text-white shadow-capsule transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lifted active:translate-y-0 active:scale-[0.98]"
           >
@@ -108,13 +111,13 @@ export default async function HomePage() {
             <svg className="transition-transform duration-200 group-hover:translate-x-1" width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
               <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
             </svg>
-          </Link>
-          <Link
+          </IntentLink>
+          <IntentLink
             href="#categories"
             className="flex h-12 items-center rounded-full border border-line bg-surface px-7 text-sm font-semibold text-ink transition-all duration-200 hover:border-accent hover:text-accent active:scale-[0.98]"
           >
             浏览分类
-          </Link>
+          </IntentLink>
         </Reveal>
       </section>
 
@@ -150,7 +153,7 @@ export default async function HomePage() {
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {categories.map((c) => (
             <Reveal key={c.id} mode="scroll">
-              <Link
+              <IntentLink
                 href={getCategoryHref(c)}
                 {...categoryLinkTarget(getCategoryHref(c))}
                 className="block h-full"
@@ -173,13 +176,13 @@ export default async function HomePage() {
                       {c.description ?? "暂无描述"}
                     </p>
                     {c.children.length > 0 && (
-                      <p className="mt-2 text-xs text-accent">
+                      <p className="mt-2 text-xs text-accent-ink">
                         包含 {c.children.length} 个子分类
                       </p>
                     )}
                   </div>
                 </GlowCard>
-              </Link>
+              </IntentLink>
             </Reveal>
           ))}
         </div>
@@ -193,7 +196,7 @@ export default async function HomePage() {
               <h2 className="text-2xl font-bold text-ink md:text-3xl">最新教程</h2>
               <p className="mt-2 text-sm text-ink-2">新鲜出炉，趁热阅读</p>
             </div>
-            <Link
+            <IntentLink
               href="/tutorials"
               className="hidden items-center gap-1.5 text-sm font-medium text-ink-2 transition-colors hover:text-accent sm:flex"
             >
@@ -201,13 +204,13 @@ export default async function HomePage() {
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
               </svg>
-            </Link>
+            </IntentLink>
           </div>
         </Reveal>
         {/* 最新一篇作为横向大卡，其余 2×2 紧凑卡，与上方分类宫格区分层级 */}
         {latest[0] && (
           <Reveal mode="scroll" className="mt-8">
-            <Link href={`/tutorials/${latest[0].slug}`} className="block">
+            <IntentLink href={`/tutorials/${latest[0].slug}`} className="block">
               <GlowCard className="group flex h-full flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between md:p-8">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-xs text-ink-3">
@@ -222,7 +225,7 @@ export default async function HomePage() {
                       {latest[0].category.name}
                     </span>
                     <span>·</span>
-                    <time>
+                    <time dateTime={latest[0].createdAt.toISOString()}>
                       {latest[0].createdAt.toLocaleDateString("zh-CN", {
                         year: "numeric",
                         month: "short",
@@ -243,7 +246,7 @@ export default async function HomePage() {
                   </svg>
                 </span>
               </GlowCard>
-            </Link>
+            </IntentLink>
           </Reveal>
         )}
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentAdmin } from "@/lib/admin-auth";
+import { confirmCurrentPassword, getCurrentAdmin } from "@/lib/admin-auth";
+import { audit } from "@/lib/audit";
 import { getSiteUpdateStatus, startSiteUpdate } from "@/lib/site-update";
 
 export const runtime = "nodejs";
@@ -16,7 +17,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await getCurrentAdmin())) {
+  const admin = await getCurrentAdmin();
+  if (!admin) {
     return NextResponse.json({ error: "登录已过期，请重新登录后台。" }, { status: 401, headers });
   }
   // The browser sends JSON only from our own origin. Reject cross-site posts
@@ -31,6 +33,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "不允许跨站触发更新。" }, { status: 403, headers });
     }
   } catch { return NextResponse.json({ error: "无效的请求来源。" }, { status: 403, headers }); }
+  // 部署会在服务器上执行新代码，属于高危操作：即使会话有效也要再输一次密码。
+  let password = "";
+  try {
+    const body: unknown = await request.json();
+    if (body && typeof body === "object" && typeof (body as { password?: unknown }).password === "string") {
+      password = (body as { password: string }).password;
+    }
+  } catch { /* 按缺少密码处理 */ }
+  const confirmError = await confirmCurrentPassword(admin, password);
+  if (confirmError) {
+    await audit("site-update.denied", { actor: admin.username, detail: confirmError });
+    return NextResponse.json({ error: confirmError }, { status: 403, headers });
+  }
+  await audit("site-update.start", { actor: admin.username });
   try { return NextResponse.json(await startSiteUpdate(), { status: 202, headers }); }
   catch (error) {
     // Only user-oriented errors are exposed; command failures can contain

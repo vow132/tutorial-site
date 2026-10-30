@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireAdminPage } from "@/lib/admin-auth";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import GitHubUpdate from "./github-update";
@@ -8,6 +9,7 @@ export const metadata: Metadata = { title: "仪表盘" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
+  await requireAdminPage();
   const [tutorialCount, publishedCount, draftCount, categoryCount, viewAgg, recent] =
     await Promise.all([
       prisma.tutorial.count(),

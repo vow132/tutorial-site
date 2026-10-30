@@ -1,9 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
+import { audit } from "@/lib/audit";
 import { SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type SettingsFormState = { error?: string; success?: string };
 
@@ -12,7 +14,7 @@ export async function updateSettings(
   _prev: SettingsFormState,
   formData: FormData
 ): Promise<SettingsFormState> {
-  await requireAuth();
+  const admin = await requireAuth();
 
   const text = (key: string) => String(formData.get(key) ?? "").trim();
 
@@ -63,6 +65,8 @@ export async function updateSettings(
     create: { key: SETTINGS_KEY, value: JSON.stringify(settings) },
   });
 
+  await audit("settings.update", { actor: admin.username });
+  revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidatePath("/", "layout");
   return { success: "设置已保存，前台已生效" };
 }

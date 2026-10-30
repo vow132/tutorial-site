@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { RateLimiter } from "@/lib/rate-limit";
 
 const FLUSH_DELAY_MS = 2_000;
 const MAX_PENDING_EVENTS = 32;
@@ -77,4 +78,24 @@ export function queueTutorialView(id: number) {
   }
 
   scheduleFlush();
+}
+
+/** 爬虫、监控和脚本的 UA；它们的访问不计入阅读量。 */
+const NON_HUMAN_AGENT =
+  /bot|crawl|spider|slurp|preview|monitor|fetch|curl|wget|python|java\/|go-http|httpclient|okhttp|axios|headless|lighthouse/i;
+
+/** 同一 IP 30 分钟内重复打开同一篇只算一次（需要 TRUST_PROXY 才能拿到 IP）。 */
+const recentViews = new RateLimiter(1, 30 * 60 * 1000, 50_000);
+
+export function countTutorialView(
+  id: number,
+  visitor: { ip: string | null; userAgent: string | null },
+) {
+  if (!visitor.userAgent || NON_HUMAN_AGENT.test(visitor.userAgent)) return;
+  if (visitor.ip) {
+    const key = `${id}:${visitor.ip}`;
+    if (recentViews.retryAfter(key) > 0) return;
+    recentViews.hit(key);
+  }
+  queueTutorialView(id);
 }

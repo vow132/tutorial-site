@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateTutorial } from "@/lib/actions/tutorials";
@@ -14,6 +15,7 @@ export default async function EditTutorialPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminPage();
   const { id } = await params;
   const tutorial = await prisma.tutorial.findUnique({
     where: { id: Number(id) },

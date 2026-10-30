@@ -1,4 +1,4 @@
-import Link from "next/link";
+import IntentLink from "./intent-link";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategories } from "@/lib/public-data";
 import {
@@ -48,13 +48,13 @@ export default async function SiteFooter() {
                     {links.map((link, j) => {
                       return (
                         <li key={j}>
-                          <Link
+                          <IntentLink
                             href={link.href}
                             {...categoryLinkTarget(link.href)}
                             className="text-sm text-ink-2 transition-colors hover:text-accent"
                           >
                             {link.label}
-                          </Link>
+                          </IntentLink>
                         </li>
                       );
                     })}

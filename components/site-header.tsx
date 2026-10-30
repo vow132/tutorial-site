@@ -1,4 +1,4 @@
-import Link from "next/link";
+import IntentLink from "./intent-link";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategoryTree } from "@/lib/public-data";
 import { getCategoryHref } from "@/lib/categories";
@@ -31,7 +31,7 @@ export default async function SiteHeader() {
     <header className="sticky top-4 z-50 mx-auto w-full max-w-6xl px-4">
       <div className="relative flex items-center gap-2 sm:gap-3 lg:justify-between">
         {/* Logo */}
-        <Link
+        <IntentLink
           href="/"
           className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-line bg-surface/85 px-2.5 shadow-capsule backdrop-blur-md lg:flex-none lg:justify-start lg:px-4"
         >
@@ -41,7 +41,7 @@ export default async function SiteHeader() {
           <span className="max-w-[46vw] truncate text-sm font-bold tracking-wide max-[359px]:hidden lg:max-w-none">
             {settings.siteName}
           </span>
-        </Link>
+        </IntentLink>
 
         {/* 胶囊导航 + 吉祥物 */}
         <div className="relative order-first lg:order-none">

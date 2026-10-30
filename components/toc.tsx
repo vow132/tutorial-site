@@ -1,51 +1,119 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { TocItem } from "@/lib/article";
 
 const MOBILE_TOC_STORAGE_KEY = "toc:mobile-open";
 
+/**
+ * 全页共享的「当前小节」跟踪器：桌面侧栏和移动端目录订阅同一份状态，
+ * 只挂一组滚动监听。标题位置缓存成文档坐标，滚动时只读 scrollY，不再每帧
+ * 逐个测量标题；图片加载等引起的页面高度变化由 ResizeObserver 触发重新测量。
+ */
+const headingTracker = (() => {
+  let ids: string[] = [];
+  let tops: number[] = [];
+  let active = "";
+  let frame = 0;
+  let resizeObserver: ResizeObserver | null = null;
+  // 点击目录后锁定所选小节，直到平滑滚动结束：否则滚动途中会依次闪过
+  // 中间各节，停下后也可能落到「下一节标题也在判定线以上」的那一节。
+  let locked = false;
+  let lockTimer = 0;
+  const listeners = new Set<() => void>();
+
+  const set = (id: string) => {
+    if (id === active) return;
+    active = id;
+    for (const listener of listeners) listener();
+  };
+  const measure = () => {
+    tops = ids.map((id) => {
+      const element = document.getElementById(id);
+      return element ? element.getBoundingClientRect().top + window.scrollY : Infinity;
+    });
+  };
+  const update = () => {
+    frame = 0;
+    if (locked) return;
+    const line = window.scrollY + Math.max(140, window.innerHeight * 0.45);
+    let current = ids[0] ?? "";
+    for (let index = 0; index < ids.length; index += 1) {
+      if (tops[index] <= line) current = ids[index];
+      else break;
+    }
+    set(current);
+  };
+  const onScroll = () => {
+    if (!frame) frame = window.requestAnimationFrame(update);
+  };
+  const onResize = () => {
+    measure();
+    onScroll();
+  };
+
+  const unlock = () => {
+    locked = false;
+    window.clearTimeout(lockTimer);
+    window.removeEventListener("scrollend", unlock);
+  };
+
+  return {
+    get: () => active,
+    /** 用户点击目录：立即高亮该节，滚动结束（或 1 秒兜底）前不再自动切换。 */
+    select(id: string) {
+      set(id);
+      unlock();
+      locked = true;
+      window.addEventListener("scrollend", unlock, { once: true });
+      lockTimer = window.setTimeout(unlock, 1000);
+    },
+    subscribe(items: TocItem[], listener: () => void) {
+      ids = items.map((item) => item.id);
+      listeners.add(listener);
+      if (listeners.size === 1) {
+        active = ids[0] ?? "";
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onResize, { passive: true });
+        resizeObserver = new ResizeObserver(onResize);
+        resizeObserver.observe(document.body);
+      }
+      onResize();
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size > 0) return;
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onResize);
+        resizeObserver?.disconnect();
+        resizeObserver = null;
+        if (frame) window.cancelAnimationFrame(frame);
+        frame = 0;
+      };
+    },
+  };
+})();
+
 /** 根据标题在视口中的位置，返回当前所在的小节。 */
 function useActiveHeading(items: TocItem[]) {
-  const [active, setActive] = useState<string>(items[0]?.id ?? "");
-
-  useEffect(() => {
-    const headings = items
-      .map((i) => document.getElementById(i.id))
-      .filter((el): el is HTMLElement => !!el);
-    if (headings.length === 0) return;
-
-    let frame = 0;
-    const updateActive = () => {
-      frame = 0;
-      const offset = Math.max(140, window.innerHeight * 0.45);
-      let current = headings[0].id;
-      for (const heading of headings) {
-        if (heading.getBoundingClientRect().top <= offset) current = heading.id;
-        else break;
-      }
-      setActive((previous) => (previous === current ? previous : current));
-    };
-    const onScroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(updateActive);
-    };
-    updateActive();
-    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      document.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
-  }, [items]);
-
-  return [active, setActive] as const;
+  const subscribe = useCallback(
+    (listener: () => void) => headingTracker.subscribe(items, listener),
+    [items],
+  );
+  const fallback = items[0]?.id ?? "";
+  const active = useSyncExternalStore(
+    subscribe,
+    () => headingTracker.get() || fallback,
+    () => fallback,
+  );
+  return [active, headingTracker.select] as const;
 }
 
 function scrollToHeading(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(id)?.scrollIntoView({
+    behavior: reduceMotion ? "auto" : "smooth",
+    block: "start",
+  });
   history.replaceState(null, "", `#${id}`);
 }
 
@@ -97,7 +165,7 @@ export default function Toc({ items }: { items: TocItem[] }) {
                   item.level === 3 ? "pl-7" : "pl-4"
                 } ${
                   active === item.id
-                    ? "border-accent font-medium text-accent"
+                    ? "border-accent font-medium text-accent-ink"
                     : "border-transparent text-ink-2 hover:text-ink"
                 }`}
               >
@@ -236,7 +304,7 @@ export function MobileToc({ items }: { items: TocItem[] }) {
                   item.level === 3 ? "pl-6" : "pl-3.5"
                 } ${
                   active === item.id
-                    ? "border-accent font-medium text-accent"
+                    ? "border-accent font-medium text-accent-ink"
                     : "border-transparent text-ink-2"
                 }`}
               >

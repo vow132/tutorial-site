@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { getSettings } from "@/lib/settings";
 import SettingsForm from "./settings-form";
 
@@ -7,6 +8,7 @@ export const metadata: Metadata = { title: "站点设置" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
+  await requireAdminPage();
   const settings = await getSettings();
 
   return (

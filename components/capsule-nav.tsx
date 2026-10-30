@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import IntentLink from "./intent-link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { categoryLinkTarget, isExternalHref } from "@/lib/categories";
@@ -59,13 +59,13 @@ function DesktopSubmenu({
 
         return (
           <li key={item.key} className="group/submenu relative">
-            <Link
+            <IntentLink
               href={item.href}
               {...categoryLinkTarget(item.href)}
               aria-haspopup={hasChildren ? "menu" : undefined}
               className={`flex min-h-10 items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors ${
                 active
-                  ? "bg-accent-soft font-semibold text-accent"
+                  ? "bg-accent-soft font-semibold text-accent-ink"
                   : "text-ink-2 hover:bg-paper hover:text-ink"
               }`}
             >
@@ -87,7 +87,7 @@ function DesktopSubmenu({
               ) : hasChildren ? (
                 <Chevron className="shrink-0 opacity-50 transition-transform group-hover/submenu:translate-x-0.5" />
               ) : null}
-            </Link>
+            </IntentLink>
 
             {hasChildren && (
               <div className="invisible absolute -top-2 left-full z-40 pl-2 opacity-0 transition-[opacity,visibility] duration-150 group-hover/submenu:visible group-hover/submenu:opacity-100 group-focus-within/submenu:visible group-focus-within/submenu:opacity-100">
@@ -168,7 +168,7 @@ function MobileNavItem({
             <Chevron className="shrink-0 opacity-55" />
           </label>
         ) : (
-          <Link
+          <IntentLink
             href={item.href}
             {...categoryLinkTarget(item.href)}
             tabIndex={open ? 0 : -1}
@@ -194,7 +194,7 @@ function MobileNavItem({
             ) : (
               <Chevron className="shrink-0 opacity-45" />
             )}
-          </Link>
+          </IntentLink>
         )}
       </div>
 
@@ -204,16 +204,16 @@ function MobileNavItem({
             className="mt-1 space-y-1 border-l border-line pl-2"
             style={{ marginLeft: `${Math.min(level + 1, 2) * 1.25 + 0.5}rem` }}
           >
-            <Link
+            <IntentLink
               href={item.href}
               {...categoryLinkTarget(item.href)}
               tabIndex={open ? 0 : -1}
               onClick={closeDrawer}
-              className="flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-accent transition-colors hover:bg-accent-soft"
+              className="flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-accent-ink transition-colors hover:bg-accent-soft"
             >
               查看此分类
               {external && <span aria-hidden="true">↗</span>}
-            </Link>
+            </IntentLink>
             {item.children!.map((child) => (
               <MobileNavItem
                 key={child.key}
@@ -243,7 +243,7 @@ function DesktopNavItem({
 
   return (
     <div className="group/nav relative">
-      <Link
+      <IntentLink
         href={item.href}
         {...categoryLinkTarget(item.href)}
         aria-haspopup={hasChildren ? "menu" : undefined}
@@ -273,7 +273,7 @@ function DesktopNavItem({
             <path d="m2.5 4 3 3 3-3" />
           </svg>
         )}
-      </Link>
+      </IntentLink>
 
       {hasChildren && (
         <div className="invisible absolute left-1/2 top-full z-30 -translate-x-1/2 pt-3 opacity-0 transition-[opacity,visibility] duration-150 group-hover/nav:visible group-hover/nav:opacity-100 group-focus-within/nav:visible group-focus-within/nav:opacity-100">
@@ -319,20 +319,33 @@ function DesktopNavArrow({
   );
 }
 
-/** 桌面端可视分类数量：窄屏少、宽屏多，随视口自适应。 */
+/**
+ * 桌面端每页可视分类数量，与 Tailwind 断点一一对应（xl=1280、2xl=1536）。
+ * 服务端不知道视口宽度，所以 hydration 前三档都渲染、用 CSS 只显示当前档，
+ * 挂载后再换成实际档位 —— 两次渲染看到的内容一致，不会跳动。
+ */
+const PAGE_SIZES = [
+  { size: 3, query: "(max-width: 1279.98px)", className: "flex xl:hidden" },
+  { size: 5, query: "(min-width: 1280px) and (max-width: 1535.98px)", className: "hidden xl:flex 2xl:hidden" },
+  { size: 6, query: "(min-width: 1536px)", className: "hidden 2xl:flex" },
+] as const;
+
+/** 挂载前返回 null；之后只在跨断点时更新（matchMedia，不监听高频 resize）。 */
 function useDesktopPageSize() {
-  const [size, setSize] = useState(4);
+  const [size, setSize] = useState<number | null>(null);
 
   useEffect(() => {
-    const compute = () => {
-      const width = window.innerWidth;
-      if (width >= 1536) setSize(6);
-      else if (width >= 1280) setSize(5);
-      else setSize(3);
-    };
+    const queries = PAGE_SIZES.map((entry) => ({
+      size: entry.size,
+      mq: window.matchMedia(entry.query),
+    }));
+    const compute = () =>
+      setSize(queries.find((entry) => entry.mq.matches)?.size ?? 3);
     compute();
-    window.addEventListener("resize", compute);
-    return () => window.removeEventListener("resize", compute);
+    for (const { mq } of queries) mq.addEventListener("change", compute);
+    return () => {
+      for (const { mq } of queries) mq.removeEventListener("change", compute);
+    };
   }, []);
 
   return size;
@@ -362,26 +375,84 @@ function balancedPages(items: NavItem[], pageSize: number): NavItem[][] {
   return pages;
 }
 
-/** 桌面胶囊导航：固定「首页 / 全部教程」，其余分类分页并用左右箭头点击切换。 */
-function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string }) {
-  const pinned = items.filter(
-    (item) => item.key === "home" || item.key === "tutorials",
+function activePage(pages: NavItem[][], pathname: string) {
+  return Math.max(
+    0,
+    pages.findIndex((group) => group.some((item) => itemIsActive(pathname, item))),
   );
-  const pageable = items.filter(
-    (item) => item.key !== "home" && item.key !== "tutorials",
+}
+
+/** 一组分类及其左右翻页箭头。 */
+function NavPager({
+  pages,
+  current,
+  pathname,
+  className = "flex",
+  slide,
+  onPage,
+}: {
+  pages: NavItem[][];
+  current: number;
+  pathname: string;
+  className?: string;
+  slide?: { dir: "prev" | "next" | null; seq: number };
+  onPage?: (delta: 1 | -1) => void;
+}) {
+  const showArrows = pages.length > 1;
+  const visible = pages[current] ?? [];
+
+  return (
+    <div className={`${className} items-center gap-1`}>
+      {showArrows && (
+        <DesktopNavArrow
+          direction="prev"
+          disabled={current === 0}
+          onClick={() => onPage?.(-1)}
+        />
+      )}
+      <div
+        key={slide?.seq ?? 0}
+        className={`flex items-center gap-1 ${
+          slide?.dir === "next"
+            ? "nav-page-next"
+            : slide?.dir === "prev"
+              ? "nav-page-prev"
+              : ""
+        }`}
+      >
+        {visible.map((item) => (
+          <DesktopNavItem key={item.key} item={item} pathname={pathname} />
+        ))}
+      </div>
+      {showArrows && (
+        <DesktopNavArrow
+          direction="next"
+          disabled={current >= pages.length - 1}
+          onClick={() => onPage?.(1)}
+        />
+      )}
+    </div>
   );
-  const pageSize = useDesktopPageSize();
-  const pages = balancedPages(pageable, pageSize);
-  const [page, setPage] = useState(0);
+}
+
+/** 已知页容量后的可翻页分类区。 */
+function PagedNav({
+  items,
+  pageSize,
+  pathname,
+}: {
+  items: NavItem[];
+  pageSize: number;
+  pathname: string;
+}) {
+  const pages = balancedPages(items, pageSize);
+  // 初始页与 hydration 前 CSS 显示的那一页一致：当前分类所在页。
+  const [page, setPage] = useState(() => activePage(pages, pathname));
 
   // 每次点击箭头就换一次 seq，让整组分类重新挂载并播放滑入动画；
   // dir 为 null 时（首次渲染、自动跟随当前分类）不播放，避免无谓闪动。
   const [slide, setSlide] = useState<{ dir: "prev" | "next" | null; seq: number }>(
     { dir: null, seq: 0 },
-  );
-
-  const activeIndex = pages.findIndex((group) =>
-    group.some((item) => itemIsActive(pathname, item)),
   );
 
   /*
@@ -394,8 +465,10 @@ function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string })
   const [syncedKey, setSyncedKey] = useState(syncKey);
   if (syncKey !== syncedKey) {
     setSyncedKey(syncKey);
-    const next =
-      activeIndex >= 0 ? activeIndex : Math.min(page, pages.length - 1);
+    const hasActive = pages.some((group) =>
+      group.some((item) => itemIsActive(pathname, item)),
+    );
+    const next = hasActive ? activePage(pages, pathname) : Math.min(page, pages.length - 1);
     if (next !== page) setPage(next);
   }
 
@@ -412,41 +485,47 @@ function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string })
     }));
   };
 
-  const showArrows = pages.length > 1;
-  const visible = pages[current] ?? [];
+  return (
+    <NavPager
+      pages={pages}
+      current={current}
+      pathname={pathname}
+      slide={slide}
+      onPage={go}
+    />
+  );
+}
+
+/** 桌面胶囊导航：固定「首页 / 全部教程」，其余分类分页并用左右箭头点击切换。 */
+function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  const pinned = items.filter(
+    (item) => item.key === "home" || item.key === "tutorials",
+  );
+  const pageable = items.filter(
+    (item) => item.key !== "home" && item.key !== "tutorials",
+  );
+  const pageSize = useDesktopPageSize();
 
   return (
     <nav className="hidden items-center gap-1 rounded-full border border-line bg-surface/85 p-1.5 shadow-capsule backdrop-blur-md lg:flex">
       {pinned.map((item) => (
         <DesktopNavItem key={item.key} item={item} pathname={pathname} />
       ))}
-      {showArrows && (
-        <DesktopNavArrow
-          direction="prev"
-          disabled={current === 0}
-          onClick={() => go(-1)}
-        />
-      )}
-      <div
-        key={slide.seq}
-        className={`flex items-center gap-1 ${
-          slide.dir === "next"
-            ? "nav-page-next"
-            : slide.dir === "prev"
-              ? "nav-page-prev"
-              : ""
-        }`}
-      >
-        {visible.map((item) => (
-          <DesktopNavItem key={item.key} item={item} pathname={pathname} />
-        ))}
-      </div>
-      {showArrows && (
-        <DesktopNavArrow
-          direction="next"
-          disabled={current >= pages.length - 1}
-          onClick={() => go(1)}
-        />
+      {pageSize === null ? (
+        PAGE_SIZES.map(({ size, className }) => {
+          const pages = balancedPages(pageable, size);
+          return (
+            <NavPager
+              key={size}
+              pages={pages}
+              current={activePage(pages, pathname)}
+              pathname={pathname}
+              className={className}
+            />
+          );
+        })
+      ) : (
+        <PagedNav items={pageable} pageSize={pageSize} pathname={pathname} />
       )}
     </nav>
   );

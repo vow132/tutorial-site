@@ -33,6 +33,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { imageSizeFromFile } from "image-size/fromFile";
+import { sanitizeArticleHtml } from "@/lib/sanitize";
 
 const languages = {
   bash,
@@ -92,6 +93,8 @@ function remember<K, V>(cache: Map<K, V>, key: K, value: V, max: number) {
 
 function decodeEntities(value: string) {
   return value
+    .replace(/&#(\d+);/g, (_match, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -100,14 +103,17 @@ function decodeEntities(value: string) {
     .replace(/&amp;/g, "&");
 }
 
+const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
+
 async function localImageSize(src: string): Promise<ImageDimension> {
-  if (!src.startsWith("/uploads/")) return null;
-  const cached = dimensionCache.get(src);
+  // 只探测 uploads 目录下的直接文件，`/uploads/../../.env` 这类路径直接跳过。
+  const name = src.startsWith("/uploads/") ? src.slice("/uploads/".length) : "";
+  if (!name || name !== path.basename(name) || name.startsWith(".")) return null;
+  const file = path.join(UPLOADS_DIR, name);
+  const cached = dimensionCache.get(file);
   if (cached) return cached;
 
-  const task = imageSizeFromFile(
-    path.join(process.cwd(), "public", src.replace(/^\/+/, "")),
-  )
+  const task = imageSizeFromFile(file)
     .then((size) =>
       size.width && size.height
         ? { width: size.width, height: size.height }
@@ -115,11 +121,14 @@ async function localImageSize(src: string): Promise<ImageDimension> {
     )
     .catch(() => null);
 
-  remember(dimensionCache, src, task, MAX_DIMENSION_CACHE);
+  remember(dimensionCache, file, task, MAX_DIMENSION_CACHE);
   return task;
 }
 
-async function enhanceImageTag(tag: string) {
+/** 第一张图常常就是首屏主图，靠近正文开头时提高下载优先级。 */
+const EARLY_IMAGE_OFFSET = 2000;
+
+async function enhanceImageTag(tag: string, order: number, offset: number) {
   const src = /src="([^"]*)"/.exec(tag)?.[1];
   if (!src) return tag;
 
@@ -132,9 +141,14 @@ async function enhanceImageTag(tag: string) {
     );
   }
   if (!/\sloading=/.test(next)) {
+    // 只有后面的图片延迟加载；第一张若也延迟，会拖慢首屏主图出现。
+    const attributes =
+      order === 0
+        ? ` decoding="async"${offset < EARLY_IMAGE_OFFSET ? ' fetchpriority="high"' : ""}`
+        : ' loading="lazy" decoding="async"';
     next = /\s\/>$/.test(next)
-      ? next.replace(/\s\/>$/, ' loading="lazy" decoding="async" />')
-      : next.replace(/>$/, ' loading="lazy" decoding="async">');
+      ? next.replace(/\s\/>$/, `${attributes} />`)
+      : next.replace(/>$/, `${attributes}>`);
   }
   return next;
 }
@@ -142,13 +156,13 @@ async function enhanceImageTag(tag: string) {
 async function replaceAsync(
   input: string,
   expression: RegExp,
-  replace: (match: string) => Promise<string>,
+  replace: (match: string, order: number, offset: number) => Promise<string>,
 ) {
   const matches = [...input.matchAll(expression)];
   if (matches.length === 0) return input;
 
   const replacements = await Promise.all(
-    matches.map((match) => replace(match[0])),
+    matches.map((match, order) => replace(match[0], order, match.index ?? 0)),
   );
   let cursor = 0;
   let output = "";
@@ -166,10 +180,12 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
   const toc: TocItem[] = [];
   let headingIndex = 0;
 
-  let output = html.replace(
+  // 渲染前再过滤一次：覆盖本次加固之前就已入库的旧内容。
+  let output = sanitizeArticleHtml(html).replace(
     /<h([23])(?:\s[^>]*)?>([\s\S]*?)<\/h\1>/g,
     (_match, level: string, inner: string) => {
-      const text = inner.replace(/<[^>]+>/g, "").trim();
+      // 目录文字交给 React 渲染（会再转义一次），这里先还原 &amp; 等实体。
+      const text = decodeEntities(inner.replace(/<[^>]+>/g, "")).trim();
       const id = `h-${headingIndex++}`;
       toc.push({ id, text, level: Number(level) });
       return `<h${level} id="${id}">${inner}</h${level}>`;

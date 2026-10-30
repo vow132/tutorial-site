@@ -1,4 +1,4 @@
-import Link from "next/link";
+import IntentLink from "./intent-link";
 import Mascot from "@/components/mascot";
 
 /**
@@ -11,12 +11,12 @@ export default function NotFoundContent() {
       <Mascot />
       <h1 className="mt-8 text-6xl font-extrabold text-ink">404</h1>
       <p className="mt-4 text-ink-2">页面走丢了，要不回首页看看？</p>
-      <Link
+      <IntentLink
         href="/"
         className="mt-8 flex h-11 items-center rounded-full bg-btn px-6 text-sm font-semibold text-white transition-transform hover:scale-105 active:scale-[0.98]"
       >
         返回首页
-      </Link>
+      </IntentLink>
     </div>
   );
 }

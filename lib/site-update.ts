@@ -96,7 +96,7 @@ async function checkRepository(): Promise<SiteUpdateStatus> {
       await github(`compare/${currentRevision}...${commit.sha}`) as { status?: string };
     const state = compareState(currentRevision, commit.sha, comparison?.status);
     const message = state === "available"
-      ? `发现新版本 ${commit.sha.slice(0, 7)}。${restriction || "点击黄色圆点自动更新。"}`
+      ? `发现新版本 ${commit.sha.slice(0, 7)}。${restriction || "点击黄色圆点并输入密码即可更新。"}`
       : state === "current" ? "当前已是最新版本。"
       : "运行版本与仓库分支已分叉，无法自动更新，请先由维护者处理版本差异。";
     return { ...base, latestRevision: commit.sha, state, canUpdate: !restriction && state === "available", message };

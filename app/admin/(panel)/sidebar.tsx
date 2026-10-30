@@ -50,6 +50,11 @@ const items: AdminItem[] = [
       </>
     ),
   },
+  {
+    href: "/admin/audit",
+    label: "安全日志",
+    icon: <path d="M11 2.5 4 5v5.5c0 4.2 3 7.4 7 9 4-1.6 7-4.8 7-9V5zM8 11l2 2 4-4" />,
+  },
 ];
 
 function isActivePath(pathname: string, href: string) {

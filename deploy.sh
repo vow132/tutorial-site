@@ -7,7 +7,8 @@ cd "$ROOT_DIR"
 export NODE_ENV=production
 
 echo "=== 1. 安装依赖 ==="
-npm ci
+# NODE_ENV=production 时 npm 默认跳过 devDependencies，但构建与 seed 需要它们。
+npm ci --include=dev
 
 echo "=== 2. 生成 Prisma 客户端 ==="
 npx prisma generate
@@ -31,6 +32,7 @@ pm2 save
 
 echo ""
 echo "✅ 部署完成"
-echo "   访问: http://服务器IP:3000"
+echo "   访问: http://服务器IP:3000（正式上线请用 Nginx/Caddy 提供 HTTPS，见 README「安全加固」）"
 echo "   后台: http://服务器IP:3000/admin"
 echo "   日志: pm2 logs 教程网"
+echo "   备份: npm run backup（建议加入 crontab 每日执行）"

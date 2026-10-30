@@ -1,13 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login, type LoginState } from "@/lib/actions/auth";
+
+const inputClass =
+  "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
 
 export default function LoginForm({ from }: { from?: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(
     login,
     {}
   );
+  // 受控输入：服务器要求两步验证码时，表单重置不会清空已填的账号密码。
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
     <form action={action} className="mt-6 space-y-4">
@@ -20,7 +26,9 @@ export default function LoginForm({ from }: { from?: string }) {
           name="username"
           required
           autoComplete="username"
-          className="h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          className={inputClass}
           placeholder="admin"
         />
       </div>
@@ -33,10 +41,30 @@ export default function LoginForm({ from }: { from?: string }) {
           type="password"
           required
           autoComplete="current-password"
-          className="h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className={inputClass}
           placeholder="••••••••"
         />
       </div>
+      {state.needsTotp && (
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-ink-2">
+            两步验证码
+          </label>
+          <input
+            name="totp"
+            required
+            autoFocus
+            inputMode="numeric"
+            pattern="[0-9 ]{6,7}"
+            maxLength={7}
+            autoComplete="one-time-code"
+            className={`${inputClass} tracking-[0.3em]`}
+            placeholder="验证器中的 6 位数字"
+          />
+        </div>
+      )}
 
       {state.error && (
         <p className="rounded-xl bg-red-500/10 px-4 py-2.5 text-sm text-red-500 dark:text-red-400">
@@ -49,7 +77,7 @@ export default function LoginForm({ from }: { from?: string }) {
         disabled={pending}
         className="h-11 w-full rounded-xl bg-btn text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "登录中…" : "登 录"}
+        {pending ? "登录中…" : state.needsTotp ? "验 证" : "登 录"}
       </button>
     </form>
   );

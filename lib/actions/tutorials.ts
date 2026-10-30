@@ -1,9 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
+import { audit } from "@/lib/audit";
+import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { CACHE_TAGS } from "@/lib/public-data";
 
 export type TutorialFormState = { error?: string };
 
@@ -20,7 +23,8 @@ function normalizeSlug(input: string, title: string) {
 function parseForm(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const excerpt = String(formData.get("excerpt") ?? "").trim();
-  const content = String(formData.get("content") ?? "").trim();
+  // 不信任客户端：Server Action 可被绕过编辑器直接调用，入库前按白名单过滤。
+  const content = sanitizeArticleHtml(String(formData.get("content") ?? "")).trim();
   const categoryId = Number(formData.get("categoryId"));
   const published = formData.get("published") === "on";
   const slug = normalizeSlug(
@@ -29,6 +33,8 @@ function parseForm(formData: FormData) {
   );
 
   if (!title) return { error: "请输入标题" as const };
+  if (title.length > 200) return { error: "标题不能超过 200 个字符" as const };
+  if (excerpt.length > 500) return { error: "摘要不能超过 500 个字符" as const };
   if (!content || content === "<p></p>") return { error: "正文不能为空" as const };
   if (!categoryId) return { error: "请选择分类" as const };
 
@@ -38,6 +44,7 @@ function parseForm(formData: FormData) {
 }
 
 function revalidatePublic(slug?: string) {
+  revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
   revalidatePath("/");
   revalidatePath("/tutorials");
   if (slug) revalidatePath(`/tutorials/${slug}`);
@@ -47,7 +54,7 @@ export async function createTutorial(
   _prev: TutorialFormState,
   formData: FormData
 ): Promise<TutorialFormState> {
-  await requireAuth();
+  const admin = await requireAuth();
   const parsed = parseForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
@@ -57,6 +64,7 @@ export async function createTutorial(
   if (exists) return { error: "Slug 已被占用，请更换" };
 
   const created = await prisma.tutorial.create({ data: parsed.data });
+  await audit("tutorial.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
   revalidatePublic(created.slug);
   redirect("/admin/tutorials");
 }
@@ -66,7 +74,7 @@ export async function updateTutorial(
   _prev: TutorialFormState,
   formData: FormData
 ): Promise<TutorialFormState> {
-  await requireAuth();
+  const admin = await requireAuth();
   const parsed = parseForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
@@ -76,21 +84,23 @@ export async function updateTutorial(
   if (conflict) return { error: "Slug 已被其他教程占用" };
 
   await prisma.tutorial.update({ where: { id }, data: parsed.data });
+  await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
   revalidatePublic(parsed.data.slug);
   redirect("/admin/tutorials");
 }
 
 export async function deleteTutorial(formData: FormData) {
-  await requireAuth();
+  const admin = await requireAuth();
   const id = Number(formData.get("id"));
   if (!id) return;
-  await prisma.tutorial.delete({ where: { id } });
+  const deleted = await prisma.tutorial.delete({ where: { id } });
+  await audit("tutorial.delete", { actor: admin.username, detail: `#${id} ${deleted.title}` });
   revalidatePublic();
   revalidatePath("/admin/tutorials");
 }
 
 export async function togglePublish(formData: FormData) {
-  await requireAuth();
+  const admin = await requireAuth();
   const id = Number(formData.get("id"));
   if (!id) return;
   const t = await prisma.tutorial.findUnique({ where: { id } });
@@ -98,6 +108,10 @@ export async function togglePublish(formData: FormData) {
   await prisma.tutorial.update({
     where: { id },
     data: { published: !t.published },
+  });
+  await audit(t.published ? "tutorial.unpublish" : "tutorial.publish", {
+    actor: admin.username,
+    detail: `#${id} ${t.title}`,
   });
   revalidatePublic(t.slug);
   revalidatePath("/admin/tutorials");

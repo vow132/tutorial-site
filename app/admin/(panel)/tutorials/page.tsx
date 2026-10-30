@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { requireAdminPage } from "@/lib/admin-auth";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { deleteTutorial, togglePublish } from "@/lib/actions/tutorials";
@@ -16,6 +17,7 @@ export default async function AdminTutorialsPage({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
+  await requireAdminPage();
   const { page: rawPage } = await searchParams;
   const requestedPage = Number.parseInt(rawPage ?? "1", 10);
   const total = await prisma.tutorial.count();
