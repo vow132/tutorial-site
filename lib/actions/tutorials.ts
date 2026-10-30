@@ -7,6 +7,7 @@ import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { CACHE_TAGS } from "@/lib/public-data";
+import { clearSearchCache } from "@/lib/search";
 
 export type TutorialFormState = { error?: string };
 
@@ -45,6 +46,7 @@ function parseForm(formData: FormData) {
 
 function revalidatePublic(slug?: string) {
   revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
+  clearSearchCache();
   revalidatePath("/");
   revalidatePath("/tutorials");
   if (slug) revalidatePath(`/tutorials/${slug}`);

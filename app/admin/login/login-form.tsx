@@ -16,7 +16,17 @@ export default function LoginForm({ from }: { from?: string }) {
   const [password, setPassword] = useState("");
 
   return (
-    <form action={action} className="mt-6 space-y-4">
+    <form
+      action={action}
+      // 浏览器自动填充有时不触发 onChange；提交时以输入框实际值为准，
+      // 否则需要两步验证时，表单重新渲染会把自动填充的密码清空。
+      onSubmit={(event) => {
+        const form = event.currentTarget;
+        setUsername((form.elements.namedItem("username") as HTMLInputElement).value);
+        setPassword((form.elements.namedItem("password") as HTMLInputElement).value);
+      }}
+      className="mt-6 space-y-4"
+    >
       {from && <input type="hidden" name="from" value={from} />}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">

@@ -91,10 +91,15 @@ function remember<K, V>(cache: Map<K, V>, key: K, value: V, max: number) {
   if (oldest !== undefined) cache.delete(oldest);
 }
 
+/** 超出 Unicode 范围的数字实体（如 &#99999999;）原样保留，避免 fromCodePoint 抛错。 */
+function fromCodePoint(match: string, codePoint: number) {
+  return codePoint > 0 && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : match;
+}
+
 function decodeEntities(value: string) {
   return value
-    .replace(/&#(\d+);/g, (_match, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (match, code: string) => fromCodePoint(match, Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (match, code: string) => fromCodePoint(match, parseInt(code, 16)))
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')

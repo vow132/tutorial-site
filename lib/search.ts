@@ -104,6 +104,11 @@ async function fullTextSearch(query: string): Promise<TutorialSearchResult[]> {
   }
 }
 
+/** 发布、撤回、删除教程或改分类后清空，避免搜到已下线的文章。 */
+export function clearSearchCache() {
+  cache.clear();
+}
+
 /** 相同关键词 60 秒内复用结果（并发请求也共享同一次查询）。 */
 export function searchPublishedTutorials(
   rawQuery: string
