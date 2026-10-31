@@ -7,6 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # 教程网（商业级图文教程平台）
 
 ## 技术栈
+- **运行时 Node.js >= 22.12**（推荐 24 LTS；Node 20 已停止维护，Prisma 7、sanitize-html 也要求 22.12+），CI 在 22、24 上都跑
 - **Next.js 16.4 (App Router) + React 19 + TypeScript**，dev/build 均使用 **webpack**（Turbopack 在中文路径下会间歇 500，勿切回）
 - **Tailwind CSS v4**（CSS 变量主题，见 `app/globals.css` 的 `@theme`；语义类 `bg-surface`/`bg-btn`/`bg-scrim`/`shadow-capsule`，`dark:` 变体跟随 `data-theme`）
 - **Prisma 7 + SQLite**（driver adapter 模式，无 Rust 引擎）

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getSettings } from "@/lib/settings";
 import { SITE_URL } from "@/lib/site-url";
 
 // 10 分钟重新生成一次，与下方 Cache-Control 一致。
@@ -29,16 +30,11 @@ export async function GET() {
         category: { select: { name: true } },
       },
     }),
-    prisma.setting.findUnique({ where: { key: "site" } }),
+    // getSettings 带缓存，设置 JSON 损坏或读取失败时回退默认值，不会让订阅源 500。
+    getSettings(),
   ]);
 
-  const settingsValue = settings ? (JSON.parse(settings.value) as {
-    siteTitle?: string;
-    siteDescription?: string;
-  }) : {};
-
-  const siteTitle = settingsValue.siteTitle ?? "教程网";
-  const siteDescription = settingsValue.siteDescription ?? "高质量图文教程";
+  const { siteTitle, siteDescription } = settings;
 
   const items = tutorials
     .map((t) => {
