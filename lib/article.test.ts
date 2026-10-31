@@ -18,10 +18,12 @@ test("only images after the first one are lazy-loaded", async () => {
   const { html } = await processArticle(
     '<p><img src="https://example.com/a.png" alt="a"></p><p>正文</p><p><img src="https://example.com/b.png" alt="b"></p>',
   );
-  const [first, second] = html.match(/<img[^>]*>/g) ?? [];
-  assert.ok(first && !first.includes('loading="lazy"'), first);
+  const images = html.match(/<img[^>]*>/g) ?? [];
+  assert.equal(images.length, 2);
+  const [first, second] = images;
+  assert.doesNotMatch(first, /loading="lazy"/);
   assert.match(first, /fetchpriority="high"/);
-  assert.match(second ?? "", /loading="lazy"/);
+  assert.match(second, /loading="lazy"/);
 });
 
 test("a first image far into the article is not prioritised", async () => {

@@ -11,6 +11,11 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Node 20 已停止维护；engines 要求 >=22.12，推荐生产环境使用 24 LTS
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
     env:
       # CI 使用一次性 SQLite 文件数据库，验证完整构建链路
       DATABASE_URL: "file:./prisma/ci.db"
@@ -22,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: 安装依赖
@@ -54,7 +59,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: npm audit（生产依赖）
         run: npm audit --omit=dev --audit-level=high --package-lock-only

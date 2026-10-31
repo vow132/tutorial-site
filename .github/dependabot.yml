@@ -13,7 +13,7 @@ updates:
       # typescript-eslint（eslint-config-next 依赖）尚不支持 TypeScript 7，升级会让 lint 直接崩溃
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
-      # Node 类型定义要与运行时（engines / CI 均为 Node 20）的大版本一致
+      # Node 类型定义要与 engines 的最低版本（Node 22）一致，避免用到旧版没有的 API
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions

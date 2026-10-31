@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# 教程网生产部署脚本（Node.js >= 20.9、npm、pm2）
+# 教程网生产部署脚本（Node.js >= 22.12，推荐 24 LTS；npm、pm2）
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 export NODE_ENV=production
+
+# Node 20 已于 2026-04 停止维护，不再有安全更新；Prisma 7、sanitize-html 也要求 22.12+。
+if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=12)?0:1)'; then
+  echo "❌ 当前 Node.js $(node -v) 过旧，请先升级到 22.12 以上（推荐 24 LTS），步骤见 README「升级 Node.js」。"
+  exit 1
+fi
 
 echo "=== 1. 安装依赖 ==="
 # NODE_ENV=production 时 npm 默认跳过 devDependencies，但构建与 seed 需要它们。

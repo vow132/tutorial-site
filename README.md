@@ -42,13 +42,29 @@ npm run dev
 
 ## 生产部署
 
-服务器要求：Node.js >= 20.9、npm、PM2。推荐使用项目根目录的脚本：
+服务器要求：Node.js >= 22.12（推荐 24 LTS；Node 20 已于 2026 年 4 月停止维护）、npm、PM2。推荐使用项目根目录的脚本：
 
 ```bash
 bash deploy.sh
 ```
 
 脚本会按“安装依赖 → Prisma generate → migrate → seed → build → PM2 平滑重载”的顺序执行。迁移和种子数据必须在 `npm run build` 之前完成，否则静态主页可能把空数据库内容生成到 `.next` 中。
+
+### 升级 Node.js
+
+先用 `node -v` 查看版本，低于 22.12 时按下面升级（以 nvm 为例，也可以用系统包管理器安装 Node 24）：
+
+```bash
+nvm install 24 && nvm alias default 24
+npm install -g pm2            # nvm 下每个 Node 版本的全局包是分开的，需要重装 PM2
+pm2 info 教程网 | grep "exec cwd"   # 找到正在运行的目录（用过一键更新时在 .updates/releases/ 下）
+cd <上一步的 exec cwd>
+npm rebuild better-sqlite3    # SQLite 驱动是原生模块，换 Node 大版本后必须重新编译
+pm2 update                    # 让 PM2 守护进程改用新 Node 并恢复站点
+pm2 info 教程网 | grep "node.js version"   # 确认已是 24.x，再打开网站检查
+```
+
+之后的一键更新会在新 Node 下重新安装依赖，不需要再手动处理。
 
 ### 环境变量
 
