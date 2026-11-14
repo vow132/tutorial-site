@@ -154,3 +154,76 @@ export async function getPublishedTutorialPage({
     tutorials: rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
   };
 }
+
+/** 文章页底部“相关教程”最多展示几篇。 */
+export const RELATED_TUTORIAL_LIMIT = 4;
+
+const relatedTutorialSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  views: true,
+  createdAt: true,
+  category: { select: { name: true, color: true } },
+} as const;
+
+/**
+ * 相关教程：先取同分类里阅读量高的，不够再从父分类、子分类、同级子分类补。
+ * 顶级分类彼此不算相关（前端 ≠ 数据库），所以没有父分类时不取“同级”。
+ * 多取两篇，让页面去掉与“上一篇/下一篇”重复的之后仍然够数。
+ */
+const cachedRelatedTutorials = unstable_cache(
+  async (tutorialId: number, categoryId: number) => {
+    const take = RELATED_TUTORIAL_LIMIT + 2;
+    const orderBy = [{ views: "desc" as const }, { createdAt: "desc" as const }];
+    const rows = await prisma.tutorial.findMany({
+      where: { published: true, categoryId, id: { not: tutorialId } },
+      orderBy,
+      take,
+      select: relatedTutorialSelect,
+    });
+
+    if (rows.length < take) {
+      const categories = await prisma.category.findMany({
+        select: { id: true, parentId: true },
+      });
+      const current = categories.find((item) => item.id === categoryId);
+      const nearby = categories
+        .filter(
+          (item) =>
+            item.id !== categoryId &&
+            (item.id === current?.parentId ||
+              item.parentId === categoryId ||
+              (current?.parentId != null && item.parentId === current.parentId)),
+        )
+        .map((item) => item.id);
+      if (nearby.length > 0) {
+        rows.push(
+          ...(await prisma.tutorial.findMany({
+            where: { published: true, categoryId: { in: nearby }, id: { not: tutorialId } },
+            orderBy,
+            take: take - rows.length,
+            select: relatedTutorialSelect,
+          })),
+        );
+      }
+    }
+
+    return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  },
+  ["related-tutorials"],
+  {
+    tags: [CACHE_TAGS.tutorials, CACHE_TAGS.categories],
+    revalidate: LIST_REVALIDATE_SECONDS,
+  },
+);
+
+/**
+ * 返回最多 RELATED_TUTORIAL_LIMIT + 2 篇候选；页面去掉“上一篇/下一篇”后再截取，
+ * 这样查询可以和上一篇/下一篇并行。
+ */
+export async function getRelatedTutorialCandidates(tutorialId: number, categoryId: number) {
+  const rows = await cachedRelatedTutorials(tutorialId, categoryId);
+  return rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) }));
+}

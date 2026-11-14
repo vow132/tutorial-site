@@ -37,11 +37,12 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **安全响应头**：CSP/HSTS/nosniff 等统一在 `next.config.ts` 的 `headers()`；HSTS 只在 `X-Forwarded-Proto: https` 时下发，`/uploads/*` 带 `sandbox` CSP
 - 后台结构：`app/admin/login`（登录页）+ `app/admin/(panel)/*`（带侧边栏的面板路由组）
 - **前台链接**：一律用 `components/intent-link.tsx`（悬停/触摸/聚焦时才预取），不要直接用 `next/link`，否则每个页面会对视口内所有链接发预取请求
-- **SEO**：可收录页面的 metadata 一律用 `lib/seo.ts` 的 `pageMetadata()` 生成——各层 metadata 是浅合并，子页面一写 `openGraph`/`alternates` 就会整个替换根布局的（RSS 链接、站点名、分享图都会丢），所以要给全字段；**根布局不能写 canonical**（否则搜索/404 页都被规范到首页）。分页列表规范地址带 `?page=N`（第 1 页不带）。结构化数据用 `components/json-ld.tsx`；搜索页 `noindex, follow` 且不进 sitemap。阅读量用原生 SQL 自增（`lib/view-counter.ts`），不能改回 `prisma.tutorial.update`，否则每次阅读都会刷新 `updatedAt`，sitemap lastmod 与 `article:modified_time` 失真
+- **SEO**：文章页底部「相关教程」来自 `lib/public-data.ts` 的 `getRelatedTutorialCandidates()`（同分类按阅读量，不够再从父/子/同父分类补，顶级分类之间不算相关）。可收录页面的 metadata 一律用 `lib/seo.ts` 的 `pageMetadata()` 生成——各层 metadata 是浅合并，子页面一写 `openGraph`/`alternates` 就会整个替换根布局的（RSS 链接、站点名、分享图都会丢），所以要给全字段；**根布局不能写 canonical**（否则搜索/404 页都被规范到首页）。分页列表规范地址带 `?page=N`（第 1 页不带）。结构化数据用 `components/json-ld.tsx`；搜索页 `noindex, follow` 且不进 sitemap。阅读量用原生 SQL 自增（`lib/view-counter.ts`），不能改回 `prisma.tutorial.update`，否则每次阅读都会刷新 `updatedAt`，sitemap lastmod 与 `article:modified_time` 失真
 - **前台数据缓存**：分类、设置、教程列表经 `unstable_cache` 缓存（`lib/public-data.ts` 的 `CACHE_TAGS`）；后台改动后在 Server Action 里 `revalidateTag(tag, { expire: 0 })`。缓存以 JSON 存储，Date 需自行还原
 - **动效与首屏**：首屏最大的元素（首页大标题、文章标题/正文）用 `<Reveal fade={false}>` 只做位移，避免从透明淡入拖慢 LCP；桌面导航 hydration 前用 CSS 断点渲染三档分页，避免跳动
 - **颜色对比度**：辅助文字 `text-ink-3`（#6b7280）、小号强调文字用 `text-accent-ink`（#4f46e5），`text-accent` 只用于大字号、图标和背景
-- **站点设置**：`Setting` 表（key-value，单行 key=`site`，JSON 存全部设置）；类型/默认值/读取在 `lib/settings.ts`（`getSettings()` 自动回退默认值）；后台编辑在 `/admin/settings`（底部栏目是客户端 JSON 编辑器，`autoCategories: true` 的栏目自动输出分类链接）；前台 layout/页脚/首页 Hero 均从 `getSettings()` 取数
+- **站点设置**：`Setting` 表（key-value，单行 key=`site`，JSON 存全部设置）；类型/默认值/读取在 `lib/settings.ts`（`getSettings()` 自动回退默认值）；后台编辑在 `/admin/settings`（底部栏目是客户端 JSON 编辑器，`autoCategories: true` 的栏目自动输出分类链接；「搜索引擎验证」的平台列表、验证码校验与 meta 输出在 `lib/search-verification.ts`，根布局输出到每个页面）；前台 layout/页脚/首页 Hero 均从 `getSettings()` 取数
+- **后台表单**：React 19 的 `<form action={…}>` 在 action 结束后会重置表单，服务端校验失败时已填内容会丢失；成功后跳转、或成功后就该保留当前值的表单用 `lib/form-submit.ts` 的 `submitKeepingValues()`（设置页、教程编辑页已改）
 - Server Actions 在 `lib/actions/`，每个都必须 `requireAuth()`；变更后 `revalidatePath`。`"use server"` 文件里导出的每个函数都会成为可被直接调用的接口，辅助函数放到普通模块中
 
 ## 默认账号

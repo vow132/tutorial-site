@@ -3,6 +3,7 @@ import "./globals.css";
 import { getSettings } from "@/lib/settings";
 import { SITE_URL } from "@/lib/site-url";
 import { DEFAULT_OG_IMAGE, RSS_FEED } from "@/lib/seo";
+import { verificationMetadata } from "@/lib/search-verification";
 
 /**
  * 全站兜底 metadata。注意这里**不能**写 canonical：没覆盖它的页面（搜索、404）
@@ -32,6 +33,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [DEFAULT_OG_IMAGE.url],
     },
     alternates: { types: RSS_FEED },
+    // 后台「站点设置 → 搜索引擎验证」里填写的站长平台验证码。
+    verification: verificationMetadata(settings.verification),
   };
 }
 

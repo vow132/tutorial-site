@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { firstArticleImage, htmlToDescription, processArticle } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
+import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
 import { countTutorialView } from "@/lib/view-counter";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { decodeSegment } from "@/lib/url";
@@ -16,6 +17,7 @@ import JsonLd from "@/components/json-ld";
 import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
+import TutorialCard from "@/components/tutorial-card";
 
 type PublishedTutorial = NonNullable<Awaited<ReturnType<typeof getPublishedTutorial>>>;
 
@@ -69,7 +71,7 @@ export default async function TutorialDetailPage({
   after(() => countTutorialView(tutorial.id, visitor));
 
   // 上一篇 / 下一篇（同分类内按时间）
-  const [prev, next, processed, settings] = await Promise.all([
+  const [prev, next, processed, settings, relatedCandidates] = await Promise.all([
     prisma.tutorial.findFirst({
       where: {
         published: true,
@@ -77,7 +79,7 @@ export default async function TutorialDetailPage({
         createdAt: { lt: tutorial.createdAt },
       },
       orderBy: { createdAt: "desc" },
-      select: { title: true, slug: true },
+      select: { id: true, title: true, slug: true },
     }),
     prisma.tutorial.findFirst({
       where: {
@@ -86,11 +88,17 @@ export default async function TutorialDetailPage({
         createdAt: { gt: tutorial.createdAt },
       },
       orderBy: { createdAt: "asc" },
-      select: { title: true, slug: true },
+      select: { id: true, title: true, slug: true },
     }),
     processArticle(tutorial.content),
     getSettings(),
+    getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
   ]);
+
+  // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
+  const related = relatedCandidates
+    .filter((item) => item.id !== prev?.id && item.id !== next?.id)
+    .slice(0, RELATED_TUTORIAL_LIMIT);
 
   const { html, toc } = processed;
   const articleUrl = absoluteUrl(tutorialPath(tutorial.slug));
@@ -221,6 +229,32 @@ export default async function TutorialDetailPage({
               )}
             </nav>
           </Reveal>
+
+          {/* 相关教程：给读者下一步，也让爬虫更快发现同主题文章 */}
+          {related.length > 0 && (
+            <section aria-labelledby="related-heading" className="mt-14">
+              <Reveal mode="scroll">
+                <h2 id="related-heading" className="text-lg font-bold text-ink">
+                  相关教程
+                </h2>
+              </Reveal>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {related.map((item, index) => (
+                  <Reveal key={item.id} mode="scroll" delay={Math.min(index, 3) * 0.05}>
+                    <TutorialCard
+                      title={item.title}
+                      slug={item.slug}
+                      excerpt={item.excerpt}
+                      categoryName={item.category.name}
+                      categoryColor={item.category.color}
+                      views={item.views}
+                      createdAt={item.createdAt}
+                    />
+                  </Reveal>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* 目录 */}
