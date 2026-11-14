@@ -12,6 +12,9 @@ import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
 import { decodeSegment } from "@/lib/url";
+import { getSettings } from "@/lib/settings";
+import { breadcrumbJsonLd, pageMetadata, pageSuffix, withPage } from "@/lib/seo";
+import JsonLd from "@/components/json-ld";
 
 const PAGE_SIZE = 9;
 
@@ -22,17 +25,64 @@ function resolveSlug(segments: string[]): string {
   return decodeSegment(last) ?? "";
 }
 
+const categoryPath = (slug: string) => `/categories/${encodeURIComponent(slug)}`;
+
+/** 分类名本身以“教程”结尾时不再重复（避免“前端教程教程”）。 */
+function categoryTitle(name: string) {
+  return /教程$/.test(name) ? name : `${name}教程`;
+}
+
+type CategoryRow = Awaited<ReturnType<typeof getCategoriesWithCounts>>[number];
+
+/** 从根到父的分类链，用于面包屑。 */
+function ancestorsOf(category: CategoryRow, all: CategoryRow[]) {
+  const byId = new Map(all.map((item) => [item.id, item]));
+  const chain: CategoryRow[] = [];
+  const seen = new Set([category.id]);
+  let parentId = category.parentId;
+  while (parentId && !seen.has(parentId)) {
+    const parent = byId.get(parentId);
+    if (!parent) break;
+    seen.add(parent.id);
+    chain.unshift(parent);
+    parentId = parent.parentId;
+  }
+  return chain;
+}
+
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string[] }>;
+  searchParams: Promise<{ page?: string }>;
 }): Promise<Metadata> {
   const { slug: segments } = await params;
   const slug = resolveSlug(segments);
   const category = (await getCategoriesWithCounts()).find((item) => item.slug === slug);
   // metadata 阶段就触发 404，保证流式传输开始前拿到真实 404 状态码。
   if (!category) notFound();
-  return { title: `${category.name}教程` };
+
+  const { page: pageStr } = await searchParams;
+  // 与页面相同的页码收敛规则（结果有缓存）：?page=999 的规范地址指向最后一页。
+  const [{ page, total }, settings] = await Promise.all([
+    getPublishedTutorialPage({
+      categoryId: category.id,
+      page: Number(pageStr) || 1,
+      pageSize: PAGE_SIZE,
+    }),
+    getSettings(),
+  ]);
+  const name = categoryTitle(category.name);
+  const description =
+    category.description?.trim() ||
+    `${settings.siteName}「${category.name}」分类下的图文教程，共 ${total} 篇，持续更新。`;
+
+  return pageMetadata({
+    title: `${name}${pageSuffix(page)}`,
+    description: page > 1 ? `${description}（第 ${page} 页）` : description,
+    path: withPage(categoryPath(category.slug), page),
+  });
 }
 
 export default async function CategoryPage({
@@ -62,15 +112,7 @@ export default async function CategoryPage({
   const categoryNode = flattened.find(({ node }) => node.id === category.id)?.node;
   if (!categoryNode) notFound();
 
-  const categoryById = new Map(allCategories.map((item) => [item.id, item]));
-  const ancestors = [];
-  let parentId = category.parentId;
-  while (parentId) {
-    const parent = categoryById.get(parentId);
-    if (!parent) break;
-    ancestors.unshift(parent);
-    parentId = parent.parentId;
-  }
+  const ancestors = ancestorsOf(category, allCategories);
 
   // 教程只在其所属分类展示，父分类不再聚合子分类下的教程。
   // 页码收敛到合法区间，避免 ?page=999 渲染出误导性的空状态；结果有缓存。
@@ -89,8 +131,15 @@ export default async function CategoryPage({
   const countTutorials = (node: typeof categoryNode): number =>
     node._count.tutorials;
 
+  const jsonLd = breadcrumbJsonLd([
+    { name: "首页", path: "/" },
+    ...ancestors.map((ancestor) => ({ name: ancestor.name, path: categoryPath(ancestor.slug) })),
+    { name: category.name },
+  ]);
+
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
+      <JsonLd data={jsonLd} />
       <Reveal fade={false}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink-3">
           <IntentLink href="/" className="transition-colors hover:text-accent">

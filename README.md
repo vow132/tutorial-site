@@ -84,7 +84,8 @@ AUTH_SECRET="请替换为随机长字符串"
 # 只有 Next 端口不对公网开放、所有请求都经过 Nginx/Caddy 时才设为 true，
 # 这样限流、安全日志和阅读量去重才会采用代理传来的真实访客 IP
 # TRUST_PROXY="true"
-# 站点对外地址（用于 sitemap / OpenGraph 的绝对链接），如：
+# 站点对外地址（canonical、sitemap、分享卡片、结构化数据的绝对链接），生产环境必须设置，
+# 未设置或指向 localhost 时服务启动会打印警告，如：
 # SITE_URL="https://example.com"
 SITE_URL="http://localhost:3000"
 ```

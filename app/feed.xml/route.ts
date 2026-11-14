@@ -18,15 +18,16 @@ export async function GET() {
   const base = SITE_URL.replace(/\/$/, "");
 
   const [tutorials, settings] = await Promise.all([
+    // 按发布时间排列：修改旧文章不会让它重新顶到订阅列表最前面。
     prisma.tutorial.findMany({
       where: { published: true },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { createdAt: "desc" },
       take: 20,
       select: {
         title: true,
         slug: true,
         excerpt: true,
-        updatedAt: true,
+        createdAt: true,
         category: { select: { name: true } },
       },
     }),
@@ -44,7 +45,7 @@ export async function GET() {
       <link>${url}</link>
       <guid isPermaLink="true">${url}</guid>
       <category>${escapeXml(t.category.name)}</category>
-      <pubDate>${new Date(t.updatedAt).toUTCString()}</pubDate>
+      <pubDate>${new Date(t.createdAt).toUTCString()}</pubDate>
       <description>${escapeXml(t.excerpt ?? "")}</description>
     </item>`;
     })

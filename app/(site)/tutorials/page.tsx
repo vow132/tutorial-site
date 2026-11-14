@@ -3,10 +3,29 @@ import { getPublishedTutorialPage } from "@/lib/public-data";
 import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
-
-export const metadata: Metadata = { title: "全部教程" };
+import { getSettings } from "@/lib/settings";
+import { pageMetadata, pageSuffix, withPage } from "@/lib/seo";
 
 const PAGE_SIZE = 9;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}): Promise<Metadata> {
+  const { page: pageStr } = await searchParams;
+  // 与页面相同的页码收敛规则（结果有缓存）：?page=999 的规范地址指向最后一页。
+  const [{ page, total }, settings] = await Promise.all([
+    getPublishedTutorialPage({ page: Number(pageStr) || 1, pageSize: PAGE_SIZE }),
+    getSettings(),
+  ]);
+  const description = `${settings.siteName}全部 ${total} 篇图文教程，按发布时间排列，持续更新。`;
+  return pageMetadata({
+    title: `全部教程${pageSuffix(page)}`,
+    description: page > 1 ? `${description}（第 ${page} 页）` : description,
+    path: withPage("/tutorials", page),
+  });
+}
 
 export default async function TutorialsPage({
   searchParams,

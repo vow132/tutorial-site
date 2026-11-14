@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
@@ -10,9 +11,18 @@ import {
 import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
+import JsonLd from "@/components/json-ld";
+import { pageMetadata } from "@/lib/seo";
+import { absoluteUrl } from "@/lib/site-url";
 
 // 首页是静态页：内容变更时由后台立即刷新；阅读量等统计每 10 分钟刷新一次。
 export const revalidate = 600;
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSettings();
+  // 不传 title：沿用根布局的站点标题。
+  return pageMetadata({ description: settings.siteDescription, path: "/" });
+}
 
 export default async function HomePage() {
   const [settings, categories, latest, tutorialStats] = await Promise.all([
@@ -65,8 +75,20 @@ export default async function HomePage() {
     },
   ];
 
+  // 告诉搜索引擎站点名称（搜索结果里显示的站点名）。
+  const websiteJsonLd = {
+    "@type": "WebSite",
+    "@id": `${absoluteUrl("/")}#website`,
+    name: settings.siteName,
+    alternateName: settings.siteTitle,
+    url: absoluteUrl("/"),
+    description: settings.siteDescription,
+    inLanguage: "zh-CN",
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4">
+      <JsonLd data={websiteJsonLd} />
       {/* ---------- Hero ---------- */}
       <section className="relative flex flex-col items-center pb-16 pt-20 text-center md:pt-28">
         {/* 低饱和靛蓝光晕，随主题取色；纯装饰 */}

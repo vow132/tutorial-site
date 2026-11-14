@@ -2,7 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getSettings } from "@/lib/settings";
 import { SITE_URL } from "@/lib/site-url";
+import { DEFAULT_OG_IMAGE, RSS_FEED } from "@/lib/seo";
 
+/**
+ * 全站兜底 metadata。注意这里**不能**写 canonical：没覆盖它的页面（搜索、404）
+ * 会全部被规范到首页。可收录页面用 lib/seo.ts 的 pageMetadata() 生成完整字段。
+ */
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
   return {
@@ -15,19 +20,18 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: "website",
       siteName: settings.siteName,
+      locale: "zh_CN",
       title: settings.siteTitle,
       description: settings.siteDescription,
-      images: [{ url: "/og.png", width: 1200, height: 630, alt: settings.siteTitle }],
+      images: [{ ...DEFAULT_OG_IMAGE, alt: settings.siteTitle }],
     },
     twitter: {
       card: "summary_large_image",
       title: settings.siteTitle,
       description: settings.siteDescription,
-      images: ["/og.png"],
+      images: [DEFAULT_OG_IMAGE.url],
     },
-    alternates: {
-      types: { "application/rss+xml": `${SITE_URL.replace(/\/$/, "")}/feed.xml` },
-    },
+    alternates: { types: RSS_FEED },
   };
 }
 
