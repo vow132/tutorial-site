@@ -7,6 +7,7 @@ import Image from "@tiptap/extension-image";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extensions";
+import { altFromFileName } from "@/lib/image-alt";
 
 async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
@@ -59,7 +60,8 @@ function insertFiles(editor: Editor, files: File[], pos?: number) {
       .then((url) => {
         replacePlaceholder({
           type: "image",
-          attrs: { src: url, alt: file.name },
+          // 文件名有意义时直接用作说明；IMG_1234 之类留空，可用工具栏“图片说明”补上。
+          attrs: { src: url, alt: altFromFileName(file.name) || null },
         });
       })
       .catch((err) => {
@@ -218,6 +220,22 @@ export default function RichTextEditor({
   };
 
   const pickImage = () => fileInputRef.current?.click();
+
+  // alt 文本：读屏软件朗读、图片加载失败时显示，也是搜索引擎理解图片的主要依据。
+  const editImageAlt = () => {
+    if (!editor.isActive("image")) {
+      window.alert("请先点击选中正文中的一张图片，再设置图片说明。");
+      return;
+    }
+    const prev = (editor.getAttributes("image").alt as string | undefined) ?? "";
+    const alt = window.prompt("图片说明（简要描述图片内容，供读屏软件和搜索引擎使用）：", prev);
+    if (alt === null) return;
+    editor
+      .chain()
+      .focus()
+      .updateAttributes("image", { alt: alt.trim().slice(0, 200) || null })
+      .run();
+  };
 
   const currentColor =
     (editor.getAttributes("textStyle").color as string | undefined) ?? null;
@@ -431,6 +449,14 @@ export default function RichTextEditor({
           className={btn(false)}
         >
           🖼 图片
+        </button>
+        <button
+          type="button"
+          title="图片说明（先选中一张图片）"
+          onClick={editImageAlt}
+          className={btn(false)}
+        >
+          图片说明
         </button>
         <button
           type="button"

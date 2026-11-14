@@ -237,11 +237,45 @@ export function processArticle(html: string): Promise<ProcessedArticle> {
   return task;
 }
 
-/** Strip HTML for excerpts and search results. */
+const BLOCK_TAG =
+  /<\/?(?:p|div|h[1-6]|li|ul|ol|pre|blockquote|br|hr|table|thead|tbody|tr|td|th|figure|figcaption|img)\b[^>]*>/gi;
+
+/**
+ * Strip HTML for excerpts and search results. Entities are decoded because the
+ * result is rendered as plain text (React / meta tags escape it again).
+ */
 export function stripHtml(html: string, max = 160): string {
-  const text = html
-    .replace(/<[^>]+>/g, " ")
+  // 块级标签换成空格；行内标签（strong、a、code…）直接去掉，中文里不会多出空格。
+  const text = decodeEntities(
+    html.replace(BLOCK_TAG, " ").replace(/<[^>]+>/g, ""),
+  )
     .replace(/\s+/g, " ")
     .trim();
   return text.length > max ? text.slice(0, max) + "…" : text;
+}
+
+/** 没写摘要时的 meta description：跳过代码块，取正文开头的文字。 */
+export function htmlToDescription(html: string, max = 120): string {
+  return stripHtml(html.replace(/<pre\b[\s\S]*?<\/pre>/gi, " "), max);
+}
+
+export type ArticleImage = { url: string; alt?: string; width?: number; height?: number };
+
+/** 正文第一张图，用作分享卡片和结构化数据的配图（只认站内路径和 http(s) 地址）。 */
+export function firstArticleImage(html: string): ArticleImage | null {
+  const tag = /<img\b[^>]*>/i.exec(html)?.[0];
+  if (!tag) return null;
+  const attr = (name: string) => {
+    const value = new RegExp(`\\s${name}="([^"]*)"`, "i").exec(tag)?.[1];
+    return value === undefined ? undefined : decodeEntities(value).trim();
+  };
+  const url = attr("src");
+  if (!url || !/^(\/[^/]|https?:\/\/)/i.test(url)) return null;
+  const width = Number(attr("width"));
+  const height = Number(attr("height"));
+  return {
+    url,
+    alt: attr("alt") || undefined,
+    ...(width > 0 && height > 0 ? { width, height } : {}),
+  };
 }

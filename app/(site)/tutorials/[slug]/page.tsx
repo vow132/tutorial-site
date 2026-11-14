@@ -3,15 +3,30 @@ import IntentLink from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { processArticle } from "@/lib/article";
+import { firstArticleImage, htmlToDescription, processArticle } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
+import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
 import { countTutorialView } from "@/lib/view-counter";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { decodeSegment } from "@/lib/url";
+import { getSettings } from "@/lib/settings";
+import { absoluteUrl } from "@/lib/site-url";
+import { DEFAULT_OG_IMAGE, breadcrumbJsonLd, pageMetadata, toAbsolute } from "@/lib/seo";
+import JsonLd from "@/components/json-ld";
 import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
+import TutorialCard from "@/components/tutorial-card";
+
+type PublishedTutorial = NonNullable<Awaited<ReturnType<typeof getPublishedTutorial>>>;
+
+const tutorialPath = (slug: string) => `/tutorials/${encodeURIComponent(slug)}`;
+
+/** 摘要优先；没写摘要时取正文开头（已过滤的 HTML），再不行用标题。 */
+function describe(tutorial: PublishedTutorial, html: string) {
+  return tutorial.excerpt?.trim() || htmlToDescription(html) || tutorial.title;
+}
 
 export async function generateMetadata({
   params,
@@ -24,7 +39,20 @@ export async function generateMetadata({
   // 在 metadata 阶段就触发 404：此时响应尚未开始流式传输，
   // 才能返回真实的 404 状态码（否则 loading.tsx 先行输出 200）。
   if (!t) notFound();
-  return { title: t.title, description: t.excerpt ?? undefined };
+  // 与页面渲染共用同一份处理结果（processArticle 按内容哈希缓存）。
+  const { html } = await processArticle(t.content);
+  const image = firstArticleImage(html);
+  return pageMetadata({
+    title: t.title,
+    description: describe(t, html),
+    path: tutorialPath(t.slug),
+    image: image && { ...image, alt: image.alt ?? t.title },
+    article: {
+      publishedTime: t.createdAt,
+      modifiedTime: t.updatedAt,
+      section: t.category.name,
+    },
+  });
 }
 
 export default async function TutorialDetailPage({
@@ -43,7 +71,7 @@ export default async function TutorialDetailPage({
   after(() => countTutorialView(tutorial.id, visitor));
 
   // 上一篇 / 下一篇（同分类内按时间）
-  const [prev, next, processed] = await Promise.all([
+  const [prev, next, processed, settings, relatedCandidates] = await Promise.all([
     prisma.tutorial.findFirst({
       where: {
         published: true,
@@ -51,7 +79,7 @@ export default async function TutorialDetailPage({
         createdAt: { lt: tutorial.createdAt },
       },
       orderBy: { createdAt: "desc" },
-      select: { title: true, slug: true },
+      select: { id: true, title: true, slug: true },
     }),
     prisma.tutorial.findFirst({
       where: {
@@ -60,17 +88,54 @@ export default async function TutorialDetailPage({
         createdAt: { gt: tutorial.createdAt },
       },
       orderBy: { createdAt: "asc" },
-      select: { title: true, slug: true },
+      select: { id: true, title: true, slug: true },
     }),
     processArticle(tutorial.content),
+    getSettings(),
+    getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
   ]);
 
+  // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
+  const related = relatedCandidates
+    .filter((item) => item.id !== prev?.id && item.id !== next?.id)
+    .slice(0, RELATED_TUTORIAL_LIMIT);
+
   const { html, toc } = processed;
+  const articleUrl = absoluteUrl(tutorialPath(tutorial.slug));
+  const site = { "@type": "Organization", name: settings.siteName, url: absoluteUrl("/") };
+  const jsonLd = {
+    "@graph": [
+      {
+        "@type": "Article",
+        "@id": `${articleUrl}#article`,
+        headline: tutorial.title,
+        description: describe(tutorial, html),
+        url: articleUrl,
+        mainEntityOfPage: articleUrl,
+        image: [toAbsolute(firstArticleImage(html)?.url ?? DEFAULT_OG_IMAGE.url)],
+        datePublished: tutorial.createdAt.toISOString(),
+        dateModified: tutorial.updatedAt.toISOString(),
+        articleSection: tutorial.category.name,
+        inLanguage: "zh-CN",
+        author: site,
+        publisher: site,
+      },
+      breadcrumbJsonLd([
+        { name: "首页", path: "/" },
+        {
+          name: tutorial.category.name,
+          path: `/categories/${encodeURIComponent(tutorial.category.slug)}`,
+        },
+        { name: tutorial.title },
+      ]),
+    ],
+  };
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;
   const minutes = Math.max(1, Math.round(words / 400));
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-12">
+      <JsonLd data={jsonLd} />
       {/* 面包屑 */}
       <Reveal>
         <nav className="flex items-center gap-2 text-sm text-ink-3">
@@ -164,6 +229,32 @@ export default async function TutorialDetailPage({
               )}
             </nav>
           </Reveal>
+
+          {/* 相关教程：给读者下一步，也让爬虫更快发现同主题文章 */}
+          {related.length > 0 && (
+            <section aria-labelledby="related-heading" className="mt-14">
+              <Reveal mode="scroll">
+                <h2 id="related-heading" className="text-lg font-bold text-ink">
+                  相关教程
+                </h2>
+              </Reveal>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {related.map((item, index) => (
+                  <Reveal key={item.id} mode="scroll" delay={Math.min(index, 3) * 0.05}>
+                    <TutorialCard
+                      title={item.title}
+                      slug={item.slug}
+                      excerpt={item.excerpt}
+                      categoryName={item.category.name}
+                      categoryColor={item.category.color}
+                      views={item.views}
+                      createdAt={item.createdAt}
+                    />
+                  </Reveal>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* 目录 */}

@@ -43,12 +43,12 @@ async function flushTutorialViews() {
   state.pendingEvents = 0;
 
   try {
+    // 用原生 SQL：Prisma 的 update/updateMany 会顺带刷新 @updatedAt，
+    // 每次阅读都会让 sitemap lastmod、文章 modified_time 变成“刚刚修改”。
     await prisma.$transaction(
-      [...batch].map(([id, increment]) =>
-        prisma.tutorial.updateMany({
-          where: { id },
-          data: { views: { increment } },
-        }),
+      [...batch].map(
+        ([id, increment]) =>
+          prisma.$executeRaw`UPDATE "Tutorial" SET "views" = "views" + ${increment} WHERE "id" = ${id}`,
       ),
     );
   } catch {
