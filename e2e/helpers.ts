@@ -12,7 +12,9 @@ export function collectErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    if (message.type() !== "error") return;
+    const { url } = message.location();
+    errors.push(url ? `${message.text()} (${url})` : message.text());
   });
   return errors;
 }

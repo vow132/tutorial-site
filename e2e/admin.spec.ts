@@ -1,4 +1,8 @@
+import { rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import sharp from "sharp";
 import { ADMIN_STATE, collectErrors, uniqueSuffix } from "./helpers";
 
 test.use({ storageState: ADMIN_STATE });
@@ -116,4 +120,77 @@ test("search engine verification codes are saved and rendered", async ({ page, r
   await page.getByRole("button", { name: "保存设置" }).click();
   await expect(page.getByText("设置已保存")).toBeVisible();
   expect(await (await request.get("/")).text()).not.toContain("baidu-site-verification");
+});
+
+test("category form keeps input on error and clears after creating", async ({ page }) => {
+  const errors = collectErrors(page);
+  const slug = `e2e-cat-${uniqueSuffix()}`;
+  await page.goto("/admin/categories");
+  const create = page.locator("form").filter({ has: page.getByRole("button", { name: "创建分类" }) });
+
+  await create.locator('input[name="name"]').fill("E2E 分类");
+  await create.locator('input[name="slug"]').fill(slug);
+  await create.locator('input[name="description"]').fill("端到端测试分类");
+  await create.getByRole("button", { name: "创建分类" }).click();
+  await expect(create.getByText("分类已创建")).toBeVisible();
+  await expect(create.locator('input[name="name"]')).toHaveValue("");
+
+  // 重复 slug：报错，已填内容保留
+  await create.locator('input[name="name"]').fill("重复的分类");
+  await create.locator('input[name="slug"]').fill(slug);
+  await create.locator('input[name="description"]').fill("保留的描述");
+  await create.getByRole("button", { name: "创建分类" }).click();
+  await expect(create.getByText("Slug 已被占用")).toBeVisible();
+  await expect(create.locator('input[name="name"]')).toHaveValue("重复的分类");
+  await expect(create.locator('input[name="description"]')).toHaveValue("保留的描述");
+
+  // 清理
+  const row = page.locator("div").filter({ hasText: `/${slug}` }).filter({ has: page.getByRole("button", { name: "删除" }) }).last();
+  page.once("dialog", (dialog) => dialog.accept());
+  await row.getByRole("button", { name: "删除" }).click();
+  await expect(page.getByText(`/${slug}`)).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("uploaded images get alt text, responsive variants and srcset", async ({ page, request }) => {
+  const errors = collectErrors(page);
+  const id = uniqueSuffix();
+  const file = path.join(os.tmpdir(), `flexbox-main-axis.png`);
+  await sharp({ create: { width: 2000, height: 1000, channels: 3, background: "#6366f1" } })
+    .png()
+    .toFile(file);
+
+  await page.goto("/admin/tutorials/new");
+  await fillTutorial(page, { title: `E2E 图片 ${id}`, slug: `e2e-image-${id}`, body: "带图片的正文" });
+  await page.locator('input[type="file"]').setInputFiles(file);
+  const image = page.locator(".ProseMirror img");
+  await expect(image).toHaveAttribute("alt", "flexbox main axis");
+  const src = (await image.getAttribute("src"))!;
+  const base = src.replace(/\.[a-z]+$/, "");
+  const uploaded = [src, `${base}-800w.webp`, `${base}-1200w.webp`];
+  test.info().attach("uploads", { body: uploaded.join("\n") });
+
+  try {
+    for (const url of uploaded) expect((await request.get(url)).status(), url).toBe(200);
+    await save(page);
+    await expect(page).toHaveURL(/\/admin\/tutorials$/);
+
+    await page.goto(`/tutorials/e2e-image-${id}`);
+    const rendered = page.locator("article img").first();
+    await expect(rendered).toHaveAttribute("srcset", new RegExp(`-800w\\.webp 800w, .*-1200w\\.webp 1200w, .* 1600w$`));
+    await expect(rendered).toHaveAttribute("sizes", /820px/);
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`${src}$`));
+    // 在清理之前断言：删除时管理列表里对该文章的预取请求会正常返回 404。
+    expect(errors).toEqual([]);
+  } finally {
+    // 清理：删除教程和上传的文件（测试与服务端在同一台机器上运行）。
+    await page.goto("/admin/tutorials");
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("row").filter({ hasText: `E2E 图片 ${id}` }).getByRole("button", { name: "删除" }).click();
+    await expect(page.getByText(`E2E 图片 ${id}`)).toHaveCount(0);
+    await Promise.all(
+      uploaded.map((url) => rm(path.join(process.cwd(), "public", url), { force: true })),
+    );
+    await rm(file, { force: true });
+  }
 });

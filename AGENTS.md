@@ -34,7 +34,7 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`；启动时设 `journal_mode=WAL` + `synchronous=NORMAL`（同步驱动的每次 fsync 都会卡住整个进程），数据库文件旁会有 `-wal`/`-shm`，**不要直接复制 `.db` 文件做备份**，用 `npm run backup`（在线备份 API）
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单
-- **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
+- **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`，宽图另存 `-800w`/`-1200w.webp` 响应式小图（命名在 `lib/image-variants.ts`），`lib/article.ts` 渲染时自动加 `srcset`/`sizes`；旧图用 `npm run images:variants` 补生成。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
 - **安全响应头**：CSP/HSTS/nosniff 等统一在 `next.config.ts` 的 `headers()`；HSTS 只在 `X-Forwarded-Proto: https` 时下发，`/uploads/*` 带 `sandbox` CSP
 - 后台结构：`app/admin/login`（登录页）+ `app/admin/(panel)/*`（带侧边栏的面板路由组）
 - **前台链接**：一律用 `components/intent-link.tsx`（悬停/触摸/聚焦时才预取），不要直接用 `next/link`，否则每个页面会对视口内所有链接发预取请求

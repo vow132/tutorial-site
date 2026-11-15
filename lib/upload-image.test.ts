@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import sharp from "sharp";
-import { detectImageFormat, optimizeImage } from "./upload-image";
+import { createVariants, detectImageFormat, optimizeImage } from "./upload-image";
 
 const solid = (width: number, height: number, background: string) =>
   sharp({ create: { width, height, channels: 3, background } });
@@ -45,4 +45,27 @@ test("oversized images are rejected instead of being decoded", async () => {
   // 8000×6000 = 48MP, above the 40MP decode limit.
   const huge = await solid(8000, 6000, "#000").png({ compressionLevel: 9 }).toBuffer();
   await assert.rejects(optimizeImage(huge, ".png"));
+});
+
+test("wide images get 800w and 1200w responsive variants", async () => {
+  const { data } = await optimizeImage(await solid(3000, 1500, "#3366ff").jpeg().toBuffer(), ".jpg");
+  const variants = await createVariants(data);
+  assert.deepEqual(variants.map(([width]) => width), [800, 1200]);
+  for (const [width, buffer] of variants) {
+    const meta = await sharp(buffer).metadata();
+    assert.equal(meta.format, "webp");
+    assert.equal(meta.width, width);
+  }
+  const medium = await createVariants(await solid(1000, 500, "#fff").png().toBuffer());
+  assert.deepEqual(medium.map(([width]) => width), [800]);
+  assert.deepEqual(await createVariants(await solid(900, 500, "#fff").png().toBuffer()), []);
+});
+
+test("animated images get no variants (re-encoding would drop frames)", async () => {
+  const frames = await Promise.all(
+    ["#ff0000", "#0000ff"].map((color) => solid(1600, 900, color).png().toBuffer()),
+  );
+  const animated = await sharp(frames, { join: { animated: true } }).webp({ loop: 0 }).toBuffer();
+  assert.deepEqual(await createVariants(animated), []);
+  assert.deepEqual(await createVariants(await solid(1600, 900, "#fff").gif().toBuffer()), []);
 });

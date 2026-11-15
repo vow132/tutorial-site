@@ -4,7 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getCurrentAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
-import { detectImageFormat, optimizeImage } from "@/lib/upload-image";
+import { variantName } from "@/lib/image-variants";
+import { createVariants, detectImageFormat, optimizeImage } from "@/lib/upload-image";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -52,6 +53,14 @@ export async function POST(request: Request) {
   await mkdir(dir, { recursive: true });
   const name = `${Date.now()}-${randomBytes(6).toString("hex")}${optimized.ext}`;
   await writeFile(path.join(dir, name), optimized.data);
+  // 响应式小图失败不影响上传本身，正文会退回只用原图。
+  try {
+    for (const [width, data] of await createVariants(optimized.data)) {
+      await writeFile(path.join(dir, variantName(name, width)), data);
+    }
+  } catch (error) {
+    console.warn("[upload] 生成响应式小图失败：", error);
+  }
   await audit("upload", {
     actor: admin.username,
     detail: `${name}（${file.size} → ${optimized.data.length} 字节）`,

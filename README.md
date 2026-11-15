@@ -23,7 +23,7 @@
 ## 功能特性
 
 - **前台**：悬浮胶囊导航（分类翻页、aura/流光动效）、亮暗双主题（跟随手动切换持久化）、鼠标跟随聚光灯卡片与轻微 3D 倾斜、滚动触发的分区渐显、小幽灵吉祥物
-- **文章**：服务端 TOC 提取与高亮（highlight.js）、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息
+- **文章**：服务端 TOC 提取与高亮（highlight.js）、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息，并生成 800/1200px 小图供手机按屏幕加载
 - **后台**：Tiptap 3 富文本编辑器（拖拽/粘贴上传图片）、分类树管理（最多三级、防循环依赖）、站点设置可视化编辑、账号安全
 - **SEO 与健壮性**：动态 sitemap / robots、canonical、逐页 OpenGraph/Twitter 分享卡片、Article/面包屑/WebSite 结构化数据、后台填写 Google/Bing/百度/360/搜狗/神马/Yandex 站长验证码、真实 404 状态码、越界分页自动收敛、空/加载/错误状态齐全
 - **安全**：可吊销的服务端会话 + 两步验证（TOTP）、受信任设备感知的登录限流、正文 HTML 白名单过滤、按文件头校验上传（不接受 SVG）、CSP/HSTS 等安全响应头、后台安全日志、Server Actions 与后台页面逐一鉴权，详见「安全加固」
@@ -211,6 +211,8 @@ server {
 17 3 * * * cd /path/to/tutorial-site && npm run backup >> backups/backup.log 2>&1
 47 3 * * * rclone sync /path/to/tutorial-site/backups remote:tutorial-backups && rclone sync /path/to/tutorial-site/public/uploads remote:tutorial-uploads
 ```
+
+本次升级之前上传的图片没有响应式小图，部署后执行一次 `npm run images:variants` 补生成（可重复执行，已有的会跳过），然后重启站点。
 
 数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
 
