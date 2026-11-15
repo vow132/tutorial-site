@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { processArticle } from "./article";
+import { firstArticleImage, htmlToDescription, processArticle, stripHtml } from "./article";
 
 test("TOC text decodes HTML entities so React renders them once", async () => {
   const { toc, html } = await processArticle(
@@ -37,4 +37,34 @@ test("malformed numeric entities never break rendering", async () => {
   const { toc } = await processArticle("<h2>A &#99999999; &#x110000; B</h2>");
   assert.equal(toc.length, 1);
   assert.match(toc[0].text, /^A .* B$/);
+});
+
+test("plain-text excerpts decode entities so they are escaped only once", () => {
+  assert.equal(stripHtml("<p>Q&amp;A：&lt;div&gt; 与&nbsp;flex</p>"), "Q&A：<div> 与 flex");
+  assert.equal(stripHtml("<p>一二三四五</p>", 3), "一二三…");
+  assert.equal(stripHtml("<h2>标题</h2><p>用 <code>flex</code> 布局</p>"), "标题 用 flex 布局");
+});
+
+test("descriptions skip code blocks and fall back to empty for image-only bodies", () => {
+  assert.equal(
+    htmlToDescription("<pre><code>npm i</code></pre><p>正文<strong>开头</strong></p>"),
+    "正文开头",
+  );
+  assert.equal(htmlToDescription('<p><img src="/uploads/a.webp" alt=""></p>'), "");
+});
+
+test("the first article image is used for share cards", () => {
+  assert.deepEqual(
+    firstArticleImage(
+      '<p>x</p><img width="800" height="450" src="/uploads/a.webp" alt="布局 &amp; 对齐"><img src="/uploads/b.webp">',
+    ),
+    { url: "/uploads/a.webp", alt: "布局 & 对齐", width: 800, height: 450 },
+  );
+  assert.deepEqual(firstArticleImage('<img src="https://cdn.example.com/a.png?x=1&amp;y=2">'), {
+    url: "https://cdn.example.com/a.png?x=1&y=2",
+    alt: undefined,
+  });
+  assert.equal(firstArticleImage("<p>没有图片</p>"), null);
+  assert.equal(firstArticleImage('<img src="data:image/png;base64,AAAA">'), null);
+  assert.equal(firstArticleImage('<img src="//evil.example/a.png">'), null);
 });

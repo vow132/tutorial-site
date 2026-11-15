@@ -6,6 +6,11 @@ import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
 import { CACHE_TAGS } from "@/lib/public-data";
+import {
+  SEARCH_ENGINES,
+  normalizeVerificationCode,
+  type SearchVerification,
+} from "@/lib/search-verification";
 
 export type SettingsFormState = { error?: string; success?: string };
 
@@ -42,6 +47,15 @@ export async function updateSettings(
     return { error: "底部栏目数据格式有误" };
   }
 
+  const verification: SearchVerification = {};
+  for (const engine of SEARCH_ENGINES) {
+    const code = normalizeVerificationCode(text(`verification.${engine.key}`));
+    if (code === null) {
+      return { error: `${engine.label}的验证码格式不对：请填写验证码，或粘贴平台给的整段 meta 标签` };
+    }
+    if (code) verification[engine.key] = code;
+  }
+
   const settings: SiteSettings = {
     siteName: text("siteName") || "教程网",
     logoText: text("logoText") || "教",
@@ -55,6 +69,7 @@ export async function updateSettings(
     footerTagline: text("footerTagline"),
     copyright: text("copyright"),
     footerColumns,
+    verification,
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };

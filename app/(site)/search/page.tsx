@@ -7,7 +7,12 @@ import GlowCard from "@/components/glow-card";
 import Mascot from "@/components/mascot";
 import Reveal from "@/components/reveal";
 
-export const metadata: Metadata = { title: "搜索" };
+// 搜索结果页是无限组合的薄内容：不收录，但允许爬虫顺着结果链接抓取教程。
+// 不能在 robots.txt 里禁止 /search，否则爬虫看不到这里的 noindex。
+export const metadata: Metadata = {
+  title: "搜索",
+  robots: { index: false, follow: true },
+};
 
 /**
  * 转义正则元字符。

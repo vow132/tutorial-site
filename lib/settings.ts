@@ -2,6 +2,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
+import { readVerification, type SearchVerification } from "@/lib/search-verification";
 
 export type FooterLink = { label: string; href: string };
 export type FooterColumn = {
@@ -27,6 +28,8 @@ export type SiteSettings = {
   footerTagline: string;
   copyright: string;
   footerColumns: FooterColumn[];
+  // 搜索引擎站长平台的 HTML 标签验证码
+  verification: SearchVerification;
 };
 
 export const SETTINGS_KEY = "site";
@@ -59,6 +62,7 @@ export const defaultSettings: SiteSettings = {
       links: [{ label: "RSS 订阅", href: "/feed.xml" }],
     },
   ],
+  verification: {},
 };
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
@@ -81,6 +85,7 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
       footerColumns: Array.isArray(parsed.footerColumns)
         ? parsed.footerColumns
         : defaultSettings.footerColumns,
+      verification: readVerification(parsed.verification),
     };
   } catch {
     return defaultSettings;

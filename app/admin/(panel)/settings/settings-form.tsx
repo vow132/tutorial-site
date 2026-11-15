@@ -3,6 +3,8 @@
 import { useActionState, useState } from "react";
 import { updateSettings, type SettingsFormState } from "@/lib/actions/settings";
 import type { SiteSettings, FooterColumn } from "@/lib/settings";
+import { SEARCH_ENGINES } from "@/lib/search-verification";
+import { submitKeepingValues } from "@/lib/form-submit";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -88,7 +90,8 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
     });
 
   return (
-    <form action={action} className="space-y-5">
+    // 不用 action={action}：校验失败时 React 会重置表单，未保存的修改会丢失。
+    <form onSubmit={submitKeepingValues(action)} className="space-y-5">
       {/* ---------- 基本信息 ---------- */}
       <Section title="基本信息" desc="显示在浏览器标签页、导航 Logo 与搜索结果中">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -107,6 +110,24 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
           defaultValue={settings.siteDescription}
           multiline
         />
+      </Section>
+
+      {/* ---------- 搜索引擎验证 ---------- */}
+      <Section
+        title="搜索引擎验证"
+        desc="在各站长平台选择「HTML 标签验证」，把验证码（或整段 meta 标签）粘贴到这里，保存后再回平台点验证；不用的留空"
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {SEARCH_ENGINES.map((engine) => (
+            <Field
+              key={engine.key}
+              label={engine.label}
+              name={`verification.${engine.key}`}
+              defaultValue={settings.verification[engine.key] ?? ""}
+              placeholder={`<meta name="${engine.meta}" content="…">`}
+            />
+          ))}
+        </div>
       </Section>
 
       {/* ---------- 首页 Hero ---------- */}

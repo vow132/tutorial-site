@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { TutorialFormState } from "@/lib/actions/tutorials";
+import { submitKeepingValues } from "@/lib/form-submit";
 
 const RichTextEditor = dynamic(
   () => import("@/components/editor/rich-text-editor"),
@@ -40,7 +41,9 @@ export default function TutorialForm({ categories, action, initial }: Props) {
   );
 
   return (
-    <form action={formAction} className="space-y-5">
+    // 不用 action={formAction}：保存失败（如 Slug 重复）时 React 会重置表单，
+    // 标题、Slug、摘要会被清空。成功后服务端会跳转，所以无需重置。
+    <form onSubmit={submitKeepingValues(formAction)} className="space-y-5">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className="mb-1.5 block text-sm font-medium text-ink-2">
