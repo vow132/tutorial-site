@@ -130,6 +130,14 @@ pm2 startOrReload .updates/active.config.cjs --update-env
 npm test
 ```
 
+端到端测试（Playwright，在真实浏览器里走一遍前台页面、SEO 输出、后台发文/改 slug/删除与缓存失效、站点设置、安全响应头）。测试会新建并删除 `e2e-` 前缀的教程，**只对开发/测试数据库运行**；CI 会在 Node 24 上自动执行：
+
+```bash
+npx playwright install chromium   # 首次运行前安装浏览器
+npm run build
+E2E_ADMIN_PASSWORD='你的后台密码' npm run test:e2e   # 默认读取 ADMIN_USERNAME / ADMIN_PASSWORD，未设置时用 admin / admin123456
+```
+
 ## 管理员账号修改
 
 登录后台后进入侧栏 **账号安全**（`/admin/account`）：

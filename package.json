@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "node --import tsx --test lib/*.test.ts && node --test scripts/*.test.mjs",
     "backup": "node scripts/backup.mjs",
-    "admin:reset": "tsx scripts/reset-admin.ts"
+    "admin:reset": "tsx scripts/reset-admin.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.1",
@@ -33,6 +34,7 @@
     "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.20.5",
     "@types/react": "^19",

@@ -53,3 +53,8 @@ next-env.d.ts
 # 一键更新任务、构建目录和数据库备份
 /.updates/
 /backups/
+
+# Playwright
+/e2e/.auth/
+/test-results/
+/playwright-report/

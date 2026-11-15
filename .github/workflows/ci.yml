@@ -51,6 +51,23 @@ jobs:
       - name: 生产构建
         run: npm run build
 
+      # 端到端测试只在一个 Node 版本上跑：浏览器安装和测试本身与 Node 版本无关。
+      - name: 安装 Playwright 浏览器
+        if: matrix.node-version == 24
+        run: npx playwright install --with-deps chromium
+
+      - name: 端到端测试
+        if: matrix.node-version == 24
+        run: npm run test:e2e
+
+      - name: 上传端到端测试失败现场
+        if: failure() && matrix.node-version == 24
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
+
   # 依赖出现高危漏洞时单独标红，不影响上面的构建结果判断。
   dependency-audit:
     runs-on: ubuntu-latest
