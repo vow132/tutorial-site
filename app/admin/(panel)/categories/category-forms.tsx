@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { submitKeepingValues } from "@/lib/form-submit";
 import {
   createCategory,
   updateCategory,
@@ -82,9 +83,15 @@ export function CreateCategoryForm({
     {},
   );
   const availableParents = parentOptions.filter((option) => option.depth < 2);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // 手动提交（出错时保留输入，见 lib/form-submit.ts）；创建成功后再清空表单，方便接着添加。
+  useEffect(() => {
+    if (state.success) formRef.current?.reset();
+  }, [state]);
 
   return (
-    <form action={action} className="mt-4 space-y-4">
+    <form ref={formRef} onSubmit={submitKeepingValues(action)} className="mt-4 space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Field label="分类名称">
           <input
@@ -286,7 +293,10 @@ export function CategoryRow({
       )}
 
       <div className="hidden peer-checked:block">
-        <form action={action} className="mt-4 space-y-4 border-t border-line pt-4">
+        <form
+          onSubmit={submitKeepingValues(action)}
+          className="mt-4 space-y-4 border-t border-line pt-4"
+        >
           <input type="hidden" name="id" value={category.id} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Field label="分类名称">

@@ -120,9 +120,11 @@ export default async function AdminTutorialsPage({
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {/* 新标签页打开，预取没有意义；草稿的前台地址是 404，预取还会在控制台报错。 */}
                       <Link
                         href={`/tutorials/${t.slug}`}
                         target="_blank"
+                        prefetch={false}
                         className="rounded-lg px-2.5 py-1.5 text-xs text-ink-3 transition-colors hover:bg-paper hover:text-ink"
                       >
                         预览
