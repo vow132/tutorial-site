@@ -204,6 +204,8 @@ server {
 47 3 * * * rclone sync /path/to/tutorial-site/backups remote:tutorial-backups && rclone sync /path/to/tutorial-site/public/uploads remote:tutorial-uploads
 ```
 
+数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
+
 恢复备份：先 `pm2 stop 教程网`，把备份解压覆盖到数据库文件（`gunzip -c backups/tutorial-xxx.db.gz > prisma/dev.db`），删除同名的 `-wal`、`-shm` 文件后再启动。前台的分类、设置缓存最多 1 小时后自动刷新，想立即生效可在后台随便保存一次站点设置和分类。
 
 **3. 账号。** 首次登录后立即修改密码并开启两步验证；GitHub 账号同样开启两步验证并为 `master` 设置分支保护，因为一键更新会部署该分支的最新提交。不需要在线更新的部署可设置 `SITE_AUTO_UPDATE="false"`。

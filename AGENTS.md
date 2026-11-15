@@ -30,7 +30,7 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout
 - **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器，只记失败；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
 - **安全日志**：敏感操作调用 `audit()`（`lib/audit.ts`），后台 `/admin/audit` 查看
-- **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`
+- **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`；启动时设 `journal_mode=WAL` + `synchronous=NORMAL`（同步驱动的每次 fsync 都会卡住整个进程），数据库文件旁会有 `-wal`/`-shm`，**不要直接复制 `.db` 文件做备份**，用 `npm run backup`（在线备份 API）
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单
 - **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
