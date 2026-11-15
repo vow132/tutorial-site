@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
 import { notFound } from "next/navigation";
-import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { firstArticleImage, htmlToDescription, processArticle } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
 import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
-import { countTutorialView } from "@/lib/view-counter";
-import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { decodeSegment } from "@/lib/url";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
@@ -18,6 +15,20 @@ import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
+import ViewBeacon from "@/components/view-beacon";
+
+/**
+ * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每 5 分钟在后台
+ * 重新生成一次（页面上的阅读量最多滞后这么久）；后台修改教程/分类/设置时立即失效
+ * （见 lib/actions）。因此页面里不能读 headers()/cookies()，阅读量改由浏览器上报（ViewBeacon）。
+ * 与相关教程缓存的 LIST_REVALIDATE_SECONDS 保持一致（取两者较小值）。
+ */
+export const revalidate = 300;
+
+/** 返回空数组：构建时不预生成，每篇文章在第一次被访问时生成并缓存。 */
+export function generateStaticParams() {
+  return [];
+}
 
 type PublishedTutorial = NonNullable<Awaited<ReturnType<typeof getPublishedTutorial>>>;
 
@@ -65,10 +76,6 @@ export default async function TutorialDetailPage({
 
   const tutorial = slug ? await getPublishedTutorial(slug) : null;
   if (!tutorial) notFound();
-
-  // 阅读量 +1：放到响应之后执行，不阻塞首屏渲染；爬虫和短时间重复访问不计数
-  const visitor = { ip: await getClientIp(), userAgent: await getUserAgent() };
-  after(() => countTutorialView(tutorial.id, visitor));
 
   // 上一篇 / 下一篇（同分类内按时间）
   const [prev, next, processed, settings, relatedCandidates] = await Promise.all([
@@ -136,6 +143,7 @@ export default async function TutorialDetailPage({
   return (
     <div className="mx-auto max-w-6xl px-4 pt-12">
       <JsonLd data={jsonLd} />
+      <ViewBeacon id={tutorial.id} />
       {/* 面包屑 */}
       <Reveal>
         <nav className="flex items-center gap-2 text-sm text-ink-3">
@@ -186,7 +194,7 @@ export default async function TutorialDetailPage({
                   </time>
                 </span>
                 <span>约 {minutes} 分钟读完</span>
-                <span>{tutorial.views + 1} 次阅读</span>
+                <span>{tutorial.views} 次阅读</span>
               </div>
             </header>
           </Reveal>

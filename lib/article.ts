@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
@@ -33,6 +34,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { imageSizeFromFile } from "image-size/fromFile";
+import { VARIANT_WIDTHS, variantName } from "@/lib/image-variants";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 
 const languages = {
@@ -81,6 +83,7 @@ type ProcessedArticle = { html: string; toc: TocItem[] };
 const MAX_DIMENSION_CACHE = 500;
 const MAX_ARTICLE_CACHE = 100;
 const dimensionCache = new Map<string, Promise<ImageDimension>>();
+const variantCache = new Map<string, Promise<number[]>>();
 const articleCache = new Map<string, Promise<ProcessedArticle>>();
 
 function remember<K, V>(cache: Map<K, V>, key: K, value: V, max: number) {
@@ -110,10 +113,15 @@ function decodeEntities(value: string) {
 
 const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
 
-async function localImageSize(src: string): Promise<ImageDimension> {
-  // 只探测 uploads 目录下的直接文件，`/uploads/../../.env` 这类路径直接跳过。
+/** 只认 uploads 目录下的直接文件名，`/uploads/../../.env` 这类路径直接跳过。 */
+function uploadName(src: string): string | null {
   const name = src.startsWith("/uploads/") ? src.slice("/uploads/".length) : "";
-  if (!name || name !== path.basename(name) || name.startsWith(".")) return null;
+  return /^[\w-][\w.-]*$/.test(name) && name === path.basename(name) ? name : null;
+}
+
+async function localImageSize(src: string): Promise<ImageDimension> {
+  const name = uploadName(src);
+  if (!name) return null;
   const file = path.join(UPLOADS_DIR, name);
   const cached = dimensionCache.get(file);
   if (cached) return cached;
@@ -130,6 +138,29 @@ async function localImageSize(src: string): Promise<ImageDimension> {
   return task;
 }
 
+/** 上传时生成的响应式小图（见 lib/upload-image.ts 的 createVariants）里实际存在的宽度。 */
+function localVariants(name: string): Promise<number[]> {
+  const cached = variantCache.get(name);
+  if (cached) return cached;
+  const task = Promise.all(
+    VARIANT_WIDTHS.map((width) =>
+      stat(path.join(UPLOADS_DIR, variantName(name, width))).then(
+        (info) => (info.isFile() ? width : 0),
+        () => 0,
+      ),
+    ),
+  ).then((widths) => widths.filter((width) => width > 0));
+  remember(variantCache, name, task, MAX_DIMENSION_CACHE);
+  return task;
+}
+
+/**
+ * 正文栏实际显示宽度：xl 约 820px，lg 为视口减去目录栏和边距，手机为视口减去两侧 16px。
+ * 浏览器据此和屏幕像素比从 srcset 里挑最小够用的一张。
+ */
+const ARTICLE_IMAGE_SIZES =
+  "(min-width: 1280px) 820px, (min-width: 1024px) calc(100vw - 302px), calc(100vw - 32px)";
+
 /** 第一张图常常就是首屏主图，靠近正文开头时提高下载优先级。 */
 const EARLY_IMAGE_OFFSET = 2000;
 
@@ -144,6 +175,17 @@ async function enhanceImageTag(tag: string, order: number, offset: number) {
       /<img/i,
       `<img width="${dimension.width}" height="${dimension.height}"`,
     );
+  }
+  const name = uploadName(src);
+  if (name && dimension && !/\ssrcset=/.test(next)) {
+    const widths = (await localVariants(name)).filter((width) => width < dimension.width);
+    if (widths.length > 0) {
+      const srcset = [
+        ...widths.map((width) => `/uploads/${variantName(name, width)} ${width}w`),
+        `${src} ${dimension.width}w`,
+      ].join(", ");
+      next = next.replace(/<img/i, `<img srcset="${srcset}" sizes="${ARTICLE_IMAGE_SIZES}"`);
+    }
   }
   if (!/\sloading=/.test(next)) {
     // 只有后面的图片延迟加载；第一张若也延迟，会拖慢首屏主图出现。

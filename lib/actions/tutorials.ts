@@ -44,12 +44,20 @@ function parseForm(formData: FormData) {
   };
 }
 
-function revalidatePublic(slug?: string) {
+/**
+ * 文章页是 ISR 缓存页：改 slug 时旧地址、删除时原地址都要显式失效，
+ * 否则在 revalidate 周期内还会继续返回旧内容。
+ */
+function revalidatePublic(...slugs: (string | null | undefined)[]) {
   revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
   clearSearchCache();
   revalidatePath("/");
   revalidatePath("/tutorials");
-  if (slug) revalidatePath(`/tutorials/${slug}`);
+  for (const slug of new Set(slugs.filter((item): item is string => Boolean(item)))) {
+    // 中文 slug 的缓存键是编码后的路径；两种写法都失效一遍，确保命中。
+    revalidatePath(`/tutorials/${slug}`);
+    revalidatePath(`/tutorials/${encodeURIComponent(slug)}`);
+  }
 }
 
 export async function createTutorial(
@@ -85,9 +93,10 @@ export async function updateTutorial(
   });
   if (conflict) return { error: "Slug 已被其他教程占用" };
 
+  const before = await prisma.tutorial.findUnique({ where: { id }, select: { slug: true } });
   await prisma.tutorial.update({ where: { id }, data: parsed.data });
   await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
-  revalidatePublic(parsed.data.slug);
+  revalidatePublic(before?.slug, parsed.data.slug);
   redirect("/admin/tutorials");
 }
 
@@ -97,7 +106,7 @@ export async function deleteTutorial(formData: FormData) {
   if (!id) return;
   const deleted = await prisma.tutorial.delete({ where: { id } });
   await audit("tutorial.delete", { actor: admin.username, detail: `#${id} ${deleted.title}` });
-  revalidatePublic();
+  revalidatePublic(deleted.slug);
   revalidatePath("/admin/tutorials");
 }
 

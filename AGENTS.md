@@ -22,6 +22,7 @@ npx prisma migrate dev   # 改 schema 后迁移
 npx prisma db seed       # 写入种子数据（管理员/分类/示例教程）
 npx prisma generate      # 重新生成客户端到 generated/prisma/
 npm test                 # 单元测试（lib/*.test.ts + scripts/*.test.mjs）
+npm run test:e2e         # 端到端测试（Playwright，需先 npm run build；会建/删 e2e- 前缀的数据，勿连生产库）
 npm run backup           # SQLite 在线备份到 backups/
 npm run admin:reset      # 应急：重置管理员密码、关闭两步验证、退出所有设备
 ```
@@ -30,13 +31,14 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout
 - **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器，只记失败；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
 - **安全日志**：敏感操作调用 `audit()`（`lib/audit.ts`），后台 `/admin/audit` 查看
-- **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`
+- **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`；启动时设 `journal_mode=WAL` + `synchronous=NORMAL`（同步驱动的每次 fsync 都会卡住整个进程），数据库文件旁会有 `-wal`/`-shm`，**不要直接复制 `.db` 文件做备份**，用 `npm run backup`（在线备份 API）
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单
-- **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
+- **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`，宽图另存 `-800w`/`-1200w.webp` 响应式小图（命名在 `lib/image-variants.ts`），`lib/article.ts` 渲染时自动加 `srcset`/`sizes`；旧图用 `npm run images:variants` 补生成。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
 - **安全响应头**：CSP/HSTS/nosniff 等统一在 `next.config.ts` 的 `headers()`；HSTS 只在 `X-Forwarded-Proto: https` 时下发，`/uploads/*` 带 `sandbox` CSP
 - 后台结构：`app/admin/login`（登录页）+ `app/admin/(panel)/*`（带侧边栏的面板路由组）
 - **前台链接**：一律用 `components/intent-link.tsx`（悬停/触摸/聚焦时才预取），不要直接用 `next/link`，否则每个页面会对视口内所有链接发预取请求
+- **文章页是 ISR 缓存页**（`revalidate = 300` + 空 `generateStaticParams`）：页面里不能用 `headers()`/`cookies()`/`after()`，否则整页退回动态渲染；阅读量由 `components/view-beacon.tsx` 上报到 `POST /api/views`。改教程时 `lib/actions/tutorials.ts` 的 `revalidatePublic()` 要把**旧 slug 和新 slug** 都传进去（中文 slug 的原文和编码形式都会失效）
 - **SEO**：文章页底部「相关教程」来自 `lib/public-data.ts` 的 `getRelatedTutorialCandidates()`（同分类按阅读量，不够再从父/子/同父分类补，顶级分类之间不算相关）。可收录页面的 metadata 一律用 `lib/seo.ts` 的 `pageMetadata()` 生成——各层 metadata 是浅合并，子页面一写 `openGraph`/`alternates` 就会整个替换根布局的（RSS 链接、站点名、分享图都会丢），所以要给全字段；**根布局不能写 canonical**（否则搜索/404 页都被规范到首页）。分页列表规范地址带 `?page=N`（第 1 页不带）。结构化数据用 `components/json-ld.tsx`；搜索页 `noindex, follow` 且不进 sitemap。阅读量用原生 SQL 自增（`lib/view-counter.ts`），不能改回 `prisma.tutorial.update`，否则每次阅读都会刷新 `updatedAt`，sitemap lastmod 与 `article:modified_time` 失真
 - **前台数据缓存**：分类、设置、教程列表经 `unstable_cache` 缓存（`lib/public-data.ts` 的 `CACHE_TAGS`）；后台改动后在 Server Action 里 `revalidateTag(tag, { expire: 0 })`。缓存以 JSON 存储，Date 需自行还原
 - **动效与首屏**：首屏最大的元素（首页大标题、文章标题/正文）用 `<Reveal fade={false}>` 只做位移，避免从透明淡入拖慢 LCP；桌面导航 hydration 前用 CSS 断点渲染三档分页，避免跳动

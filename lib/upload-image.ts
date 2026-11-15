@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { VARIANT_MIN_GAIN, VARIANT_WIDTHS } from "@/lib/image-variants";
 
 /** 正文栏宽约 760px，1600px 足够 2 倍屏清晰显示。 */
 const MAX_WIDTH = 1600;
@@ -52,6 +53,27 @@ export async function optimizeImage(buffer: Buffer, ext: string): Promise<{ data
   // 本来就很小的 PNG/WebP 重新编码可能更大，保留原文件；JPEG 始终重编码以去掉 EXIF。
   if (ext !== ".jpg" && data.length >= buffer.length) return { data: buffer, ext };
   return { data, ext: ".webp" };
+}
+
+/**
+ * 为正文图生成响应式小图。动图（GIF/多帧 WebP）重新编码会丢帧，不处理；
+ * 本来就不宽的图也不处理。返回 [宽度, 数据] 列表。
+ */
+export async function createVariants(data: Buffer): Promise<Array<[number, Buffer]>> {
+  const meta = await sharp(data, { animated: true, limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  if (meta.format === "gif" || meta.format === "svg" || (meta.pages ?? 1) > 1) return [];
+  const width = meta.width ?? 0;
+  const result: Array<[number, Buffer]> = [];
+  for (const target of VARIANT_WIDTHS) {
+    if (width < target * VARIANT_MIN_GAIN) continue;
+    const variant = await sharp(data, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
+      .rotate()
+      .resize({ width: target })
+      .webp(meta.format === "png" ? { quality: 90, smartSubsample: true } : { quality: 82 })
+      .toBuffer();
+    result.push([target, variant]);
+  }
+  return result;
 }
 
 /** 按文件头识别出的扩展名；不是支持的图片格式时返回 null。 */

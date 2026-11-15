@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
+import sharp from "sharp";
 import { firstArticleImage, htmlToDescription, processArticle, stripHtml } from "./article";
 
 test("TOC text decodes HTML entities so React renders them once", async () => {
@@ -67,4 +70,34 @@ test("the first article image is used for share cards", () => {
   assert.equal(firstArticleImage("<p>没有图片</p>"), null);
   assert.equal(firstArticleImage('<img src="data:image/png;base64,AAAA">'), null);
   assert.equal(firstArticleImage('<img src="//evil.example/a.png">'), null);
+});
+
+test("uploaded images with responsive variants get srcset and sizes", async (t) => {
+  const dir = path.join(process.cwd(), "public", "uploads");
+  const name = `test-${Date.now()}-${process.pid}`;
+  const files = [`${name}.webp`, `${name}-800w.webp`, `${name}-1200w.webp`, `${name}-plain.webp`];
+  await mkdir(dir, { recursive: true });
+  t.after(() => Promise.all(files.map((file) => rm(path.join(dir, file), { force: true }))));
+  const image = (width: number) =>
+    sharp({ create: { width, height: Math.round(width / 2), channels: 3, background: "#123456" } })
+      .webp()
+      .toBuffer();
+  await writeFile(path.join(dir, files[0]), await image(1600));
+  await writeFile(path.join(dir, files[1]), await image(800));
+  await writeFile(path.join(dir, files[2]), await image(1200));
+  await writeFile(path.join(dir, files[3]), await image(1600));
+
+  const { html } = await processArticle(
+    `<p><img src="/uploads/${files[0]}" alt="a"></p><p><img src="/uploads/${files[3]}" alt="b"></p>`,
+  );
+  const images = html.match(/<img[^>]*>/g) ?? [];
+  assert.equal(images.length, 2);
+  const [withVariants, plain] = images as [string, string];
+  assert.match(
+    withVariants,
+    new RegExp(`srcset="/uploads/${name}-800w\\.webp 800w, /uploads/${name}-1200w\\.webp 1200w, /uploads/${name}\\.webp 1600w"`),
+  );
+  assert.match(withVariants, /sizes="\(min-width: 1280px\) 820px/);
+  assert.match(withVariants, /width="1600" height="800"/);
+  assert.doesNotMatch(plain, /srcset/);
 });

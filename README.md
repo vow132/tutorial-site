@@ -23,7 +23,7 @@
 ## 功能特性
 
 - **前台**：悬浮胶囊导航（分类翻页、aura/流光动效）、亮暗双主题（跟随手动切换持久化）、鼠标跟随聚光灯卡片与轻微 3D 倾斜、滚动触发的分区渐显、小幽灵吉祥物
-- **文章**：服务端 TOC 提取与高亮（highlight.js）、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息
+- **文章**：服务端 TOC 提取与高亮（highlight.js）、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息，并生成 800/1200px 小图供手机按屏幕加载
 - **后台**：Tiptap 3 富文本编辑器（拖拽/粘贴上传图片）、分类树管理（最多三级、防循环依赖）、站点设置可视化编辑、账号安全
 - **SEO 与健壮性**：动态 sitemap / robots、canonical、逐页 OpenGraph/Twitter 分享卡片、Article/面包屑/WebSite 结构化数据、后台填写 Google/Bing/百度/360/搜狗/神马/Yandex 站长验证码、真实 404 状态码、越界分页自动收敛、空/加载/错误状态齐全
 - **安全**：可吊销的服务端会话 + 两步验证（TOTP）、受信任设备感知的登录限流、正文 HTML 白名单过滤、按文件头校验上传（不接受 SVG）、CSP/HSTS 等安全响应头、后台安全日志、Server Actions 与后台页面逐一鉴权，详见「安全加固」
@@ -130,6 +130,14 @@ pm2 startOrReload .updates/active.config.cjs --update-env
 npm test
 ```
 
+端到端测试（Playwright，在真实浏览器里走一遍前台页面、SEO 输出、后台发文/改 slug/删除与缓存失效、站点设置、安全响应头）。测试会新建并删除 `e2e-` 前缀的教程，**只对开发/测试数据库运行**；CI 会在 Node 24 上自动执行：
+
+```bash
+npx playwright install chromium   # 首次运行前安装浏览器
+npm run build
+E2E_ADMIN_PASSWORD='你的后台密码' npm run test:e2e   # 默认读取 ADMIN_USERNAME / ADMIN_PASSWORD，未设置时用 admin / admin123456
+```
+
 ## 管理员账号修改
 
 登录后台后进入侧栏 **账号安全**（`/admin/account`）：
@@ -203,6 +211,10 @@ server {
 17 3 * * * cd /path/to/tutorial-site && npm run backup >> backups/backup.log 2>&1
 47 3 * * * rclone sync /path/to/tutorial-site/backups remote:tutorial-backups && rclone sync /path/to/tutorial-site/public/uploads remote:tutorial-uploads
 ```
+
+本次升级之前上传的图片没有响应式小图，部署后执行一次 `npm run images:variants` 补生成（可重复执行，已有的会跳过），然后重启站点。
+
+数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
 
 恢复备份：先 `pm2 stop 教程网`，把备份解压覆盖到数据库文件（`gunzip -c backups/tutorial-xxx.db.gz > prisma/dev.db`），删除同名的 `-wal`、`-shm` 文件后再启动。前台的分类、设置缓存最多 1 小时后自动刷新，想立即生效可在后台随便保存一次站点设置和分类。
 

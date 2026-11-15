@@ -1,0 +1,35 @@
+import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * 端到端测试：针对生产构建运行（先 `npm run build`，再 `npm run test:e2e`）。
+ * 测试会在数据库里新建并删除带 e2e- 前缀的教程/分类，请勿指向生产数据库。
+ */
+const PORT = Number(process.env.E2E_PORT ?? 3100);
+
+export default defineConfig({
+  testDir: "./e2e",
+  // 共用一个 SQLite 数据库和登录状态，串行执行最稳定。
+  fullyParallel: false,
+  workers: 1,
+  forbidOnly: Boolean(process.env.CI),
+  retries: 0,
+  reporter: process.env.CI ? [["list"], ["github"]] : "list",
+  use: {
+    baseURL: `http://127.0.0.1:${PORT}`,
+    trace: "off",
+  },
+  projects: [
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+  ],
+  webServer: {
+    command: `npm run start -- -p ${PORT}`,
+    url: `http://127.0.0.1:${PORT}/robots.txt`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000,
+  },
+});
