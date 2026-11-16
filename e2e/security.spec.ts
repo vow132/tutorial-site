@@ -27,3 +27,22 @@ test("a wrong password is rejected", async ({ page }) => {
   await expect(page.getByText("用户名或密码错误")).toBeVisible();
   await expect(page).toHaveURL(/\/admin\/login/);
 });
+
+test("a burst of distinct searches is capped site-wide, then recovers", async ({ request }) => {
+  const stamp = Date.now();
+  const bodies = [];
+  for (let i = 0; i < 30; i++) {
+    const response = await request.get(`/search?q=${encodeURIComponent(`burst-${stamp}-${i}`)}`);
+    expect(response.status()).toBe(200);
+    bodies.push(await response.text());
+  }
+  expect(bodies.some((body) => body.includes("搜索的人有点多"))).toBe(true);
+
+  // 预算窗口是 5 秒：等它恢复，不影响之后的测试。
+  await expect
+    .poll(async () => (await (await request.get(`/search?q=recover-${stamp}`)).text()).includes("搜索的人有点多"), {
+      timeout: 8_000,
+      intervals: [1_000],
+    })
+    .toBe(false);
+});
