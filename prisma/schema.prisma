@@ -41,6 +41,12 @@ model Tutorial {
 
   @@index([categoryId])
   @@index([published, createdAt])
+  // 分类列表、上一篇/下一篇、各分类已发布篇数
+  @@index([published, categoryId, createdAt])
+  // sitemap（覆盖索引：只读索引不回表）
+  @@index([published, updatedAt, slug])
+  // 后台教程列表按最近修改排序
+  @@index([updatedAt])
 }
 
 model Admin {

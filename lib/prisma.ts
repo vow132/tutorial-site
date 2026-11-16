@@ -15,6 +15,8 @@ async function configureSqlite(client: PrismaClient) {
   try {
     await client.$queryRawUnsafe("PRAGMA journal_mode = WAL");
     await client.$executeRawUnsafe("PRAGMA synchronous = NORMAL");
+    // SQLite 官方建议长连接在打开时执行：按需更新查询规划器的统计信息（有上限，很快）。
+    await client.$queryRawUnsafe("PRAGMA optimize = 0x10002");
   } catch (error) {
     console.warn("[db] 无法启用 SQLite WAL 模式，继续使用默认模式：", error);
   }
