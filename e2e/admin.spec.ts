@@ -95,6 +95,9 @@ test("tutorial lifecycle keeps the cached article page in sync", async ({ page, 
   await page.getByRole("row").filter({ hasText: renamed }).getByRole("button", { name: "删除" }).click();
   await expect(page.getByText(renamed)).toHaveCount(0);
   expect((await request.get(`/tutorials/${newSlug}`)).status()).toBe(404);
+  // 首页、列表页也不能再出现已删除的教程（缓存同步失效）
+  expect(await (await request.get("/")).text()).not.toContain(newSlug);
+  expect(await (await request.get("/tutorials")).text()).not.toContain(newSlug);
 
   expect(errors).toEqual([]);
 });
@@ -188,6 +191,7 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
     page.once("dialog", (dialog) => dialog.accept());
     await page.getByRole("row").filter({ hasText: `E2E 图片 ${id}` }).getByRole("button", { name: "删除" }).click();
     await expect(page.getByText(`E2E 图片 ${id}`)).toHaveCount(0);
+    expect(await (await request.get("/")).text()).not.toContain(`e2e-image-${id}`);
     await Promise.all(
       uploaded.map((url) => rm(path.join(process.cwd(), "public", url), { force: true })),
     );

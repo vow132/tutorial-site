@@ -18,12 +18,12 @@ import TutorialCard from "@/components/tutorial-card";
 import ViewBeacon from "@/components/view-beacon";
 
 /**
- * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每 5 分钟在后台
+ * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
  * 重新生成一次（页面上的阅读量最多滞后这么久）；后台修改教程/分类/设置时立即失效
  * （见 lib/actions）。因此页面里不能读 headers()/cookies()，阅读量改由浏览器上报（ViewBeacon）。
- * 与相关教程缓存的 LIST_REVALIDATE_SECONDS 保持一致（取两者较小值）。
+ * 周期取 1 分钟：如果某次重新生成恰好跨过后台的修改，旧内容最多保留 1 分钟。
  */
-export const revalidate = 300;
+export const revalidate = 60;
 
 /** 返回空数组：构建时不预生成，每篇文章在第一次被访问时生成并缓存。 */
 export function generateStaticParams() {
