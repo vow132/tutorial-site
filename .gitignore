@@ -58,3 +58,6 @@ next-env.d.ts
 /e2e/.auth/
 /test-results/
 /playwright-report/
+
+# deploy.sh 的临时数据库快照
+/.deploy-build.db*

@@ -216,7 +216,7 @@ server {
 
 本次升级之前上传的图片没有响应式小图，部署后执行一次 `npm run images:variants` 补生成（可重复执行，已有的会跳过），然后重启站点。
 
-数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
+再次执行 `bash deploy.sh` 时如果站点正在运行，脚本会先对数据库快照执行迁移并构建（站点照常服务），最后只在迁移正式数据库的几秒内停站。生产数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
 
 恢复备份：先 `pm2 stop 教程网`，把备份解压覆盖到数据库文件（`gunzip -c backups/tutorial-xxx.db.gz > prisma/dev.db`），删除同名的 `-wal`、`-shm` 文件后再启动。前台的分类、设置缓存最多 1 小时后自动刷新，想立即生效可在后台随便保存一次站点设置和分类。
 
