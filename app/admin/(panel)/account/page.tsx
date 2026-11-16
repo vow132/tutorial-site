@@ -11,6 +11,8 @@ import { describeAgent } from "@/lib/user-agent";
 import { getAlertConfig, getAlertStatus } from "@/lib/alerts";
 import AccountForm from "./account-form";
 import AlertsForm from "./alerts-form";
+import Passkeys from "./passkeys";
+import { relyingParty } from "@/lib/passkeys";
 import { DisableTwoFactorForm, EnableTwoFactorForm } from "./two-factor-form";
 
 export const metadata: Metadata = { title: "账号安全" };
@@ -36,7 +38,16 @@ export default async function AdminAccountPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const [alertConfig, alertStatus] = await Promise.all([getAlertConfig(), getAlertStatus()]);
+  const [alertConfig, alertStatus, passkeys] = await Promise.all([
+    getAlertConfig(),
+    getAlertStatus(),
+    prisma.adminPasskey.findMany({
+      where: { adminId: admin.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, createdAt: true, lastUsedAt: true, backedUp: true },
+    }),
+  ]);
+  const rp = relyingParty();
 
   let setup: { token: string; secret: string; qr: string } | null = null;
   if (!admin.totpSecret) {
@@ -91,6 +102,35 @@ export default async function AdminAccountPage({
             <DisableTwoFactorForm />
           </>
         )}
+      </section>
+
+      <section id="passkeys" className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-ink">通行密钥</h2>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              passkeys.length > 0
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-paper text-ink-3"
+            }`}
+          >
+            {passkeys.length > 0 ? `已登记 ${passkeys.length} 个` : "未登记"}
+          </span>
+        </div>
+        <p className="mb-5 text-sm text-ink-3">
+          用指纹、面容、手机或安全密钥登录，不用输入密码，钓鱼网站也骗不走。通行密钥本身已包含设备 +
+          生物识别两重验证，用它登录时不再需要两步验证码；密码登录照常可用。
+        </p>
+        <Passkeys
+          passkeys={passkeys.map((row) => ({
+            id: row.id,
+            name: row.name,
+            createdAt: row.createdAt.toISOString(),
+            lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+            backedUp: row.backedUp,
+          }))}
+          unavailable={"error" in rp ? rp.error : null}
+        />
       </section>
 
       <section id="alerts" className="rounded-3xl border border-line bg-surface p-6 sm:p-8">

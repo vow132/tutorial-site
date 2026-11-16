@@ -59,6 +59,27 @@ model Admin {
   totpLastStep Int?
   createdAt    DateTime       @default(now())
   sessions     AdminSession[]
+  passkeys     AdminPasskey[]
+}
+
+/// WebAuthn 通行密钥（指纹 / 面容 / 手机 / 安全密钥）。只存公钥，私钥不离开用户设备。
+model AdminPasskey {
+  /// Credential ID（base64url）
+  id         String    @id
+  adminId    Int
+  admin      Admin     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  publicKey  Bytes
+  /// 签名计数器，用于发现被克隆的认证器
+  counter    Int       @default(0)
+  /// 逗号分隔的 transports（internal、hybrid、usb…）
+  transports String?
+  name       String
+  /// 是否为可同步的密钥（如 iCloud 钥匙串、Google 密码管理器）
+  backedUp   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([adminId])
 }
 
 /// Server-side session record: logging out or revoking deletes the row,

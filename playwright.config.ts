@@ -6,6 +6,15 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 
+/**
+ * 测试服务器的 SITE_URL：通行密钥（WebAuthn）要求域名，不接受 IP，所以用 localhost；
+ * 通行密钥测试以 http://localhost 访问，其余测试仍用 127.0.0.1。
+ */
+const SITE_URL = process.env.SITE_URL ?? `http://localhost:${PORT}`;
+const serverEnv = Object.fromEntries(
+  Object.entries({ ...process.env, SITE_URL }).filter((entry): entry is [string, string] => entry[1] !== undefined),
+);
+
 export default defineConfig({
   testDir: "./e2e",
   // 共用一个 SQLite 数据库和登录状态，串行执行最稳定。
@@ -31,5 +40,6 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}/robots.txt`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
+    env: serverEnv,
   },
 });

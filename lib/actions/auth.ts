@@ -10,6 +10,7 @@ import {
   rememberDevice,
   startAdminSession,
 } from "@/lib/admin-auth";
+import { safeAdminFrom } from "@/lib/admin-redirect";
 import { audit } from "@/lib/audit";
 import { getClientIp } from "@/lib/client-ip";
 import { passwordProblem } from "@/lib/password-policy";
@@ -36,13 +37,6 @@ const limiters = {
 /** 用户名不存在时也跑一次同等成本的 bcrypt，避免用响应时间探测用户名。 */
 const DUMMY_HASH = "$2b$12$jJ8casc00woJP55PFB44IejGXBvuES90KswhYW0Z7AURyigQm1stK";
 
-/** 只允许站内 /admin 路径，防止 open redirect。 */
-function safeAdminFrom(raw: string | undefined): string {
-  if (raw && /^\/admin(?:\/|$)/.test(raw) && !raw.startsWith("/admin//")) {
-    return raw;
-  }
-  return "/admin";
-}
 
 export async function login(
   _prev: LoginState,

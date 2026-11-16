@@ -31,7 +31,7 @@ async function secureCookies(): Promise<boolean> {
   return proto === "https" || (store.get("origin") ?? "").startsWith("https://");
 }
 
-async function cookieOptions(maxAge: number, path = "/") {
+export async function cookieOptions(maxAge: number, path = "/") {
   return {
     httpOnly: true,
     sameSite: "lax" as const,

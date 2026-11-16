@@ -24,11 +24,12 @@ npx prisma generate      # 重新生成客户端到 generated/prisma/
 npm test                 # 单元测试（lib/*.test.ts + scripts/*.test.mjs）
 npm run test:e2e         # 端到端测试（Playwright，需先 npm run build；会建/删 e2e- 前缀的数据，勿连生产库）
 npm run backup           # SQLite 在线备份到 backups/
-npm run admin:reset      # 应急：重置管理员密码、关闭两步验证、退出所有设备
+npm run admin:reset      # 应急：重置管理员密码、关闭两步验证、删除通行密钥、退出所有设备
 ```
 
 ## 关键架构决策
 - **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout
+- **通行密钥**：`@simplewebauthn/server` + `browser`（浏览器端只在点击时动态加载）。RP ID/Origin 取自 `SITE_URL`（`lib/passkeys.ts` 的 `relyingParty()`，要求域名 + HTTPS，localhost 例外）；挑战放在签名 Cookie 里、一次性使用；可发现凭据 + `userVerification: "required"`，所以通行密钥登录跳过 TOTP。登记要输当前密码。e2e 用 Chromium 虚拟认证器、以 `http://localhost` 访问（WebAuthn 不接受 IP）
 - **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器，只记失败；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
 - **安全日志**：敏感操作调用 `audit()`（`lib/audit.ts`），后台 `/admin/audit` 查看
 - **安全告警**：`audit()` 写完日志后按动作名决定是否推送（映射在 `lib/alerts.ts` 的 `alertForAudit()`，新增敏感操作时顺带加上）；推送实现在 `lib/alert-transport.mjs`（纯 JS，`scripts/backup.mjs`、`scripts/site-update.mjs` 也直接用它）。配置存 `Setting` 表 key=`alerts`，与公开站点设置分开，密钥不回显到页面；浏览器端只能引用 `lib/alert-channels.mjs`。推送在请求内读配置、网络发送放后台，失败不影响业务。备份过期检查由 `instrumentation.ts` 启动的定时器执行（`lib/backup-watch.ts`），定时器里不能用依赖 Next 缓存的 `getSettings()`

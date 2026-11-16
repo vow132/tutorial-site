@@ -71,7 +71,7 @@ test.describe.serial("security alerts", () => {
     await page.goto("/admin/login");
     await page.fill('input[name="username"]', admin.username);
     await page.fill('input[name="password"]', admin.password);
-    await page.getByRole("button", { name: /登\s*录/ }).click();
+    await page.getByRole("button", { name: /^登\s*录$/ }).click();
     await expect(page).toHaveURL(/\/admin(\/account\?weak=1)?$/);
     await expect.poll(titles).toContain("新设备登录了后台");
     const alert = received.find((item) => item.event === "login.success")!;
@@ -87,7 +87,7 @@ test.describe.serial("security alerts", () => {
     for (let i = 0; i < 10; i++) {
       await page.fill('input[name="username"]', username);
       await page.fill('input[name="password"]', `wrong-password-${i}`);
-      await page.getByRole("button", { name: /登\s*录/ }).click();
+      await page.getByRole("button", { name: /^登\s*录$/ }).click();
       await expect(page.getByText(/用户名或密码错误|尝试次数过多/)).toBeVisible();
     }
     await expect.poll(titles).toContain("后台登录因多次失败已被临时锁定");

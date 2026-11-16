@@ -23,7 +23,7 @@ test("a wrong password is rejected", async ({ page }) => {
   await page.goto("/admin/login");
   await page.fill('input[name="username"]', "e2e-nobody");
   await page.fill('input[name="password"]', "definitely-wrong-password");
-  await page.getByRole("button", { name: /登\s*录/ }).click();
+  await page.getByRole("button", { name: /^登\s*录$/ }).click();
   await expect(page.getByText("用户名或密码错误")).toBeVisible();
   await expect(page).toHaveURL(/\/admin\/login/);
 });

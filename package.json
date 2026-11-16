@@ -16,6 +16,8 @@
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
     "@tiptap/extension-color": "^3.33.1",
     "@tiptap/extension-image": "^3.33.1",
     "@tiptap/extension-text-style": "^3.28.0",
