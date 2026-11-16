@@ -31,6 +31,7 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout
 - **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器，只记失败；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
 - **安全日志**：敏感操作调用 `audit()`（`lib/audit.ts`），后台 `/admin/audit` 查看
+- **安全告警**：`audit()` 写完日志后按动作名决定是否推送（映射在 `lib/alerts.ts` 的 `alertForAudit()`，新增敏感操作时顺带加上）；推送实现在 `lib/alert-transport.mjs`（纯 JS，`scripts/backup.mjs`、`scripts/site-update.mjs` 也直接用它）。配置存 `Setting` 表 key=`alerts`，与公开站点设置分开，密钥不回显到页面；浏览器端只能引用 `lib/alert-channels.mjs`。推送在请求内读配置、网络发送放后台，失败不影响业务。备份过期检查由 `instrumentation.ts` 启动的定时器执行（`lib/backup-watch.ts`），定时器里不能用依赖 Next 缓存的 `getSettings()`
 - **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`；启动时设 `journal_mode=WAL` + `synchronous=NORMAL`（同步驱动的每次 fsync 都会卡住整个进程），数据库文件旁会有 `-wal`/`-shm`，**不要直接复制 `.db` 文件做备份**，用 `npm run backup`（在线备份 API）
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单

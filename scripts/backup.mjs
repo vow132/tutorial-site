@@ -13,6 +13,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { createGzip } from "node:zlib";
+import { notifyFromDatabase } from "../lib/alert-transport.mjs";
 import { databaseFile } from "./site-update.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,22 +33,47 @@ const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").sl
 const target = path.join(directory, `tutorial-${stamp}.db.gz`);
 const snapshot = path.join(directory, `.tutorial-${stamp}.db.partial`);
 
-await mkdir(directory, { recursive: true, mode: 0o700 });
-const db = new Database(source, { readonly: true, fileMustExist: true, timeout: 10_000 });
-try {
-  await db.backup(snapshot);
-} finally {
-  db.close();
-}
-try {
-  await pipeline(createReadStream(snapshot), createGzip({ level: 9 }), createWriteStream(`${target}.partial`, { mode: 0o600 }));
-  await rename(`${target}.partial`, target);
-} finally {
-  await rm(snapshot, { force: true });
-  await rm(`${target}.partial`, { force: true });
+async function runBackup() {
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const db = new Database(source, { readonly: true, fileMustExist: true, timeout: 10_000 });
+  try {
+    await db.backup(snapshot);
+  } finally {
+    db.close();
+  }
+  try {
+    await pipeline(createReadStream(snapshot), createGzip({ level: 9 }), createWriteStream(`${target}.partial`, { mode: 0o600 }));
+    await rename(`${target}.partial`, target);
+  } finally {
+    await rm(snapshot, { force: true });
+    await rm(`${target}.partial`, { force: true });
+  }
+
+  const backups = (await readdir(directory)).filter((name) => /^tutorial-\d{8}-\d{6}\.db\.gz$/.test(name)).sort().reverse();
+  for (const name of backups.slice(keep)) await rm(path.join(directory, name), { force: true });
+
+  console.log(`✅ 数据库已备份到 ${target}（保留最近 ${keep} 份）`);
 }
 
-const backups = (await readdir(directory)).filter((name) => /^tutorial-\d{8}-\d{6}\.db\.gz$/.test(name)).sort().reverse();
-for (const name of backups.slice(keep)) await rm(path.join(directory, name), { force: true });
-
-console.log(`✅ 数据库已备份到 ${target}（保留最近 ${keep} 份）`);
+try {
+  await runBackup();
+} catch (error) {
+  const reason = error instanceof Error ? error.message : String(error);
+  console.error("❌ 数据库备份失败：", reason);
+  // 备份失败要让人知道：读取后台配置的安全告警渠道推送（数据库打不开时只能打印）。
+  try {
+    const alertDb = new Database(source, { readonly: true, fileMustExist: true, timeout: 10_000 });
+    try {
+      await notifyFromDatabase(alertDb, {
+        event: "backup.failed",
+        title: "数据库备份失败",
+        lines: [`原因：${reason.slice(0, 300)}`, `数据库：${source}`, `备份目录：${directory}`],
+      });
+    } finally {
+      alertDb.close();
+    }
+  } catch {
+    // 数据库本身打不开，无法读取告警配置
+  }
+  process.exitCode = 1;
+}

@@ -79,6 +79,19 @@ export async function login(
   const fail = async (action: string) => {
     for (const [limiter, key] of buckets) limiter.hit(key);
     await audit(action, { actor: username, detail: device ? "受信任设备" : "陌生设备" });
+    // 这一次失败让某个计数器触发了锁定：记一条日志并推送告警（每次锁定只会触发一次）。
+    const locked = buckets.filter(([limiter, key]) => limiter.retryAfter(key) > 0).map(([limiter]) => limiter);
+    if (locked.length > 0) {
+      const scope = locked
+        .map((limiter) =>
+          limiter === limiters.device ? "这台受信任设备"
+          : limiter === limiters.account ? "该用户名"
+          : limiter === limiters.ip ? "该 IP"
+          : "所有陌生设备（全站）",
+        )
+        .join("、");
+      await audit("login.locked", { actor: username, detail: scope });
+    }
   };
 
   const admin = await prisma.admin.findUnique({ where: { username } });

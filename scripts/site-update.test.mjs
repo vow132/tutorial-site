@@ -97,13 +97,15 @@ async function fixture(t, options = {}) {
     calls.push({ command: "health", revision, port });
     if ((options.healthFails && revision === TARGET) || (options.rollbackHealthFails && revision === CURRENT)) throw new Error("wrong deployed revision");
   };
+  const notices = [];
+  const notify = async (databasePath, moduleRoot, message) => { notices.push({ databasePath, message }); };
   const result = await performUpdate({ root, targetRevision: TARGET, jobId: JOB }, {
     platform: "linux", env: { NODE_ENV: "production", SITE_AUTO_UPDATE: "true", DATABASE_URL: `file:${database}`, SITE_CURRENT_REVISION: CURRENT },
-    run, backup, health, link: (source, target) => symlink(source, target, process.platform === "win32" ? "junction" : "dir"),
+    run, backup, health, notify, link: (source, target) => symlink(source, target, process.platform === "win32" ? "junction" : "dir"),
     logError: (...items) => errors.push(items.map((item) => item instanceof Error ? item.message : item).join(" ")),
   });
   return {
-    root, database, calls, result, app, errors,
+    root, database, calls, result, app, errors, notices,
     status: JSON.parse(await readFile(path.join(updates, "status.json"), "utf8")),
     async lockExists() { try { await access(path.join(updates, "update.lock")); return true; } catch { return false; } },
   };
@@ -128,11 +130,20 @@ test("successful update builds against a snapshot before stopping and activates 
   assert.equal(await readFile(f.database, "utf8"), "migrated database");
   assert.equal(await readFile(path.join(f.root, ".updates", `database-${JOB}.db`), "utf8"), "latest database before stop");
   assert.equal(f.calls.find((call) => call.command === "health").revision, TARGET);
+  // 更新结果推送到安全告警，读取的是共享的线上数据库
+  assert.equal(f.notices.length, 1);
+  assert.equal(f.notices[0].message.event, "site-update.success");
+  assert.equal(f.notices[0].databasePath, f.database);
+  assert.ok(f.notices[0].message.lines.some((line) => line.includes(TARGET.slice(0, 7))));
 });
 
 test("a failed staged build leaves the original running process and database untouched", async (t) => {
   const f = await fixture(t, { buildFails: true });
   assert.equal(f.result.success, false);
+  assert.deepEqual(f.notices.map((notice) => notice.message.event), ["site-update.failed"]);
+  assert.ok(f.notices[0].message.lines.some((line) => line.includes("构建失败")));
+  // 推送内容不能带出构建日志里的敏感信息
+  assert.ok(!JSON.stringify(f.notices).includes("fixture-secret"));
   assert.equal(f.status.state, "error");
   assert.equal(await f.lockExists(), false);
   assert.equal(await readFile(f.database, "utf8"), "original database");

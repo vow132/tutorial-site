@@ -7,7 +7,10 @@ import { logoutEverywhere, revokeOtherSessions } from "@/lib/actions/account";
 import { getSettings } from "@/lib/settings";
 import { signTotpSetup } from "@/lib/session";
 import { generateTotpSecret, totpUri } from "@/lib/totp";
+import { describeAgent } from "@/lib/user-agent";
+import { getAlertConfig, getAlertStatus } from "@/lib/alerts";
 import AccountForm from "./account-form";
+import AlertsForm from "./alerts-form";
 import { DisableTwoFactorForm, EnableTwoFactorForm } from "./two-factor-form";
 
 export const metadata: Metadata = { title: "账号安全" };
@@ -17,24 +20,6 @@ const dateFormat = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
   timeStyle: "short",
 });
-
-function describeAgent(userAgent: string | null) {
-  if (!userAgent) return "未知设备";
-  const browser =
-    /Edg\//.test(userAgent) ? "Edge"
-    : /Chrome\//.test(userAgent) ? "Chrome"
-    : /Firefox\//.test(userAgent) ? "Firefox"
-    : /Safari\//.test(userAgent) ? "Safari"
-    : "浏览器";
-  const os =
-    /iPhone|iPad/.test(userAgent) ? "iOS"
-    : /Android/.test(userAgent) ? "Android"
-    : /Windows/.test(userAgent) ? "Windows"
-    : /Mac OS X/.test(userAgent) ? "macOS"
-    : /Linux/.test(userAgent) ? "Linux"
-    : "未知系统";
-  return `${browser} · ${os}`;
-}
 
 export default async function AdminAccountPage({
   searchParams,
@@ -50,6 +35,8 @@ export default async function AdminAccountPage({
     where: { adminId: admin.id, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
+
+  const [alertConfig, alertStatus] = await Promise.all([getAlertConfig(), getAlertStatus()]);
 
   let setup: { token: string; secret: string; qr: string } | null = null;
   if (!admin.totpSecret) {
@@ -104,6 +91,47 @@ export default async function AdminAccountPage({
             <DisableTwoFactorForm />
           </>
         )}
+      </section>
+
+      <section id="alerts" className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-ink">安全告警</h2>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              alertConfig.channel !== "off"
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            }`}
+          >
+            {alertConfig.channel !== "off" ? "已开启" : "未开启"}
+          </span>
+        </div>
+        <p className="mb-5 text-sm text-ink-3">
+          新设备登录、登录被锁定、修改密码或两步验证、网站更新结果、备份失败或过期时，
+          实时推送到你的手机。推送失败不影响登录等操作本身。
+        </p>
+        {alertStatus.lastAt && (
+          <p
+            className={`mb-5 rounded-xl px-4 py-3 text-xs ${
+              alertStatus.lastOk
+                ? "bg-paper text-ink-3"
+                : "bg-red-500/10 text-red-500 dark:text-red-400"
+            }`}
+          >
+            上次推送：{dateFormat.format(new Date(alertStatus.lastAt))}「{alertStatus.lastTitle}」
+            {alertStatus.lastOk ? " 成功" : ` 失败：${alertStatus.lastError ?? "未知原因"}`}
+          </p>
+        )}
+        <AlertsForm
+          initial={{
+            channel: alertConfig.channel,
+            url: alertConfig.url ?? "",
+            hasSecret: Boolean(alertConfig.secret),
+            hasTelegramToken: Boolean(alertConfig.telegramToken),
+            telegramChatId: alertConfig.telegramChatId ?? "",
+            backupReminder: alertConfig.backupReminder !== false,
+          }}
+        />
       </section>
 
       <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">

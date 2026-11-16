@@ -126,6 +126,23 @@ async function sqliteBackup(source, destination, moduleRoot) {
   try { await db.backup(destination); } finally { db.close(); }
 }
 
+/** 更新结果推送到后台配置的安全告警渠道；任何错误都只打印，不影响更新流程。 */
+async function notifyUpdateResult(databasePath, moduleRoot, message) {
+  try {
+    const { notifyFromDatabase } = await import("../lib/alert-transport.mjs");
+    const require = createRequire(path.join(moduleRoot, "package.json"));
+    const Database = require("better-sqlite3");
+    const db = new Database(databasePath, { readonly: true, fileMustExist: true, timeout: 10_000 });
+    try {
+      await notifyFromDatabase(db, message);
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    console.error("[site-update] 推送更新结果失败：", error instanceof Error ? error.message : error);
+  }
+}
+
 async function health(revision, port) {
   const url = `http://127.0.0.1:${port}/admin/login`;
   for (let attempt = 0; attempt < 30; attempt++) {
@@ -170,6 +187,8 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
   const link = dependencies.link || symlink;
   const logError = dependencies.logError || console.error;
   const prune = dependencies.prune || pruneUpdateArtifacts;
+  const notify = dependencies.notify || notifyUpdateResult;
+  const notifyDatabase = () => liveDatabase || databaseFile(environment.DATABASE_URL, root);
   const branch = environment.SITE_UPDATE_BRANCH || "master";
   if (!SHA.test(targetRevision) || !JOB.test(jobId)) throw new Error("更新任务参数无效。");
   root = await realpath(root);
@@ -305,6 +324,11 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
       await prune(updates, { protect: [release, previous.cwd, liveBackup, previousConfig] });
     } catch (pruneError) { logError(`[site-update:${jobId}] prune`, pruneError); }
     await progress("complete", "更新成功，站点已运行最新版本。", "success");
+    await notify(notifyDatabase(), root, {
+      event: "site-update.success",
+      title: "网站已更新到新版本",
+      lines: [`新版本：${targetRevision.slice(0, 7)}`, `原版本：${currentRevision.slice(0, 7)}`],
+    });
     return { success: true, release };
   } catch (error) {
     logError(`[site-update:${jobId}] ${phase}`, error);
@@ -346,6 +370,11 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
           ? preflightMessage.startsWith("git ") || preflightMessage.startsWith("pm2 ") ? "部署检查失败，请检查服务器 .updates/worker.log。" : preflightMessage
           : "新版本构建失败，原站点继续运行。详细原因见服务器 .updates/worker.log。";
     await progress("failed", message, "error");
+    await notify(notifyDatabase(), root, {
+      event: "site-update.failed",
+      title: rollbackFailed ? "网站更新失败，自动恢复未完成，请尽快处理" : "网站更新失败",
+      lines: [message, `目标版本：${targetRevision.slice(0, 7)}`, `失败阶段：${failedPhase}`],
+    });
     return { success: false, rollbackFailed };
   } finally {
     // Do not remove a newer task's lock if the status was changed by an operator.
