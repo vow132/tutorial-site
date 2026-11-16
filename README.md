@@ -167,44 +167,12 @@ npm run admin:reset -- --password '新的强密码' --username admin
 
 ## 安全加固（上线必做）
 
-**1. HTTPS 反向代理，不要直接暴露 3000 端口。** Nginx 示例（`http {}` 中先定义限流区）：
+**1. HTTPS 反向代理，不要直接暴露 3000 端口。** 完整的 Nginx 配置见 [`deploy/nginx.conf.example`](deploy/nginx.conf.example)：复制到 `/etc/nginx/conf.d/tutorial.conf`，替换域名、证书和项目路径后 `sudo nginx -t && sudo systemctl reload nginx`。它包含：
 
-```nginx
-limit_req_zone $binary_remote_addr zone=tutorial_login:10m  rate=10r/m;
-limit_req_zone $binary_remote_addr zone=tutorial_search:10m rate=30r/m;
-
-server {
-    listen 80;
-    server_name example.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name example.com;
-    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
-    client_max_body_size 6m;
-
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # 上传图片由 Nginx 直接读磁盘，减轻 Node 压力（不配置也能工作，由 Next 提供）
-    location /uploads/ {
-        alias /path/to/tutorial-site/public/uploads/;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
-        add_header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" always;
-        add_header X-Content-Type-Options nosniff always;
-    }
-
-    location = /admin/login { limit_req zone=tutorial_login  burst=10 nodelay; proxy_pass http://127.0.0.1:3000; }
-    location = /search      { limit_req zone=tutorial_search burst=20 nodelay; proxy_pass http://127.0.0.1:3000; }
-    location /              { proxy_pass http://127.0.0.1:3000; }
-}
-```
+- HTTP 跳转 HTTPS、登录和搜索按 IP 限流、上传图片由 Nginx 直接读磁盘；
+- **公开页面缓存**：首页、教程列表/文章、分类、RSS、sitemap 由 Nginx 缓存 1 分钟，大部分访问不再经过 Node。后台修改文章后访客最多晚 1 分钟看到；后台、搜索、接口、表单提交和站内点击跳转时的数据请求（带 `RSC` 请求头）都不走缓存。响应头 `X-Cache-Status` 可看到 HIT / MISS / STALE；
+- **更新不掉线**：Node 重启或一键更新切换期间，缓存过的页面继续返回（最长兜底 7 天），没缓存的页面显示「站点正在更新」提示（HTTP 503 + `Retry-After`），而不是 502 错误页；
+- 已在 Ubuntu 24.04 自带的 Nginx 1.24 上验证（`http2` 写在 `listen` 里，1.25 之前的版本不认识单独的 `http2 on;`）。
 
 然后：防火墙只放行 80/443（如 `ufw deny 3000`），在 `.env.production` 中设置 `TRUST_PROXY="true"` 与 `SITE_URL="https://你的域名"`。经 HTTPS 访问时站点会自动下发 HSTS、给 Cookie 加 Secure 标记。
 

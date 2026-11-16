@@ -1,0 +1,79 @@
+# 教程网 Nginx 示例配置：复制到 /etc/nginx/conf.d/tutorial.conf（该目录在 http {} 内被引入），
+# 把 example.com、证书路径、/path/to/tutorial-site 换成你的实际值，然后
+#   sudo mkdir -p /var/cache/nginx/tutorial && sudo nginx -t && sudo systemctl reload nginx
+
+# 登录、搜索限流（按访客 IP）
+limit_req_zone $binary_remote_addr zone=tutorial_login:10m  rate=10r/m;
+limit_req_zone $binary_remote_addr zone=tutorial_search:10m rate=30r/m;
+
+# 公开页面缓存：inactive=7d 让旧页面在 Node 停机时还能兜底 7 天
+proxy_cache_path /var/cache/nginx/tutorial levels=1:2 keys_zone=tutorial_pages:10m
+                 max_size=1g inactive=7d use_temp_path=off;
+
+server {
+    listen 80;
+    server_name example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    # Ubuntu 24.04 / Debian 12 自带的 Nginx 1.22–1.24 不认识单独的 `http2 on;`（1.25.1 才有），
+    # 这种写法在新旧版本上都能用（新版本只会提示 deprecated）。
+    listen 443 ssl http2;
+    server_name example.com;
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    client_max_body_size 6m;
+
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # 上传图片由 Nginx 直接读磁盘，减轻 Node 压力（不配置也能工作，由 Next 提供）
+    location /uploads/ {
+        alias /path/to/tutorial-site/public/uploads/;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" always;
+        add_header X-Content-Type-Options nosniff always;
+    }
+
+    location = /admin/login { limit_req zone=tutorial_login  burst=10 nodelay; proxy_pass http://127.0.0.1:3000; }
+    location = /search      { limit_req zone=tutorial_search burst=20 nodelay; proxy_pass http://127.0.0.1:3000; }
+
+    # ---- 公开页面缓存 ----
+    # 只缓存所有访客看到都一样的只读页面：首页、教程列表/文章、分类、RSS、sitemap。
+    # 后台、接口、搜索、提交表单（POST）不在这里，始终直连 Node。
+    location ~ ^/($|tutorials(/|$)|categories/|feed\.xml$|sitemap\.xml$|robots\.txt$) {
+        proxy_pass http://127.0.0.1:3000;
+
+        proxy_cache tutorial_pages;
+        proxy_cache_key "$scheme$host$request_uri";
+        # 不按 Next 的 Cache-Control（文章页 s-maxage=300）走，统一缓存 1 分钟：
+        # 后台修改文章后，访客最多晚 1 分钟看到。
+        proxy_ignore_headers Cache-Control Expires;
+        proxy_cache_valid 200 301 302 1m;
+        proxy_cache_valid 404 10s;
+        # Node 重启、一键更新切换期间（连不上 / 502 / 504）继续返回最近一次的缓存页，
+        # 过期后由一个请求在后台刷新，其余请求先拿旧页面，不会一起压到 Node 上。
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_background_update on;
+        proxy_cache_lock on;
+        # 站内点击跳转时浏览器请求的是 RSC 数据（带 RSC 请求头），不缓存。
+        proxy_cache_bypass $http_rsc $http_next_router_prefetch;
+        proxy_no_cache     $http_rsc $http_next_router_prefetch;
+        # 排查用：HIT 命中缓存，MISS 回源，STALE 后端不可用时返回的旧页面，BYPASS 未走缓存
+        add_header X-Cache-Status $upstream_cache_status always;
+    }
+
+    location / { proxy_pass http://127.0.0.1:3000; }
+
+    # Node 重启/更新切换的几秒内，没有缓存的页面给出友好提示，而不是 Nginx 默认的 502 页面。
+    error_page 502 504 = @tutorial_unavailable;
+    location @tutorial_unavailable {
+        default_type "text/html; charset=utf-8";
+        add_header Retry-After 10 always;
+        add_header Cache-Control "no-store" always;
+        return 503 '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>站点正在更新</title></head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:20vh auto;padding:0 1rem;text-align:center;color:#111827"><h1 style="font-size:1.5rem">站点正在更新</h1><p style="color:#6b7280">通常只需要几秒钟，请稍后刷新页面。</p></body></html>';
+    }
+}
