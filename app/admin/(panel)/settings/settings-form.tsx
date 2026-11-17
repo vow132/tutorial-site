@@ -130,6 +130,19 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
         </div>
       </Section>
 
+      {/* ---------- 安全联系方式 ---------- */}
+      <Section
+        title="安全联系方式"
+        desc="安全研究人员发现漏洞时联系谁。填写后网站会提供标准的 /.well-known/security.txt；留空则不提供"
+      >
+        <Field
+          label="邮箱或网址"
+          name="securityContact"
+          defaultValue={settings.securityContact}
+          placeholder="security@example.com 或 https://example.com/security"
+        />
+      </Section>
+
       {/* ---------- 首页 Hero ---------- */}
       <Section title="首页 Hero 文案" desc="首页顶部的大标题区域">
         <Field label="徽标文字" name="heroBadge" defaultValue={settings.heroBadge} placeholder="持续更新的知识库" />

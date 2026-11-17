@@ -30,6 +30,8 @@ export type SiteSettings = {
   footerColumns: FooterColumn[];
   // 搜索引擎站长平台的 HTML 标签验证码
   verification: SearchVerification;
+  /** 安全问题联系方式（mailto: 或 https:），用于 /.well-known/security.txt；空串表示不提供 */
+  securityContact: string;
 };
 
 export const SETTINGS_KEY = "site";
@@ -63,6 +65,7 @@ export const defaultSettings: SiteSettings = {
     },
   ],
   verification: {},
+  securityContact: "",
 };
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
@@ -86,6 +89,7 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
         ? parsed.footerColumns
         : defaultSettings.footerColumns,
       verification: readVerification(parsed.verification),
+      securityContact: typeof parsed.securityContact === "string" ? parsed.securityContact : "",
     };
   } catch {
     return defaultSettings;

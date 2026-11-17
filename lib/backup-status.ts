@@ -1,8 +1,8 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
-/** scripts/backup.mjs 生成的文件名。 */
-const BACKUP_FILE = /^tutorial-\d{8}-\d{6}\.db\.gz$/;
+/** scripts/backup.mjs 生成的文件名（设置了 BACKUP_PASSPHRASE 时带 .enc）。 */
+const BACKUP_FILE = /^tutorial-\d{8}-\d{6}\.db\.gz(\.enc)?$/;
 
 /** 超过这么久没有新备份就算「过期」。 */
 export const BACKUP_STALE_MS = 48 * 60 * 60 * 1000;
@@ -67,7 +67,9 @@ export function describeBackup(status: BackupStatus, now = Date.now()) {
   if (!status.latest) return { text: "还没有备份", stale: true };
   const age = now - status.latest.at.getTime();
   return {
-    text: `${formatAge(age)}（${(status.latest.size / 1024 / 1024).toFixed(1)} MB，共保留 ${status.count} 份）`,
+    text: `${formatAge(age)}（${(status.latest.size / 1024 / 1024).toFixed(1)} MB${
+      status.latest.name.endsWith(".enc") ? "，已加密" : ""
+    }，共保留 ${status.count} 份）`,
     stale: age >= BACKUP_STALE_MS,
   };
 }

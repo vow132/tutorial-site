@@ -23,13 +23,16 @@ npx prisma db seed       # 写入种子数据（管理员/分类/示例教程）
 npx prisma generate      # 重新生成客户端到 generated/prisma/
 npm test                 # 单元测试（lib/*.test.ts + scripts/*.test.mjs）
 npm run test:e2e         # 端到端测试（Playwright，需先 npm run build；会建/删 e2e- 前缀的数据，勿连生产库）
-npm run backup           # SQLite 在线备份到 backups/
-npm run admin:reset      # 应急：重置管理员密码、关闭两步验证、删除通行密钥、退出所有设备
+npm run backup           # SQLite 在线备份到 backups/（设置 BACKUP_PASSPHRASE 时加密为 .db.gz.enc）
+npm run backup:restore -- <文件>  # 把备份解为独立的 restored-*.db 并做完整性检查（不动线上库）
+npm run admin:reset      # 应急：重置管理员密码、关闭两步验证（含恢复码）、删除通行密钥、退出所有设备
 ```
 
 ## 关键架构决策
 - **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout
 - **通行密钥**：`@simplewebauthn/server` + `browser`（浏览器端只在点击时动态加载）。RP ID/Origin 取自 `SITE_URL`（`lib/passkeys.ts` 的 `relyingParty()`，要求域名 + HTTPS，localhost 例外）；挑战放在签名 Cookie 里、一次性使用；可发现凭据 + `userVerification: "required"`，所以通行密钥登录跳过 TOTP。登记要输当前密码。e2e 用 Chromium 虚拟认证器、以 `http://localhost` 访问（WebAuthn 不接受 IP）
+- **敏感字段静态加密**：两步验证密钥、告警配置用 `lib/secret-box.mjs`（AES-256-GCM，`enc:v1:` 前缀，密钥取 `DATA_ENCRYPTION_KEY`，否则由 `AUTH_SECRET` 派生）加密存库，读取时兼容旧明文；`instrumentation.ts` 启动时把明文/旧密钥数据重新加密（`lib/secret-migration.ts`）。新增需要保密的字段时同样走这里，并给一个独立的 purpose
+- **两步验证**：校验统一走 `lib/second-factor.ts` 的 `verifySecondFactor()`（6 位验证码或一次性恢复码，均为条件更新/删除防并发重放）；恢复码只存 SHA-256（`AdminRecoveryCode` 表），关闭两步验证和 `admin:reset` 时一并删除
 - **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器，只记失败；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
 - **安全日志**：敏感操作调用 `audit()`（`lib/audit.ts`），后台 `/admin/audit` 查看
 - **安全告警**：`audit()` 写完日志后按动作名决定是否推送（映射在 `lib/alerts.ts` 的 `alertForAudit()`，新增敏感操作时顺带加上）；推送实现在 `lib/alert-transport.mjs`（纯 JS，`scripts/backup.mjs`、`scripts/site-update.mjs` 也直接用它）。配置存 `Setting` 表 key=`alerts`，与公开站点设置分开，密钥不回显到页面；浏览器端只能引用 `lib/alert-channels.mjs`。推送在请求内读配置、网络发送放后台，失败不影响业务。备份过期检查由 `instrumentation.ts` 启动的定时器执行（`lib/backup-watch.ts`），定时器里不能用依赖 Next 缓存的 `getSettings()`
@@ -47,7 +50,7 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **颜色对比度**：辅助文字 `text-ink-3`（#6b7280）、小号强调文字用 `text-accent-ink`（#4f46e5），`text-accent` 只用于大字号、图标和背景。分类颜色是后台随意填的，用作小字时一律加 `cat-text` 类 + `style={categoryTextStyle(color)}`（`lib/color.ts` 按亮/暗背景各算一个达到 4.5:1 的变体），不要直接 `style={{ color }}`
 - **正文交互**：文章 HTML 是服务端生成的静态内容（标题 ID 按文字生成，见 `headingSlug()`；代码块带语言标签和复制按钮），交互由 `components/article-enhancer.tsx` 事件委托接管（复制代码、`#` 复制章节链接、图片放大、旧 `#h-N` 链接兼容）。打印样式在 `globals.css` 的 `@media print`，站点外框元素加 `print-hide` 类
 - **原生 checkbox 驱动的开关**（移动端抽屉、本页目录）：hydration 前也能点开，用 `components/label-button.tsx`（label 不能带 ARIA role，按钮语义放在内层 span 上），CSS 选择器写成 `.xxx-toggle:checked + label .xxx-trigger`
-- **站点设置**：`Setting` 表（key-value，单行 key=`site`，JSON 存全部设置）；类型/默认值/读取在 `lib/settings.ts`（`getSettings()` 自动回退默认值）；后台编辑在 `/admin/settings`（底部栏目是客户端 JSON 编辑器，`autoCategories: true` 的栏目自动输出分类链接；「搜索引擎验证」的平台列表、验证码校验与 meta 输出在 `lib/search-verification.ts`，根布局输出到每个页面）；前台 layout/页脚/首页 Hero 均从 `getSettings()` 取数
+- **站点设置**：`Setting` 表（key-value，单行 key=`site`，JSON 存全部设置）；类型/默认值/读取在 `lib/settings.ts`（`getSettings()` 自动回退默认值）；后台编辑在 `/admin/settings`（底部栏目是客户端 JSON 编辑器，`autoCategories: true` 的栏目自动输出分类链接；「搜索引擎验证」的平台列表、验证码校验与 meta 输出在 `lib/search-verification.ts`，根布局输出到每个页面；「安全联系方式」生成 `app/.well-known/security.txt/route.ts`，留空返回 404）；前台 layout/页脚/首页 Hero 均从 `getSettings()` 取数
 - **后台表单**：React 19 的 `<form action={…}>` 在 action 结束后会重置表单，服务端校验失败时已填内容会丢失；成功后跳转、或成功后就该保留当前值的表单用 `lib/form-submit.ts` 的 `submitKeepingValues()`（设置页、教程编辑页已改）
 - Server Actions 在 `lib/actions/`，每个都必须 `requireAuth()`；变更后 `revalidatePath`。`"use server"` 文件里导出的每个函数都会成为可被直接调用的接口，辅助函数放到普通模块中
 

@@ -119,3 +119,13 @@ test("scripts read the config from SQLite and never throw", async () => {
     db.close();
   }
 });
+
+test("alert settings are stored encrypted and fail closed when the key changes", async () => {
+  const { serializeAlertConfig } = await import("./alert-transport.mjs");
+  const env = { NODE_ENV: "production", AUTH_SECRET: "s".repeat(48) };
+  const config = { channel: "telegram" as const, telegramToken: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ", telegramChatId: "123456" };
+  const stored = serializeAlertConfig({ ...config, locked: true }, env);
+  assert.ok(!stored.includes("ABCDEFGHIJ"));
+  assert.deepEqual(parseAlertConfig(stored, env), { ...config, url: undefined, secret: undefined, backupReminder: true });
+  assert.deepEqual(parseAlertConfig(stored, { ...env, AUTH_SECRET: "t".repeat(48) }), { channel: "off", locked: true });
+});

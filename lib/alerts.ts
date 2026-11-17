@@ -6,6 +6,7 @@ import {
   formatAlertTime,
   parseAlertConfig,
   sendAlert,
+  serializeAlertConfig,
   type AlertConfig,
 } from "@/lib/alert-transport.mjs";
 
@@ -24,7 +25,7 @@ export async function getAlertConfig(): Promise<AlertConfig> {
 }
 
 export async function saveAlertConfig(config: AlertConfig) {
-  const value = JSON.stringify(config);
+  const value = serializeAlertConfig(config);
   await prisma.setting.upsert({
     where: { key: ALERT_SETTING_KEY },
     update: { value },
@@ -137,6 +138,13 @@ export function alertForAudit(
       return { title: "两步验证已被关闭", lines: [...who, NOT_ME] };
     case "passkey.add":
       return { title: "添加了新的通行密钥", lines: [...who, `名称：${context.detail ?? "—"}`, NOT_ME] };
+    case "login.recovery_code":
+      return {
+        title: "有人用恢复码登录了后台",
+        lines: [...who, `恢复码：${context.detail ?? "—"}`, "恢复码只在手机丢失时使用；如果不是你本人，请立即重新生成恢复码并修改密码。"],
+      };
+    case "recovery_codes.regenerate":
+      return { title: "两步验证恢复码已重新生成", lines: [...who, "旧的恢复码已全部作废。", NOT_ME] };
     case "passkey.remove":
       return { title: "删除了通行密钥", lines: [...who, `名称：${context.detail ?? "—"}`] };
     default:

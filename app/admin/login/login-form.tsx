@@ -59,20 +59,25 @@ export default function LoginForm({ from }: { from?: string }) {
       </div>
       {state.needsTotp && (
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-2">
+          <label htmlFor="login-totp" className="mb-1.5 block text-sm font-medium text-ink-2">
             两步验证码
           </label>
           <input
+            id="login-totp"
             name="totp"
             required
             autoFocus
-            inputMode="numeric"
-            pattern="[0-9 ]{6,7}"
-            maxLength={7}
+            maxLength={24}
             autoComplete="one-time-code"
-            className={`${inputClass} tracking-[0.3em]`}
+            autoCapitalize="off"
+            spellCheck={false}
+            aria-describedby="login-totp-hint"
+            className={`${inputClass} tracking-[0.2em]`}
             placeholder="验证器中的 6 位数字"
           />
+          <p id="login-totp-hint" className="mt-1.5 text-xs text-ink-3">
+            手机不在身边？输入开启两步验证时保存的恢复码（形如 abcd-efgh-ijkl-mnop），每个只能用一次。
+          </p>
         </div>
       )}
 

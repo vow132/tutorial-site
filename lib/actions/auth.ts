@@ -15,7 +15,7 @@ import { audit } from "@/lib/audit";
 import { getClientIp } from "@/lib/client-ip";
 import { passwordProblem } from "@/lib/password-policy";
 import { sharedLimiter, type RateLimiter } from "@/lib/rate-limit";
-import { verifyTotp } from "@/lib/totp";
+import { LOCKED_TOTP_MESSAGE, verifySecondFactor } from "@/lib/second-factor";
 
 export type LoginState = { error?: string; needsTotp?: boolean };
 
@@ -95,25 +95,19 @@ export async function login(
     return { error: "用户名或密码错误", needsTotp: showTotp };
   }
 
+  let recoveryCodesLeft: number | null = null;
   if (admin.totpSecret) {
     if (!totp) return { needsTotp: true };
-    const step = verifyTotp(admin.totpSecret, totp, admin.totpLastStep);
-    // 条件更新：同一个验证码并发重放时只有一个请求能赢。
-    const accepted =
-      step !== null &&
-      (
-        await prisma.admin.updateMany({
-          where: {
-            id: admin.id,
-            OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }],
-          },
-          data: { totpLastStep: step },
-        })
-      ).count === 1;
-    if (!accepted) {
+    // 6 位验证码或一次性恢复码；同一个码并发重放时只有一个请求能成功。
+    const factor = await verifySecondFactor(admin, totp);
+    if (!factor.ok) {
       await fail("login.totp_failed");
-      return { error: "两步验证码不正确或已被使用", needsTotp: true };
+      return {
+        error: factor.reason === "locked" ? LOCKED_TOTP_MESSAGE : "验证码或恢复码不正确，或已被使用",
+        needsTotp: true,
+      };
     }
+    if (factor.method === "recovery") recoveryCodesLeft = factor.remaining;
   }
 
   for (const [limiter, key] of buckets) {
@@ -126,6 +120,9 @@ export async function login(
     actor: admin.username,
     detail: device ? "受信任设备" : "新设备",
   });
+  if (recoveryCodesLeft !== null) {
+    await audit("login.recovery_code", { actor: admin.username, detail: `剩余 ${recoveryCodesLeft} 个` });
+  }
 
   // 仍在使用默认/弱密码时，直接带去改密码页面。
   redirect(passwordProblem(password, admin.username) ? "/admin/account?weak=1" : from);

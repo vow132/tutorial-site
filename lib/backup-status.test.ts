@@ -20,4 +20,6 @@ test("dashboard text describes backup age and staleness", () => {
   const stale = describeBackup({ directory: "/b", count: 1, latest: { name: "x", at: new Date(now - BACKUP_STALE_MS), size: 0 } }, now);
   assert.equal(stale.stale, true);
   assert.deepEqual(describeBackup({ directory: "/b", count: 0, latest: null }, now), { text: "还没有备份", stale: true });
+  const encrypted = describeBackup({ directory: "/b", count: 2, latest: { name: "tutorial-20261116-030000.db.gz.enc", at: hoursAgo(1), size: 1_048_576 } }, now);
+  assert.equal(encrypted.text, "1 小时前（1.0 MB，已加密，共保留 2 份）");
 });
