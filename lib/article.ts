@@ -223,9 +223,47 @@ async function replaceAsync(
   return output + input.slice(cursor);
 }
 
+/** 文章页上已经被占用的元素 ID，标题不能和它们重名。 */
+const RESERVED_IDS = new Set(["main", "related-heading", "top"]);
+
+/**
+ * 标题 ID：按标题文字生成（保留中文），分享出去的章节链接不会因为前面插入了
+ * 新标题而错位。标点和空白换成连字符；同一篇里重名时追加 -2、-3。
+ */
+export function headingSlug(text: string) {
+  return text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60)
+    .replace(/-$/, "");
+}
+
+/** 代码块右上角显示的语言名。 */
+const LANGUAGE_LABELS: Record<string, string> = {
+  bash: "Shell", c: "C", cpp: "C++", csharp: "C#", css: "CSS", dart: "Dart",
+  dockerfile: "Dockerfile", go: "Go", graphql: "GraphQL", http: "HTTP", ini: "INI",
+  java: "Java", javascript: "JavaScript", json: "JSON", kotlin: "Kotlin", less: "Less",
+  markdown: "Markdown", nginx: "Nginx", objectivec: "Objective-C", php: "PHP",
+  powershell: "PowerShell", python: "Python", ruby: "Ruby", rust: "Rust", scss: "SCSS",
+  sql: "SQL", swift: "Swift", typescript: "TypeScript", xml: "HTML", yaml: "YAML",
+};
+
+/** 代码块外壳：语言标签 + 复制按钮（按钮由 components/article-enhancer.tsx 接管）。 */
+function codeBlock(language: string, highlighted: string) {
+  const label = LANGUAGE_LABELS[language] ?? "代码";
+  return (
+    `<div class="code-block"><div class="code-head"><span class="code-lang">${label}</span>` +
+    `<button type="button" class="code-copy" data-copy-code aria-label="复制代码">复制</button></div>` +
+    `<pre><code class="hljs language-${language}">${highlighted}</code></pre></div>`
+  );
+}
+
 async function processArticleUncached(html: string): Promise<ProcessedArticle> {
   const toc: TocItem[] = [];
-  let headingIndex = 0;
+  const usedIds = new Set(RESERVED_IDS);
 
   // 渲染前再过滤一次：覆盖本次加固之前就已入库的旧内容。
   let output = sanitizeArticleHtml(html).replace(
@@ -233,9 +271,13 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
     (_match, level: string, inner: string) => {
       // 目录文字交给 React 渲染（会再转义一次），这里先还原 &amp; 等实体。
       const text = decodeEntities(inner.replace(/<[^>]+>/g, "")).trim();
-      const id = `h-${headingIndex++}`;
+      const base = headingSlug(text) || `section-${toc.length + 1}`;
+      let id = base;
+      for (let n = 2; usedIds.has(id); n++) id = `${base}-${n}`;
+      usedIds.add(id);
       toc.push({ id, text, level: Number(level) });
-      return `<h${level} id="${id}">${inner}</h${level}>`;
+      // 悬停时出现的 # 链接：点击复制本节地址（components/article-enhancer.tsx）。
+      return `<h${level} id="${id}">${inner}<a class="heading-anchor" href="#${id}" aria-label="复制本节链接">#</a></h${level}>`;
     },
   );
 
@@ -244,11 +286,11 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
     (match, language: string | undefined, code: string) => {
       const decoded = decodeEntities(code);
       try {
-        const highlighted =
-          language && hljs.getLanguage(language)
-            ? hljs.highlight(decoded, { language }).value
-            : hljs.highlightAuto(decoded).value;
-        return `<pre><code class="hljs language-${language ?? "plaintext"}">${highlighted}</code></pre>`;
+        if (language && hljs.getLanguage(language)) {
+          return codeBlock(language, hljs.highlight(decoded, { language }).value);
+        }
+        const auto = hljs.highlightAuto(decoded);
+        return codeBlock(auto.language ?? "plaintext", auto.value);
       } catch {
         return match;
       }

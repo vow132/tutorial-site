@@ -2,6 +2,7 @@
 
 import { useCallback, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { TocItem } from "@/lib/article";
+import LabelButton from "@/components/label-button";
 
 const MOBILE_TOC_STORAGE_KEY = "toc:mobile-open";
 
@@ -149,7 +150,7 @@ export default function Toc({ items }: { items: TocItem[] }) {
   };
 
   return (
-    <aside className="relative hidden min-w-0 self-stretch lg:block">
+    <aside className="print-hide relative hidden min-w-0 self-stretch lg:block">
       <nav className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pb-6" aria-label="本页目录">
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-3">
           本页目录
@@ -238,7 +239,7 @@ export function MobileToc({ items }: { items: TocItem[] }) {
   };
 
   return (
-    <div className="mt-7 lg:hidden">
+    <div className="print-hide mt-7 lg:hidden">
       <input
         ref={attachToggle}
         id={toggleId}
@@ -257,9 +258,8 @@ export function MobileToc({ items }: { items: TocItem[] }) {
         }}
       />
 
-      <label
+      <LabelButton
         htmlFor={toggleId}
-        role="button"
         tabIndex={0}
         aria-controls={panelId}
         aria-expanded={open}
@@ -286,7 +286,7 @@ export function MobileToc({ items }: { items: TocItem[] }) {
           {items.length} 节
         </span>
         <Caret className="mobile-toc-caret shrink-0 text-ink-3 transition-transform duration-200" />
-      </label>
+      </LabelButton>
 
       <nav
         id={panelId}

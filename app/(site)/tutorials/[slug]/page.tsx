@@ -16,6 +16,8 @@ import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 import ViewBeacon from "@/components/view-beacon";
+import ArticleEnhancer from "@/components/article-enhancer";
+import { categoryTextStyle } from "@/lib/color";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -29,6 +31,9 @@ export const revalidate = 60;
 export function generateStaticParams() {
   return [];
 }
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
 
 type PublishedTutorial = NonNullable<Awaited<ReturnType<typeof getPublishedTutorial>>>;
 
@@ -137,6 +142,8 @@ export default async function TutorialDetailPage({
       ]),
     ],
   };
+  // 修改日期与发布日期不是同一天时才显示「更新于」（阅读量计数不会改动 updatedAt）。
+  const updated = formatDate(tutorial.updatedAt) !== formatDate(tutorial.createdAt);
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;
   const minutes = Math.max(1, Math.round(words / 400));
 
@@ -144,9 +151,10 @@ export default async function TutorialDetailPage({
     <div className="mx-auto max-w-6xl px-4 pt-12">
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
+      <ArticleEnhancer />
       {/* 面包屑 */}
       <Reveal>
-        <nav className="flex items-center gap-2 text-sm text-ink-3">
+        <nav className="print-hide flex items-center gap-2 text-sm text-ink-3">
           <IntentLink href="/" className="transition-colors hover:text-accent">首页</IntentLink>
           <span>/</span>
           <IntentLink
@@ -161,16 +169,16 @@ export default async function TutorialDetailPage({
         </nav>
       </Reveal>
 
-      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px] xl:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="article-grid mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px] xl:grid-cols-[minmax(0,1fr)_260px]">
         <div>
           {/* 头部 */}
           <Reveal fade={false}>
             <header>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+                className="cat-text inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
                 style={{
                   backgroundColor: `${tutorial.category.color}14`,
-                  color: tutorial.category.color,
+                  ...categoryTextStyle(tutorial.category.color),
                 }}
               >
                 <span
@@ -185,14 +193,14 @@ export default async function TutorialDetailPage({
               <div className="mt-4 flex flex-wrap items-center gap-4 border-b border-line pb-6 text-xs text-ink-3">
                 <span>
                   发布于{" "}
-                  <time dateTime={tutorial.createdAt.toISOString()}>
-                    {tutorial.createdAt.toLocaleDateString("zh-CN", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </time>
+                  <time dateTime={tutorial.createdAt.toISOString()}>{formatDate(tutorial.createdAt)}</time>
                 </span>
+                {updated && (
+                  <span>
+                    更新于{" "}
+                    <time dateTime={tutorial.updatedAt.toISOString()}>{formatDate(tutorial.updatedAt)}</time>
+                  </span>
+                )}
                 <span>约 {minutes} 分钟读完</span>
                 <span>{tutorial.views} 次阅读</span>
               </div>
@@ -212,7 +220,7 @@ export default async function TutorialDetailPage({
 
           {/* 上一篇 / 下一篇 */}
           <Reveal mode="scroll">
-            <nav className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <nav className="print-hide mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {prev ? (
                 <IntentLink href={`/tutorials/${prev.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5">
@@ -240,7 +248,7 @@ export default async function TutorialDetailPage({
 
           {/* 相关教程：给读者下一步，也让爬虫更快发现同主题文章 */}
           {related.length > 0 && (
-            <section aria-labelledby="related-heading" className="mt-14">
+            <section aria-labelledby="related-heading" className="print-hide mt-14">
               <Reveal mode="scroll">
                 <h2 id="related-heading" className="text-lg font-bold text-ink">
                   相关教程

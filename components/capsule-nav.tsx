@@ -4,6 +4,7 @@ import IntentLink from "./intent-link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { categoryLinkTarget, isExternalHref } from "@/lib/categories";
+import LabelButton from "@/components/label-button";
 
 export type NavItem = {
   key: string;
@@ -135,9 +136,8 @@ function MobileNavItem({
       )}
       <div className="flex items-center gap-1">
         {hasChildren ? (
-          <label
+          <LabelButton
             htmlFor={submenuToggleId}
-            role="button"
             tabIndex={open ? 0 : -1}
             aria-label={`展开或收起${item.label}子分类`}
             onKeyDown={(event) => {
@@ -166,7 +166,7 @@ function MobileNavItem({
               {item.children!.length}
             </span>
             <Chevron className="shrink-0 opacity-55" />
-          </label>
+          </LabelButton>
         ) : (
           <IntentLink
             href={item.href}
@@ -538,8 +538,8 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const drawerId = useId();
   const toggleId = useId();
   const toggleRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLLabelElement>(null);
-  const closeButtonRef = useRef<HTMLLabelElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const closeButtonRef = useRef<HTMLSpanElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
 
@@ -634,11 +634,10 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         }}
       />
 
-      <label
+      <LabelButton
         ref={triggerRef}
         htmlFor={toggleId}
         className="mobile-drawer-trigger flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line bg-surface/90 shadow-capsule backdrop-blur-md transition-colors hover:bg-paper lg:hidden"
-        role="button"
         tabIndex={0}
         aria-label="打开菜单"
         aria-controls={drawerId}
@@ -653,17 +652,16 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
           <path d="M2.5 5h13M2.5 9h13M2.5 13h13" />
         </svg>
-      </label>
+      </LabelButton>
 
       <div
         ref={shellRef}
         className="mobile-drawer-shell pointer-events-none fixed inset-0 z-[70] lg:hidden"
         aria-hidden={!open}
       >
-        <label
+        <LabelButton
           htmlFor={toggleId}
           aria-label="关闭菜单"
-          role="button"
           tabIndex={open ? 0 : -1}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -688,10 +686,9 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
               </p>
               <p className="mt-1 text-lg font-bold text-ink">菜单导航</p>
             </div>
-            <label
+            <LabelButton
               ref={closeButtonRef}
               htmlFor={toggleId}
-              role="button"
               tabIndex={open ? 0 : -1}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -705,7 +702,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M4 4l10 10M14 4 4 14" />
               </svg>
-            </label>
+            </LabelButton>
           </div>
 
           <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="移动端导航">

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteTutorial, togglePublish } from "@/lib/actions/tutorials";
 import Pagination from "@/components/pagination";
 import DeleteButton from "./delete-button";
+import { categoryTextStyle } from "@/lib/color";
 
 export const metadata: Metadata = { title: "教程管理" };
 
@@ -89,8 +90,8 @@ export default async function AdminTutorialsPage({
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-4 md:table-cell">
                     <span
-                      className="inline-flex items-center gap-1.5 text-xs"
-                      style={{ color: t.category.color }}
+                      className="cat-text inline-flex items-center gap-1.5 text-xs"
+                      style={categoryTextStyle(t.category.color)}
                     >
                       <span
                         className="h-1.5 w-1.5 rounded-full"

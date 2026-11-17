@@ -21,7 +21,7 @@ export default async function SiteFooter() {
   );
 
   return (
-    <footer className="mt-24 border-t border-line bg-surface/60">
+    <footer className="print-hide mt-24 border-t border-line bg-surface/60">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="flex flex-col gap-10 md:flex-row md:justify-between">
           <div className="max-w-xs">
@@ -43,7 +43,7 @@ export default async function SiteFooter() {
                 : col.links;
               return (
                 <div key={i}>
-                  <h4 className="text-sm font-semibold text-ink">{col.title}</h4>
+                  <h2 className="text-sm font-semibold text-ink">{col.title}</h2>
                   <ul className="mt-3 space-y-2">
                     {links.map((link, j) => {
                       return (

@@ -55,6 +55,7 @@ export default async function TutorialsPage({
         </div>
       ) : (
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <h2 className="sr-only">教程列表</h2>
           {tutorials.map((t, i) => (
             <Reveal key={t.id} delay={Math.min(i, 5) * 0.05}>
               <TutorialCard

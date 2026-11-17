@@ -183,6 +183,13 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
     await expect(rendered).toHaveAttribute("srcset", new RegExp(`-800w\\.webp 800w, .*-1200w\\.webp 1200w, .* 1600w$`));
     await expect(rendered).toHaveAttribute("sizes", /820px/);
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`${src}$`));
+    // 点击正文图片放大，Esc 关闭
+    await rendered.click();
+    const zoom = page.getByRole("dialog", { name: "flexbox main axis" });
+    await expect(zoom).toBeVisible();
+    await expect(zoom.getByRole("button", { name: "关闭大图" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(zoom).toHaveCount(0);
     // 在清理之前断言：删除时管理列表里对该文章的预取请求会正常返回 404。
     expect(errors).toEqual([]);
   } finally {

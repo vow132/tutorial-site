@@ -1,5 +1,6 @@
 import IntentLink from "./intent-link";
 import GlowCard from "./glow-card";
+import { categoryTextStyle } from "@/lib/color";
 
 type Props = {
   title: string;
@@ -28,7 +29,7 @@ export default function TutorialCard({
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: categoryColor }}
           />
-          <span className="font-medium" style={{ color: categoryColor }}>
+          <span className="cat-text font-medium" style={categoryTextStyle(categoryColor)}>
             {categoryName}
           </span>
           <span>·</span>

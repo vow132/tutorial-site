@@ -6,6 +6,7 @@ import { SearchBusyError, isShortQuery, searchPublishedTutorials } from "@/lib/s
 import GlowCard from "@/components/glow-card";
 import Mascot from "@/components/mascot";
 import Reveal from "@/components/reveal";
+import { categoryTextStyle } from "@/lib/color";
 
 // 搜索结果页是无限组合的薄内容：不收录，但允许爬虫顺着结果链接抓取教程。
 // 不能在 robots.txt 里禁止 /search，否则爬虫看不到这里的 noindex。
@@ -144,6 +145,7 @@ export default async function SearchPage({
       )}
 
       <div className="mt-10 space-y-4">
+        {results.length > 0 && <h2 className="sr-only">搜索结果</h2>}
         {results.map((t, i) => (
           <Reveal key={t.id} delay={Math.min(i, 5) * 0.05}>
             <IntentLink href={`/tutorials/${t.slug}`} className="block">
@@ -153,7 +155,7 @@ export default async function SearchPage({
                     className="h-2 w-2 rounded-full"
                     style={{ backgroundColor: t.category.color }}
                   />
-                  <span style={{ color: t.category.color }}>{t.category.name}</span>
+                  <span className="cat-text" style={categoryTextStyle(t.category.color)}>{t.category.name}</span>
                   <span>·</span>
                   <span>{t.views} 阅读</span>
                 </div>

@@ -28,7 +28,7 @@ export default async function SiteHeader() {
   ];
 
   return (
-    <header className="sticky top-4 z-50 mx-auto w-full max-w-6xl px-4">
+    <header className="print-hide sticky top-4 z-50 mx-auto w-full max-w-6xl px-4">
       <div className="relative flex items-center gap-2 sm:gap-3 lg:justify-between">
         {/* Logo */}
         <IntentLink

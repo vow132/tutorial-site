@@ -12,6 +12,7 @@ import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 import JsonLd from "@/components/json-ld";
+import { categoryTextStyle } from "@/lib/color";
 import { pageMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -243,8 +244,8 @@ export default async function HomePage() {
                       style={{ backgroundColor: latest[0].category.color }}
                     />
                     <span
-                      className="font-medium"
-                      style={{ color: latest[0].category.color }}
+                      className="cat-text font-medium"
+                      style={categoryTextStyle(latest[0].category.color)}
                     >
                       {latest[0].category.name}
                     </span>

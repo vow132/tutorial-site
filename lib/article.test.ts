@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import sharp from "sharp";
-import { firstArticleImage, htmlToDescription, processArticle, stripHtml } from "./article";
+import { firstArticleImage, headingSlug, htmlToDescription, processArticle, stripHtml } from "./article";
 
 test("TOC text decodes HTML entities so React renders them once", async () => {
   const { toc, html } = await processArticle(
@@ -100,4 +100,32 @@ test("uploaded images with responsive variants get srcset and sizes", async (t) 
   assert.match(withVariants, /sizes="\(min-width: 1280px\) 820px/);
   assert.match(withVariants, /width="1600" height="800"/);
   assert.doesNotMatch(plain, /srcset/);
+});
+
+test("heading ids come from the heading text and stay unique", async () => {
+  assert.equal(headingSlug("为什么需要 Flexbox？"), "为什么需要-flexbox");
+  assert.equal(headingSlug("  Q&A：常见问题  "), "q-a-常见问题");
+  const { toc, html } = await processArticle(
+    "<h2>为什么需要 Flexbox？</h2><h3>小结</h3><h2>小结</h2><h2>main</h2><h2>！！！</h2>",
+  );
+  assert.deepEqual(
+    toc.map((item) => item.id),
+    ["为什么需要-flexbox", "小结", "小结-2", "main-2", "section-5"],
+  );
+  // 每个标题带一个 # 链接，目录文字里不含 #
+  assert.match(html, /<h2 id="为什么需要-flexbox">为什么需要 Flexbox？<a class="heading-anchor" href="#为什么需要-flexbox"/);
+  assert.equal(toc[0].text, "为什么需要 Flexbox？");
+});
+
+test("code blocks get a language label and a copy button", async () => {
+  const { html } = await processArticle(
+    '<pre><code class="language-javascript">const a = 1;</code></pre><pre><code>SELECT * FROM users WHERE id = 1;</code></pre>',
+  );
+  const blocks = html.match(/<div class="code-block">[\s\S]*?<\/pre><\/div>/g) ?? [];
+  assert.equal(blocks.length, 2);
+  assert.match(blocks[0], /<span class="code-lang">JavaScript<\/span>/);
+  assert.match(blocks[0], /data-copy-code/);
+  assert.match(blocks[0], /<code class="hljs language-javascript">/);
+  // 未标注语言时自动识别
+  assert.match(blocks[1], /<span class="code-lang">SQL<\/span>/);
 });
