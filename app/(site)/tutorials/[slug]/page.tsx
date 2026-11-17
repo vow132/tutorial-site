@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { firstArticleImage, htmlToDescription, processArticle } from "@/lib/article";
+import { firstArticleImage, htmlToDescription, processArticle, uploadedImage } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
 import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
@@ -44,6 +44,20 @@ function describe(tutorial: PublishedTutorial, html: string) {
   return tutorial.excerpt?.trim() || htmlToDescription(html) || tutorial.title;
 }
 
+/** 封面（带尺寸和 srcset）；没有封面或文件丢失时为 null。 */
+async function coverImage(tutorial: PublishedTutorial) {
+  const info = tutorial.cover ? await uploadedImage(tutorial.cover) : null;
+  return info && tutorial.cover ? { url: tutorial.cover, ...info } : null;
+}
+
+/** 分享卡片和结构化数据用的图：封面优先，其次正文第一张图。 */
+async function shareImage(tutorial: PublishedTutorial, html: string) {
+  const cover = await coverImage(tutorial);
+  if (cover) return { url: cover.url, width: cover.width, height: cover.height, alt: tutorial.title };
+  const image = firstArticleImage(html);
+  return image && { ...image, alt: image.alt ?? tutorial.title };
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -57,12 +71,11 @@ export async function generateMetadata({
   if (!t) notFound();
   // 与页面渲染共用同一份处理结果（processArticle 按内容哈希缓存）。
   const { html } = await processArticle(t.content);
-  const image = firstArticleImage(html);
   return pageMetadata({
     title: t.title,
     description: describe(t, html),
     path: tutorialPath(t.slug),
-    image: image && { ...image, alt: image.alt ?? t.title },
+    image: await shareImage(t, html),
     article: {
       publishedTime: t.createdAt,
       modifiedTime: t.updatedAt,
@@ -83,7 +96,7 @@ export default async function TutorialDetailPage({
   if (!tutorial) notFound();
 
   // 上一篇 / 下一篇（同分类内按时间）
-  const [prev, next, processed, settings, relatedCandidates] = await Promise.all([
+  const [prev, next, processed, settings, relatedCandidates, cover] = await Promise.all([
     prisma.tutorial.findFirst({
       where: {
         published: true,
@@ -105,6 +118,7 @@ export default async function TutorialDetailPage({
     processArticle(tutorial.content),
     getSettings(),
     getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
+    coverImage(tutorial),
   ]);
 
   // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
@@ -124,7 +138,7 @@ export default async function TutorialDetailPage({
         description: describe(tutorial, html),
         url: articleUrl,
         mainEntityOfPage: articleUrl,
-        image: [toAbsolute(firstArticleImage(html)?.url ?? DEFAULT_OG_IMAGE.url)],
+        image: [toAbsolute(cover?.url ?? firstArticleImage(html)?.url ?? DEFAULT_OG_IMAGE.url)],
         datePublished: tutorial.createdAt.toISOString(),
         dateModified: tutorial.updatedAt.toISOString(),
         articleSection: tutorial.category.name,
@@ -207,6 +221,22 @@ export default async function TutorialDetailPage({
             </header>
           </Reveal>
 
+          {/* 封面头图：首屏主图，提高下载优先级 */}
+          {cover && (
+            // eslint-disable-next-line @next/next/no-img-element -- 上传目录的静态文件，自带响应式小图
+            <img
+              src={cover.url}
+              srcSet={cover.srcSet}
+              sizes="(min-width: 1280px) 820px, (min-width: 1024px) calc(100vw - 302px), calc(100vw - 32px)"
+              width={cover.width}
+              height={cover.height}
+              alt={tutorial.title}
+              fetchPriority="high"
+              decoding="async"
+              className="article-cover mt-8 aspect-video w-full rounded-2xl border border-line bg-paper object-cover"
+            />
+          )}
+
           {/* 移动端本页目录（可自行开关） */}
           <MobileToc items={toc} />
 
@@ -265,6 +295,7 @@ export default async function TutorialDetailPage({
                       categoryColor={item.category.color}
                       views={item.views}
                       createdAt={item.createdAt}
+                      thumbnail={item.thumbnail}
                     />
                   </Reveal>
                 ))}

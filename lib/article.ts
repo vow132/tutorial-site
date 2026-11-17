@@ -34,7 +34,7 @@ import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { imageSizeFromFile } from "image-size/fromFile";
-import { VARIANT_WIDTHS, variantName } from "@/lib/image-variants";
+import { THUMBNAIL_WIDTH, VARIANT_WIDTHS, variantName } from "@/lib/image-variants";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 
 const languages = {
@@ -152,6 +152,32 @@ function localVariants(name: string): Promise<number[]> {
   ).then((widths) => widths.filter((width) => width > 0));
   remember(variantCache, name, task, MAX_DIMENSION_CACHE);
   return task;
+}
+
+/** 本站上传图片的尺寸和 srcset（文章头图用）；不是本站上传的、或文件不存在时返回 null。 */
+export async function uploadedImage(src: string) {
+  const name = uploadName(src);
+  const dimension = name ? await localImageSize(src) : null;
+  if (!name || !dimension) return null;
+  const widths = (await localVariants(name)).filter((width) => width < dimension.width);
+  return {
+    ...dimension,
+    srcSet: widths.length
+      ? [...widths.map((width) => `/uploads/${variantName(name, width)} ${width}w`), `${src} ${dimension.width}w`].join(", ")
+      : undefined,
+  };
+}
+
+/**
+ * 列表卡片缩略图地址：优先 400w 小图，其次 800w，再次原图。只接受本站上传的图片，
+ * 外链图片不做缩略图（可能很大、也可能失效）。
+ */
+export async function thumbnailFor(src: string | null | undefined): Promise<string | null> {
+  const name = src ? uploadName(src) : null;
+  if (!src || !name || !(await localImageSize(src))) return null;
+  const widths = await localVariants(name);
+  const best = [THUMBNAIL_WIDTH, 800].find((width) => widths.includes(width));
+  return best ? `/uploads/${variantName(name, best)}` : src;
 }
 
 /**
@@ -341,6 +367,11 @@ export function stripHtml(html: string, max = 160): string {
 /** 没写摘要时的 meta description：跳过代码块，取正文开头的文字。 */
 export function htmlToDescription(html: string, max = 120): string {
   return stripHtml(html.replace(/<pre\b[\s\S]*?<\/pre>/gi, " "), max);
+}
+
+/** 正文里第一张本站上传的图片地址（跳过外链图片）。 */
+export function firstUploadedImage(html: string): string | null {
+  return /<img\b[^>]*\ssrc="(\/uploads\/[^"]+)"/i.exec(html)?.[1] ?? null;
 }
 
 export type ArticleImage = { url: string; alt?: string; width?: number; height?: number };

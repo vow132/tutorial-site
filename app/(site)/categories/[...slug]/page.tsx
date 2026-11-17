@@ -234,6 +234,7 @@ export default async function CategoryPage({
                 categoryColor={tutorial.category.color}
                 views={tutorial.views}
                 createdAt={tutorial.createdAt}
+                thumbnail={tutorial.thumbnail}
               />
             </Reveal>
           ))}

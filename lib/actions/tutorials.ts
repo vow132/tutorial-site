@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { firstUploadedImage, thumbnailFor, uploadedImage } from "@/lib/article";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { clearSearchCache } from "@/lib/search";
 
@@ -21,13 +22,17 @@ function normalizeSlug(input: string, title: string) {
   return slug || `tutorial-${Date.now().toString(36)}`;
 }
 
-function parseForm(formData: FormData) {
+/** 封面只接受本站上传的图片（/uploads/文件名），防止填入外链或任意路径。 */
+const COVER_URL = /^\/uploads\/[\w-]+\.(?:webp|png|jpe?g|gif)$/i;
+
+async function parseForm(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const excerpt = String(formData.get("excerpt") ?? "").trim();
   // 不信任客户端：Server Action 可被绕过编辑器直接调用，入库前按白名单过滤。
   const content = sanitizeArticleHtml(String(formData.get("content") ?? "")).trim();
   const categoryId = Number(formData.get("categoryId"));
   const published = formData.get("published") === "on";
+  const cover = String(formData.get("cover") ?? "").trim() || null;
   const slug = normalizeSlug(
     String(formData.get("slug") ?? "").trim(),
     title
@@ -38,9 +43,15 @@ function parseForm(formData: FormData) {
   if (excerpt.length > 500) return { error: "摘要不能超过 500 个字符" as const };
   if (!content || content === "<p></p>") return { error: "正文不能为空" as const };
   if (!categoryId) return { error: "请选择分类" as const };
+  if (cover && (!COVER_URL.test(cover) || !(await uploadedImage(cover)))) {
+    return { error: "封面图无效或文件已不存在，请重新上传" as const };
+  }
+
+  // 列表卡片缩略图：封面优先，否则取正文第一张本站上传的图片。
+  const thumbnail = await thumbnailFor(cover ?? firstUploadedImage(content));
 
   return {
-    data: { title, slug, excerpt: excerpt || null, content, categoryId, published },
+    data: { title, slug, excerpt: excerpt || null, content, categoryId, published, cover, thumbnail },
   };
 }
 
@@ -65,7 +76,7 @@ export async function createTutorial(
   formData: FormData
 ): Promise<TutorialFormState> {
   const admin = await requireAuth();
-  const parsed = parseForm(formData);
+  const parsed = await parseForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
   const exists = await prisma.tutorial.findUnique({
@@ -85,7 +96,7 @@ export async function updateTutorial(
   formData: FormData
 ): Promise<TutorialFormState> {
   const admin = await requireAuth();
-  const parsed = parseForm(formData);
+  const parsed = await parseForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
   const conflict = await prisma.tutorial.findFirst({

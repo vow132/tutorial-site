@@ -66,6 +66,7 @@ export default async function TutorialsPage({
                 categoryColor={t.category.color}
                 views={t.views}
                 createdAt={t.createdAt}
+                thumbnail={t.thumbnail}
               />
             </Reveal>
           ))}

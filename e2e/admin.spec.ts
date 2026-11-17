@@ -165,12 +165,12 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
 
   await page.goto("/admin/tutorials/new");
   await fillTutorial(page, { title: `E2E 图片 ${id}`, slug: `e2e-image-${id}`, body: "带图片的正文" });
-  await page.locator('input[type="file"]').setInputFiles(file);
+  await page.locator('.tiptap-shell input[type="file"]').setInputFiles(file);
   const image = page.locator(".ProseMirror img");
   await expect(image).toHaveAttribute("alt", "flexbox main axis");
   const src = (await image.getAttribute("src"))!;
   const base = src.replace(/\.[a-z]+$/, "");
-  const uploaded = [src, `${base}-800w.webp`, `${base}-1200w.webp`];
+  const uploaded = [src, `${base}-400w.webp`, `${base}-800w.webp`, `${base}-1200w.webp`];
   test.info().attach("uploads", { body: uploaded.join("\n") });
 
   try {

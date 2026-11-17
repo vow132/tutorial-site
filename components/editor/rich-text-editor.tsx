@@ -8,6 +8,8 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extensions";
 import { altFromFileName } from "@/lib/image-alt";
+import { CALLOUT_TYPES } from "@/lib/callouts";
+import { Callout } from "./callout";
 
 async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
@@ -105,6 +107,8 @@ export default function RichTextEditor({
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
+  const [calloutOpen, setCalloutOpen] = useState(false);
+  const calloutRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const colorRef = useRef<HTMLDivElement>(null);
@@ -119,6 +123,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       Image.configure({ inline: false, allowBase64: false }),
+      Callout,
       Placeholder.configure({
         placeholder: "开始撰写正文… 支持直接拖拽或粘贴图片",
       }),
@@ -198,6 +203,18 @@ export default function RichTextEditor({
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [colorOpen]);
+
+  // 点击提示框菜单外部时关闭
+  useEffect(() => {
+    if (!calloutOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (calloutRef.current && !calloutRef.current.contains(e.target as Node)) {
+        setCalloutOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [calloutOpen]);
 
   if (!editor) {
     return (
@@ -372,6 +389,53 @@ export default function RichTextEditor({
         >
           代码块
         </button>
+        {/* 提示框：提示 / 注意 / 警告 */}
+        <div ref={calloutRef} className="relative">
+          <button
+            type="button"
+            title="提示框"
+            aria-haspopup="menu"
+            aria-expanded={calloutOpen}
+            onClick={() => setCalloutOpen((v) => !v)}
+            className={btn(calloutOpen || editor.isActive("callout"))}
+          >
+            💡 提示框
+          </button>
+          {calloutOpen && (
+            <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-max rounded-xl border border-line bg-surface p-1 shadow-lg">
+              {CALLOUT_TYPES.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    editor.chain().focus().toggleCallout(item.value).run();
+                    setCalloutOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors hover:bg-paper ${
+                    editor.isActive("callout", { type: item.value }) ? "text-accent-ink" : "text-ink-2"
+                  }`}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+              {editor.isActive("callout") && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    editor.chain().focus().unsetCallout().run();
+                    setCalloutOpen(false);
+                  }}
+                  className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-3 py-1.5 text-left text-sm text-ink-3 transition-colors hover:bg-paper"
+                >
+                  取消提示框
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         {/* 文字颜色调色板 */}
         <div ref={colorRef} className="relative">
           <button

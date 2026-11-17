@@ -5,6 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { TutorialFormState } from "@/lib/actions/tutorials";
 import { submitKeepingValues } from "@/lib/form-submit";
+import CoverField from "./cover-field";
 
 const RichTextEditor = dynamic(
   () => import("@/components/editor/rich-text-editor"),
@@ -28,6 +29,7 @@ type Props = {
     content: string;
     categoryId: number;
     published: boolean;
+    cover: string | null;
   };
 };
 
@@ -104,6 +106,8 @@ export default function TutorialForm({ categories, action, initial }: Props) {
           />
         </div>
       </div>
+
+      <CoverField initial={initial?.cover ?? null} />
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">

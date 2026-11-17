@@ -50,6 +50,7 @@ export default async function EditTutorialPage({
             content: tutorial.content,
             categoryId: tutorial.categoryId,
             published: tutorial.published,
+            cover: tutorial.cover,
           }}
         />
       </div>

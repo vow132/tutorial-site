@@ -31,7 +31,10 @@ model Tutorial {
   slug       String   @unique
   excerpt    String?
   content    String
+  /// 后台上传的封面图（/uploads/…），文章页头图与分享卡片使用
   cover      String?
+  /// 列表卡片缩略图：封面，没有封面时取正文第一张上传图片（优先 800w 小图）；保存时计算
+  thumbnail  String?
   published  Boolean  @default(false)
   views      Int      @default(0)
   categoryId Int

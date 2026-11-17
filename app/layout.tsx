@@ -59,9 +59,13 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/*
+          首屏前执行：恢复亮/暗主题；省流量模式、内存 < 4GB、CPU < 4 核或系统要求减少透明效果时
+          标记 data-lite，CSS 据此关掉毛玻璃、装饰光晕和循环动画（globals.css「精简模式」）。
+        */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var k="tutorial-site-theme";var root=document.documentElement;function theme(){try{return localStorage.getItem(k)==="dark"?"dark":"light"}catch(e){return"light"}}function sync(t,persist){root.dataset.theme=t;root.style.colorScheme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#0d1117":"#f7f8fa");if(persist){try{localStorage.setItem(k,t)}catch(e){}}}sync(theme(),false);document.addEventListener("click",function(e){var el=e.target instanceof Element?e.target.closest("[data-theme-toggle]"):null;if(!el)return;sync(root.dataset.theme==="dark"?"light":"dark",true)});window.addEventListener("storage",function(e){if(e.key===k)sync(e.newValue==="dark"?"dark":"light",false)})})()`,
+            __html: `(function(){var k="tutorial-site-theme";var root=document.documentElement;function theme(){try{return localStorage.getItem(k)==="dark"?"dark":"light"}catch(e){return"light"}}function sync(t,persist){root.dataset.theme=t;root.style.colorScheme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="dark"?"#0d1117":"#f7f8fa");if(persist){try{localStorage.setItem(k,t)}catch(e){}}}sync(theme(),false);try{var n=navigator,c=n.connection;if((c&&c.saveData)||(n.deviceMemory&&n.deviceMemory<4)||(n.hardwareConcurrency&&n.hardwareConcurrency<4)||matchMedia("(prefers-reduced-transparency: reduce)").matches)root.dataset.lite=""}catch(e){}document.addEventListener("click",function(e){var el=e.target instanceof Element?e.target.closest("[data-theme-toggle]"):null;if(!el)return;sync(root.dataset.theme==="dark"?"light":"dark",true)});window.addEventListener("storage",function(e){if(e.key===k)sync(e.newValue==="dark"?"dark":"light",false)})})()`,
           }}
         />
       </head>

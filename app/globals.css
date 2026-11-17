@@ -275,6 +275,22 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   }
 }
 
+/* ---------- 精简模式：低端设备 / 省流量（根布局内联脚本设置 data-lite） ---------- */
+/* 毛玻璃（backdrop-filter）和大面积模糊光晕是这个站最贵的绘制，循环动画让页面一直在重绘。 */
+:root[data-lite] *,
+:root[data-lite] *::before,
+:root[data-lite] *::after {
+  /* 只写标准属性：构建时会自动补 -webkit- 前缀（两个都写反而会被压缩成只剩前缀版） */
+  backdrop-filter: none !important;
+}
+:root[data-lite] .blur-3xl { display: none; }
+:root[data-lite] .mascot-float,
+:root[data-lite] .mascot-eyes,
+:root[data-lite] .nav-aura,
+:root[data-lite] .nav-shine {
+  animation: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .reveal-rise,
@@ -404,6 +420,47 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   max-width: 100%;
 }
 .article-body hr { border: none; border-top: 1px solid var(--color-line); margin: 2.4em 0; }
+
+/* 提示框（components/editor/callout.ts）：标签与图标由 CSS 生成，正文 HTML 只有 data-callout 属性 */
+.article-body [data-callout],
+.tiptap-shell .ProseMirror [data-callout] {
+  --callout: #6366f1;
+  --callout-ink: #4f46e5;
+  margin: 1.4em 0;
+  padding: 0.8rem 1.1rem 0.85rem;
+  border: 1px solid color-mix(in oklab, var(--callout) 26%, transparent);
+  border-left-width: 4px;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--callout) 7%, var(--color-surface));
+}
+.article-body [data-callout]::before,
+.tiptap-shell .ProseMirror [data-callout]::before {
+  content: "💡 提示";
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--callout-ink);
+}
+.article-body [data-callout="warning"],
+.tiptap-shell .ProseMirror [data-callout="warning"] { --callout: #f59e0b; --callout-ink: #92400e; }
+.article-body [data-callout="warning"]::before,
+.tiptap-shell .ProseMirror [data-callout="warning"]::before { content: "⚠️ 注意"; }
+.article-body [data-callout="danger"],
+.tiptap-shell .ProseMirror [data-callout="danger"] { --callout: #ef4444; --callout-ink: #b91c1c; }
+.article-body [data-callout="danger"]::before,
+.tiptap-shell .ProseMirror [data-callout="danger"]::before { content: "⛔ 警告"; }
+:root[data-theme="dark"] .article-body [data-callout],
+:root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout] { --callout-ink: #a5b4fc; }
+:root[data-theme="dark"] .article-body [data-callout="warning"],
+:root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout="warning"] { --callout-ink: #fbbf24; }
+:root[data-theme="dark"] .article-body [data-callout="danger"],
+:root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout="danger"] { --callout-ink: #fca5a5; }
+.article-body [data-callout] > :first-child,
+.tiptap-shell .ProseMirror [data-callout] > :first-child { margin-top: 0; }
+.article-body [data-callout] > :last-child,
+.tiptap-shell .ProseMirror [data-callout] > :last-child { margin-bottom: 0; }
 
 /* 代码块：顶部语言标签 + 复制按钮（components/article-enhancer.tsx） */
 .article-body .code-block {
@@ -585,4 +642,6 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   /* 外部链接在纸上看不到地址，附在后面 */
   .article-body a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #555; word-break: break-all; }
   .glow-card { box-shadow: none !important; border-color: #ddd !important; }
+  /* 提示框保留底色和左侧色条，否则打印出来和普通段落分不清 */
+  .article-body [data-callout] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }

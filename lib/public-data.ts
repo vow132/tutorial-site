@@ -115,6 +115,7 @@ const cachedTutorialPage = unstable_cache(
         title: true,
         slug: true,
         excerpt: true,
+        thumbnail: true,
         views: true,
         createdAt: true,
         category: { select: { name: true, color: true } },
@@ -123,7 +124,7 @@ const cachedTutorialPage = unstable_cache(
     // 缓存以 JSON 存储，Date 会变成字符串；统一存 ISO 字符串，读取时再还原。
     return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
   },
-  ["published-tutorial-page"],
+  ["published-tutorial-page", "v2"],
   {
     tags: [CACHE_TAGS.tutorials, CACHE_TAGS.categories],
     revalidate: LIST_REVALIDATE_SECONDS,
@@ -163,6 +164,7 @@ const relatedTutorialSelect = {
   title: true,
   slug: true,
   excerpt: true,
+  thumbnail: true,
   views: true,
   createdAt: true,
   category: { select: { name: true, color: true } },
@@ -212,7 +214,7 @@ const cachedRelatedTutorials = unstable_cache(
 
     return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
   },
-  ["related-tutorials"],
+  ["related-tutorials", "v2"],
   {
     tags: [CACHE_TAGS.tutorials, CACHE_TAGS.categories],
     revalidate: LIST_REVALIDATE_SECONDS,

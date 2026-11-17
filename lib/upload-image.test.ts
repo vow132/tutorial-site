@@ -47,18 +47,20 @@ test("oversized images are rejected instead of being decoded", async () => {
   await assert.rejects(optimizeImage(huge, ".png"));
 });
 
-test("wide images get 800w and 1200w responsive variants", async () => {
+test("wide images get 400w, 800w and 1200w responsive variants", async () => {
   const { data } = await optimizeImage(await solid(3000, 1500, "#3366ff").jpeg().toBuffer(), ".jpg");
   const variants = await createVariants(data);
-  assert.deepEqual(variants.map(([width]) => width), [800, 1200]);
+  assert.deepEqual(variants.map(([width]) => width), [400, 800, 1200]);
   for (const [width, buffer] of variants) {
     const meta = await sharp(buffer).metadata();
     assert.equal(meta.format, "webp");
     assert.equal(meta.width, width);
   }
   const medium = await createVariants(await solid(1000, 500, "#fff").png().toBuffer());
-  assert.deepEqual(medium.map(([width]) => width), [800]);
-  assert.deepEqual(await createVariants(await solid(900, 500, "#fff").png().toBuffer()), []);
+  assert.deepEqual(medium.map(([width]) => width), [400, 800]);
+  const small = await createVariants(await solid(900, 500, "#fff").png().toBuffer());
+  assert.deepEqual(small.map(([width]) => width), [400]);
+  assert.deepEqual(await createVariants(await solid(440, 300, "#fff").png().toBuffer()), []);
 });
 
 test("animated images get no variants (re-encoding would drop frames)", async () => {
