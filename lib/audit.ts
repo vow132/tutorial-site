@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { getClientIp } from "@/lib/client-ip";
+import { alertForAudit, notifyInBackground } from "@/lib/alerts";
+import { getClientIp, getUserAgent } from "@/lib/client-ip";
 
 const RETENTION_DAYS = 365;
 const PRUNE_EVERY = 200;
@@ -14,14 +15,18 @@ export async function audit(
   options: { actor?: string | null; detail?: string | null } = {},
 ) {
   try {
+    const ip = await getClientIp();
     await prisma.auditLog.create({
       data: {
         action,
         actor: options.actor?.slice(0, 64) ?? null,
-        ip: await getClientIp(),
+        ip,
         detail: options.detail?.slice(0, 500) ?? null,
       },
     });
+    // 新设备登录、改密码、关闭两步验证等需要实时推送（见 lib/alerts.ts）。
+    const alert = alertForAudit(action, { ...options, ip, userAgent: await getUserAgent() });
+    if (alert) await notifyInBackground(action, alert.title, alert.lines);
     if (++writesSincePrune >= PRUNE_EVERY) {
       writesSincePrune = 0;
       await prisma.auditLog.deleteMany({

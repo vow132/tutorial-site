@@ -129,6 +129,44 @@ export function readTotpSetup(token: string | undefined | null, adminId: number)
   return data.s;
 }
 
+export type PasskeyPurpose = "register" | "login";
+
+/** WebAuthn 挑战：5 分钟内有效，绑定用途（注册 / 登录）以及注册时的管理员与密钥名称。 */
+export function signPasskeyChallenge(
+  purpose: PasskeyPurpose,
+  challenge: string,
+  extra: { adminId?: number; name?: string } = {},
+): string {
+  return signToken("passkey", {
+    p: purpose,
+    c: challenge,
+    a: extra.adminId ?? null,
+    n: extra.name ?? null,
+    exp: Date.now() + 5 * 60 * 1000,
+  });
+}
+
+export function readPasskeyChallenge(
+  token: string | undefined | null,
+  purpose: PasskeyPurpose,
+): { challenge: string; adminId: number | null; name: string | null } | null {
+  const data = readToken("passkey", token);
+  if (
+    !data ||
+    data.p !== purpose ||
+    typeof data.c !== "string" ||
+    typeof data.exp !== "number" ||
+    data.exp <= Date.now()
+  ) {
+    return null;
+  }
+  return {
+    challenge: data.c,
+    adminId: typeof data.a === "number" ? data.a : null,
+    name: typeof data.n === "string" ? data.n : null,
+  };
+}
+
 /** Returns the device id when the cookie was issued to this username. */
 export function readDevice(token: string | undefined | null, username: string): string | null {
   const data = readToken("device", token);

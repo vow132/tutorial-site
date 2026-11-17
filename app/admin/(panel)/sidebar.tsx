@@ -100,9 +100,12 @@ function SidebarLinks({
       </nav>
 
       <div className="mt-3 space-y-1 border-t border-line pt-3">
+        {/* 新标签页打开，不预取：后台页面每次加载都预取首页会触发首页重新生成，
+            恰好和删除/修改教程同时发生时，可能把旧内容写进缓存。 */}
         <Link
           href="/"
           target="_blank"
+          prefetch={false}
           onClick={onNavigate}
           className="flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink"
         >

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getAlertConfig } from "@/lib/alerts";
+import { ALERT_CHANNELS } from "@/lib/alert-channels.mjs";
+import { describeBackup, getBackupStatus } from "@/lib/backup-status";
 import GitHubUpdate from "./github-update";
 
 export const metadata: Metadata = { title: "仪表盘" };
@@ -10,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   await requireAdminPage();
-  const [tutorialCount, publishedCount, draftCount, categoryCount, viewAgg, recent] =
+  const [tutorialCount, publishedCount, draftCount, categoryCount, viewAgg, recent, backup, alertConfig] =
     await Promise.all([
       prisma.tutorial.count(),
       prisma.tutorial.count({ where: { published: true } }),
@@ -28,7 +31,12 @@ export default async function AdminDashboard() {
           category: { select: { name: true } },
         },
       }),
+      getBackupStatus(),
+      getAlertConfig(),
     ]);
+
+  const { text: backupText, stale: backupStale } = describeBackup(backup);
+  const alertLabel = ALERT_CHANNELS.find((item) => item.value === alertConfig.channel)?.label;
 
   const stats = [
     { label: "教程总数", value: tutorialCount, color: "var(--chart-indigo)" },
@@ -72,6 +80,38 @@ export default async function AdminDashboard() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* 运维状态：备份停掉、告警没开都是长期运行里最容易被忽略的事故 */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div
+          className={`rounded-3xl border p-5 ${
+            backupStale ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-surface"
+          }`}
+        >
+          <p className="text-xs text-ink-2">上次数据库备份</p>
+          <p className={`mt-1.5 text-sm font-semibold ${backupStale ? "text-amber-700 dark:text-amber-300" : "text-ink"}`}>
+            {backupText}
+          </p>
+          {backupStale && (
+            <p className="mt-1.5 text-xs text-ink-3">
+              超过 2 天没有新备份。请在服务器 crontab 里每天执行 <code>npm run backup</code>，并同步到异地。
+            </p>
+          )}
+        </div>
+        <div
+          className={`rounded-3xl border p-5 ${
+            alertConfig.channel === "off" ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-surface"
+          }`}
+        >
+          <p className="text-xs text-ink-2">安全告警</p>
+          <p className="mt-1.5 text-sm font-semibold text-ink">
+            {alertConfig.channel === "off" ? "未开启" : `已开启 · ${alertLabel}`}
+          </p>
+          <Link href="/admin/account#alerts" className="mt-1.5 inline-block text-xs text-accent-ink hover:underline">
+            {alertConfig.channel === "off" ? "去设置，新设备登录等情况会推送到手机 →" : "修改告警设置 →"}
+          </Link>
+        </div>
       </div>
 
       <h2 className="mt-10 text-lg font-bold text-ink">最近更新</h2>

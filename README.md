@@ -88,6 +88,8 @@ AUTH_SECRET="请替换为随机长字符串"
 # 未设置或指向 localhost 时服务启动会打印警告，如：
 # SITE_URL="https://example.com"
 SITE_URL="http://localhost:3000"
+# 安全告警消息里的时间按哪个时区显示（默认北京时间）
+# ALERT_TIMEZONE="Asia/Shanghai"
 ```
 
 `DATABASE_URL` 的相对路径以项目根目录为基准。PM2 配置已经固定 `cwd`，运行时和 Prisma CLI 会使用同一个数据库文件。
@@ -146,6 +148,7 @@ E2E_ADMIN_PASSWORD='你的后台密码' npm run test:e2e   # 默认读取 ADMIN_
 - 新密码至少 10 位，且不能是常见弱口令或包含用户名；仍在使用默认/弱密码登录时会被直接带到这里；
 - 保存后当前浏览器保持登录，**其他设备上的登录全部失效**；
 - **两步验证**：用验证器 App 扫码并输入 6 位数字即可开启，之后登录需要密码 + 验证码；
+- **通行密钥（Passkey）**：用指纹、面容、手机或 USB 安全密钥登录，不用输入用户名和密码，钓鱼网站也骗不走。添加时需要输入当前密码；通行密钥本身包含「设备 + 生物识别/PIN」两重验证，用它登录时不再要求两步验证码，密码登录照常可用。通行密钥绑定 `SITE_URL` 的域名，要求站点走 HTTPS、用域名访问（不能是 IP），更换域名后需要重新添加；
 - **登录设备**：列出所有未过期的会话，可一键「退出其他设备」或「退出所有设备」。退出登录会删除服务端会话，复制走的 Cookie 立即失效。
 
 登录限流只统计失败次数：
@@ -160,48 +163,16 @@ npm run admin:reset                       # 随机生成新密码并打印
 npm run admin:reset -- --password '新的强密码' --username admin
 ```
 
-该命令会重置密码、关闭两步验证并退出所有设备。后台 **安全日志**（`/admin/audit`）记录登录、改密、发布、上传、部署等操作，保留一年。
+该命令会重置密码、关闭两步验证、删除所有通行密钥并退出所有设备。后台 **安全日志**（`/admin/audit`）记录登录、改密、发布、上传、部署等操作，保留一年。
 
 ## 安全加固（上线必做）
 
-**1. HTTPS 反向代理，不要直接暴露 3000 端口。** Nginx 示例（`http {}` 中先定义限流区）：
+**1. HTTPS 反向代理，不要直接暴露 3000 端口。** 完整的 Nginx 配置见 [`deploy/nginx.conf.example`](deploy/nginx.conf.example)：复制到 `/etc/nginx/conf.d/tutorial.conf`，替换域名、证书和项目路径后 `sudo nginx -t && sudo systemctl reload nginx`。它包含：
 
-```nginx
-limit_req_zone $binary_remote_addr zone=tutorial_login:10m  rate=10r/m;
-limit_req_zone $binary_remote_addr zone=tutorial_search:10m rate=30r/m;
-
-server {
-    listen 80;
-    server_name example.com;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name example.com;
-    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
-    client_max_body_size 6m;
-
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # 上传图片由 Nginx 直接读磁盘，减轻 Node 压力（不配置也能工作，由 Next 提供）
-    location /uploads/ {
-        alias /path/to/tutorial-site/public/uploads/;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
-        add_header Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" always;
-        add_header X-Content-Type-Options nosniff always;
-    }
-
-    location = /admin/login { limit_req zone=tutorial_login  burst=10 nodelay; proxy_pass http://127.0.0.1:3000; }
-    location = /search      { limit_req zone=tutorial_search burst=20 nodelay; proxy_pass http://127.0.0.1:3000; }
-    location /              { proxy_pass http://127.0.0.1:3000; }
-}
-```
+- HTTP 跳转 HTTPS、登录和搜索按 IP 限流、上传图片由 Nginx 直接读磁盘；
+- **公开页面缓存**：首页、教程列表/文章、分类、RSS、sitemap 由 Nginx 缓存 1 分钟，大部分访问不再经过 Node。后台修改文章后访客最多晚 1 分钟看到；后台、搜索、接口、表单提交和站内点击跳转时的数据请求（带 `RSC` 请求头）都不走缓存。响应头 `X-Cache-Status` 可看到 HIT / MISS / STALE；
+- **更新不掉线**：Node 重启或一键更新切换期间，缓存过的页面继续返回（最长兜底 7 天），没缓存的页面显示「站点正在更新」提示（HTTP 503 + `Retry-After`），而不是 502 错误页；
+- 已在 Ubuntu 24.04 自带的 Nginx 1.24 上验证（`http2` 写在 `listen` 里，1.25 之前的版本不认识单独的 `http2 on;`）。
 
 然后：防火墙只放行 80/443（如 `ufw deny 3000`），在 `.env.production` 中设置 `TRUST_PROXY="true"` 与 `SITE_URL="https://你的域名"`。经 HTTPS 访问时站点会自动下发 HSTS、给 Cookie 加 Secure 标记。
 
@@ -214,10 +185,20 @@ server {
 
 本次升级之前上传的图片没有响应式小图，部署后执行一次 `npm run images:variants` 补生成（可重复执行，已有的会跳过），然后重启站点。
 
-数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
+再次执行 `bash deploy.sh` 时如果站点正在运行，脚本会先对数据库快照执行迁移并构建（站点照常服务），最后只在迁移正式数据库的几秒内停站。生产数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
 
 恢复备份：先 `pm2 stop 教程网`，把备份解压覆盖到数据库文件（`gunzip -c backups/tutorial-xxx.db.gz > prisma/dev.db`），删除同名的 `-wal`、`-shm` 文件后再启动。前台的分类、设置缓存最多 1 小时后自动刷新，想立即生效可在后台随便保存一次站点设置和分类。
 
 **3. 账号。** 首次登录后立即修改密码并开启两步验证；GitHub 账号同样开启两步验证并为 `master` 设置分支保护，因为一键更新会部署该分支的最新提交。不需要在线更新的部署可设置 `SITE_AUTO_UPDATE="false"`。
 
 **4. 依赖。** CI 会单独运行 `npm audit`，Dependabot 每周提交依赖更新 PR，请及时合并。
+
+**5. 安全告警。** 在后台「账号安全 → 安全告警」选择钉钉、飞书、企业微信群机器人、Telegram 或通用 Webhook，填好后点「发送测试消息」确认能收到。以下情况会实时推送：
+
+- 新设备登录后台（之前没在这个浏览器登录过）；
+- 连续输错密码导致登录被临时锁定；
+- 修改用户名/密码、开启或关闭两步验证、添加或删除通行密钥、修改告警设置（会先通知原来的渠道）；
+- 一键更新成功或失败；
+- `npm run backup` 执行失败，或超过 2 天没有新备份（每天最多提醒一次，可在告警设置里关闭）。
+
+保存告警设置需要输入当前密码，防止会话被盗后被人悄悄关掉告警。服务器需要能访问对应平台（如 `oapi.dingtalk.com`；国内服务器通常无法访问 Telegram）。推送失败不影响登录等操作，失败原因显示在告警设置上方。仪表盘会显示上次备份时间和告警是否已开启。

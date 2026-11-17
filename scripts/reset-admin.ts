@@ -2,7 +2,8 @@
  * 应急恢复：忘记密码或丢失两步验证手机时，在服务器上运行
  *   npm run admin:reset                     # 随机生成新密码
  *   npm run admin:reset -- --password '新密码' --username admin
- * 会重置密码、关闭两步验证并吊销该管理员的所有登录会话。
+ * 会重置密码、关闭两步验证、删除所有通行密钥并吊销该管理员的所有登录会话
+ * （账号可能已被人控制时，对方可能偷偷添加了通行密钥，必须一并清掉）。
  */
 import { randomBytes } from "node:crypto";
 import { parseArgs } from "node:util";
@@ -47,14 +48,20 @@ async function main() {
       },
     }),
     prisma.adminSession.deleteMany({ where: { adminId: admin.id } }),
+    prisma.adminPasskey.deleteMany({ where: { adminId: admin.id } }),
     prisma.auditLog.create({
-      data: { action: "account.reset_cli", actor: admin.username, detail: "服务器命令行重置密码并关闭两步验证" },
+      data: {
+        action: "account.reset_cli",
+        actor: admin.username,
+        detail: "服务器命令行重置密码，关闭两步验证并删除所有通行密钥",
+      },
     }),
   ]);
 
   console.log(`✅ 已重置管理员 ${admin.username}`);
   if (!values.password) console.log(`   新密码：${password}`);
-  console.log("   两步验证已关闭，所有已登录设备已退出。登录后请立即修改密码并重新开启两步验证。");
+  console.log("   两步验证已关闭、通行密钥已全部删除，所有已登录设备已退出。");
+  console.log("   登录后请立即修改密码，并重新开启两步验证、重新添加通行密钥。");
 }
 
 main()

@@ -12,11 +12,18 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
  *   丢失最后几笔提交；比默认的 FULL 少一次 fsync。它只对当前连接生效，所以每次启动都设。
  */
 async function configureSqlite(client: PrismaClient) {
+  // 只在生产环境用 WAL：Prisma 迁移引擎会设 locking_mode=EXCLUSIVE，WAL 下只要还有
+  // 别的进程连着数据库就会报 database is locked。开发时 `prisma migrate dev` 常在
+  // `npm run dev` 运行期间执行，所以开发环境切回默认的回滚日志模式。
+  // 生产部署的迁移都在停站后执行（deploy.sh、一键更新）。
+  const production = process.env.NODE_ENV === "production";
   try {
-    await client.$queryRawUnsafe("PRAGMA journal_mode = WAL");
+    await client.$queryRawUnsafe(`PRAGMA journal_mode = ${production ? "WAL" : "DELETE"}`);
     await client.$executeRawUnsafe("PRAGMA synchronous = NORMAL");
+    // SQLite 官方建议长连接在打开时执行：按需更新查询规划器的统计信息（有上限，很快）。
+    await client.$queryRawUnsafe("PRAGMA optimize = 0x10002");
   } catch (error) {
-    console.warn("[db] 无法启用 SQLite WAL 模式，继续使用默认模式：", error);
+    console.warn("[db] 设置 SQLite 日志模式失败，继续使用当前模式：", error);
   }
 }
 

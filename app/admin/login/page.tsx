@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/admin-auth";
+import { relyingParty } from "@/lib/passkeys";
+import { prisma } from "@/lib/prisma";
 import Mascot from "@/components/mascot";
 import LoginForm from "./login-form";
+import PasskeyLogin from "./passkey-login";
 
 export const metadata: Metadata = { title: "管理员登录" };
 
@@ -22,6 +25,9 @@ export default async function AdminLoginPage({
     redirect(safeFrom ?? "/admin");
   }
 
+  // 登记过通行密钥、且站点地址满足 WebAuthn 要求（HTTPS + 域名）时才显示通行密钥登录。
+  const passkeyLogin = !("error" in relyingParty()) && (await prisma.adminPasskey.count()) > 0;
+
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center px-4 pb-24 pt-20">
       <Mascot />
@@ -34,6 +40,7 @@ export default async function AdminLoginPage({
           <p className="mt-1 text-sm text-ink-3">登录以管理教程内容</p>
         </div>
         <LoginForm from={safeFrom} />
+        {passkeyLogin && <PasskeyLogin from={safeFrom} />}
       </div>
     </div>
   );

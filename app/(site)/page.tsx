@@ -16,7 +16,9 @@ import { pageMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site-url";
 
 // 首页是静态页：内容变更时由后台立即刷新；阅读量等统计每 10 分钟刷新一次。
-export const revalidate = 600;
+// 后台改动会立即让首页失效；但如果有一次重新生成恰好在改动之前开始、之后才结束，
+// Next 会把旧内容当成新的存下来。把周期缩短到 1 分钟，这种竞态最多影响 1 分钟。
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { stripHtml } from "@/lib/article";
+import { sharedLimiter } from "@/lib/rate-limit";
 
 export type TutorialSearchResult = {
   id: number;
@@ -109,7 +110,21 @@ export function clearSearchCache() {
   cache.clear();
 }
 
-/** 相同关键词 60 秒内复用结果（并发请求也共享同一次查询）。 */
+/**
+ * 全站搜索预算：每 5 秒最多执行 20 次「未命中缓存」的数据库查询（平均每分钟 240 次）。
+ * 按访客 IP 的限流要配置 TRUST_PROXY 才生效；这一层不依赖 IP，防止有人不停换
+ * 关键词让同步执行的 SQLite 查询占满进程。窗口取 5 秒，突发流量也只会占用一小段时间。
+ */
+const GLOBAL_SEARCH_BUDGET = { max: 20, windowMs: 5_000 };
+
+/** 全站搜索预算用完时抛出，搜索页提示稍后再试。 */
+export class SearchBusyError extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super("search budget exhausted");
+  }
+}
+
+/** 相同关键词 60 秒内复用结果（并发请求也共享同一次查询）；命中缓存不消耗全站预算。 */
 export function searchPublishedTutorials(
   rawQuery: string
 ): Promise<TutorialSearchResult[]> {
@@ -120,6 +135,11 @@ export function searchPublishedTutorials(
   const now = Date.now();
   const hit = cache.get(key);
   if (hit && hit.expires > now) return hit.promise;
+
+  const budget = sharedLimiter("search:global", GLOBAL_SEARCH_BUDGET.max, GLOBAL_SEARCH_BUDGET.windowMs);
+  const wait = budget.retryAfter("all", now);
+  if (wait > 0) return Promise.reject(new SearchBusyError(wait));
+  budget.hit("all", now);
 
   const promise = (isShortQuery(query) ? titleSearch(query) : fullTextSearch(query)).catch(
     (error) => {
