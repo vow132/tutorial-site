@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { getPublishedTutorialPage } from "@/lib/public-data";
+import { getPublishedTags, getPublishedTutorialPage } from "@/lib/public-data";
+import IntentLink from "@/components/intent-link";
+import TagChips from "@/components/tag-chips";
 import TutorialCard from "@/components/tutorial-card";
 import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
@@ -35,10 +37,10 @@ export default async function TutorialsPage({
   const { page: pageStr } = await searchParams;
 
   // 页码收敛到合法区间，避免 ?page=999 渲染出误导性的空状态；结果有缓存。
-  const { total, totalPages, page, tutorials } = await getPublishedTutorialPage({
-    page: Number(pageStr) || 1,
-    pageSize: PAGE_SIZE,
-  });
+  const [{ total, totalPages, page, tutorials }, tags] = await Promise.all([
+    getPublishedTutorialPage({ page: Number(pageStr) || 1, pageSize: PAGE_SIZE }),
+    getPublishedTags(),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
@@ -47,6 +49,17 @@ export default async function TutorialsPage({
           全部教程
         </h1>
         <p className="mt-3 text-sm text-ink-2">共 {total} 篇，持续更新中</p>
+        {tags.length > 0 && (
+          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="text-xs font-medium text-ink-3">热门标签</span>
+            <TagChips label="热门标签" showCount tags={tags.slice(0, 12)} />
+            {tags.length > 12 && (
+              <IntentLink href="/tags" className="text-xs font-medium text-accent-ink hover:underline">
+                全部 {tags.length} 个 →
+              </IntentLink>
+            )}
+          </div>
+        )}
       </Reveal>
 
       {tutorials.length === 0 ? (

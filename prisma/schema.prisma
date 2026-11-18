@@ -26,21 +26,22 @@ model Category {
 }
 
 model Tutorial {
-  id         Int      @id @default(autoincrement())
+  id         Int           @id @default(autoincrement())
   title      String
-  slug       String   @unique
+  slug       String        @unique
   excerpt    String?
   content    String
   /// 后台上传的封面图（/uploads/…），文章页头图与分享卡片使用
   cover      String?
   /// 列表卡片缩略图：封面，没有封面时取正文第一张上传图片（优先 800w 小图）；保存时计算
   thumbnail  String?
-  published  Boolean  @default(false)
-  views      Int      @default(0)
+  published  Boolean       @default(false)
+  views      Int           @default(0)
   categoryId Int
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  category   Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tags       TutorialTag[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   @@index([categoryId])
   @@index([published, createdAt])
@@ -64,6 +65,28 @@ model Admin {
   sessions      AdminSession[]
   passkeys      AdminPasskey[]
   recoveryCodes AdminRecoveryCode[]
+}
+
+/// 教程标签（与分类互补：一篇教程只属于一个分类，但可以有多个标签）。
+model Tag {
+  id        Int           @id @default(autoincrement())
+  name      String        @unique
+  /// URL 别名：小写，非字母数字转成连字符（见 lib/tags.ts 的 tagSlug）
+  slug      String        @unique
+  createdAt DateTime      @default(now())
+  tutorials TutorialTag[]
+}
+
+model TutorialTag {
+  tutorialId Int
+  tagId      Int
+  tutorial   Tutorial @relation(fields: [tutorialId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  /// 作者填写的顺序（第一个通常最重要）
+  position   Int      @default(0)
+
+  @@id([tutorialId, tagId])
+  @@index([tagId])
 }
 
 /// 两步验证的一次性恢复码（只存 SHA-256），用掉即删除。

@@ -17,6 +17,7 @@ export const getPublishedTutorial = cache(async (slug: string) =>
       createdAt: true,
       updatedAt: true,
       category: true,
+      tags: { orderBy: { position: "asc" }, select: { tag: { select: { name: true, slug: true } } } },
     },
   }),
 );

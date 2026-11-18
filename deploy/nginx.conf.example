@@ -42,9 +42,9 @@ server {
     location = /search      { limit_req zone=tutorial_search burst=20 nodelay; proxy_pass http://127.0.0.1:3000; }
 
     # ---- 公开页面缓存 ----
-    # 只缓存所有访客看到都一样的只读页面：首页、教程列表/文章、分类、RSS、sitemap。
+    # 只缓存所有访客看到都一样的只读页面：首页、教程列表/文章、分类、标签、关于页、RSS、sitemap。
     # 后台、接口、搜索、提交表单（POST）不在这里，始终直连 Node。
-    location ~ ^/($|tutorials(/|$)|categories/|feed\.xml$|sitemap\.xml$|robots\.txt$) {
+    location ~ ^/($|tutorials(/|$)|categories/|tags(/|$)|about$|feed\.xml$|sitemap\.xml$|robots\.txt$) {
         proxy_pass http://127.0.0.1:3000;
 
         proxy_cache tutorial_pages;
@@ -63,6 +63,18 @@ server {
         proxy_cache_bypass $http_rsc $http_next_router_prefetch;
         proxy_no_cache     $http_rsc $http_next_router_prefetch;
         # 排查用：HIT 命中缓存，MISS 回源，STALE 后端不可用时返回的旧页面，BYPASS 未走缓存
+        add_header X-Cache-Status $upstream_cache_status always;
+    }
+
+    # ---- 文章分享图（/og/tutorials/<id>?v=版本）----
+    # 地址带内容版本号，直接沿用 Node 返回的 Cache-Control：当前版本缓存一年，旧版本 5 分钟。
+    location /og/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_cache tutorial_pages;
+        proxy_cache_key "$scheme$host$request_uri";
+        proxy_cache_valid 404 10s;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_lock on;
         add_header X-Cache-Status $upstream_cache_status always;
     }
 

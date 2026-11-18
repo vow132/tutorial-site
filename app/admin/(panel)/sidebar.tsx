@@ -31,6 +31,21 @@ const items: AdminItem[] = [
     icon: <path d="M3.5 3.5h6v6h-6zM11.5 3.5h6v6h-6zM3.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z" />,
   },
   {
+    href: "/admin/tags",
+    label: "标签管理",
+    icon: <path d="M3 3h7.5l8 8-7.5 7.5-8-8zM7 7h.01" />,
+  },
+  {
+    href: "/admin/about",
+    label: "关于页面",
+    icon: (
+      <>
+        <circle cx="11" cy="11" r="8" />
+        <path d="M11 10v5M11 7h.01" />
+      </>
+    ),
+  },
+  {
     href: "/admin/settings",
     label: "站点设置",
     icon: (

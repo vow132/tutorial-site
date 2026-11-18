@@ -56,12 +56,16 @@ export const defaultSettings: SiteSettings = {
       title: "快速入口",
       links: [
         { label: "全部教程", href: "/tutorials" },
+        { label: "全部标签", href: "/tags" },
         { label: "搜索", href: "/search" },
       ],
     },
     {
       title: "关于",
-      links: [{ label: "RSS 订阅", href: "/feed.xml" }],
+      links: [
+        { label: "关于本站", href: "/about" },
+        { label: "RSS 订阅", href: "/feed.xml" },
+      ],
     },
   ],
   verification: {},

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { getDatabaseUrl } from "../lib/database-url";
+import { tagSlug } from "../lib/tags";
 
 const adapter = new PrismaBetterSqlite3({ url: getDatabaseUrl(), timeout: 5000 });
 const prisma = new PrismaClient({ adapter });
@@ -154,6 +155,28 @@ await pipeline(
       update: {},
       create: { ...t, content: t.content.trim() },
     });
+  }
+
+  // 示例标签：只给还没有标签的示例教程加，不覆盖后台改过的。
+  const sampleTags: Record<string, string[]> = {
+    "css-flexbox-guide": ["CSS", "Flexbox", "前端基础"],
+    "nodejs-file-io": ["Node.js", "文件系统"],
+    "http-cache-in-5-min": ["HTTP", "缓存", "前端基础"],
+  };
+  for (const [slug, names] of Object.entries(sampleTags)) {
+    const tutorial = await prisma.tutorial.findUnique({
+      where: { slug },
+      select: { id: true, _count: { select: { tags: true } } },
+    });
+    if (!tutorial || tutorial._count.tags > 0) continue;
+    for (const [position, name] of names.entries()) {
+      const tag = await prisma.tag.upsert({
+        where: { slug: tagSlug(name) },
+        update: {},
+        create: { name, slug: tagSlug(name) },
+      });
+      await prisma.tutorialTag.create({ data: { tutorialId: tutorial.id, tagId: tag.id, position } });
+    }
   }
 
   console.log("✅ 种子数据写入完成");

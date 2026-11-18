@@ -182,7 +182,8 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
     const rendered = page.locator("article img").first();
     await expect(rendered).toHaveAttribute("srcset", new RegExp(`-800w\\.webp 800w, .*-1200w\\.webp 1200w, .* 1600w$`));
     await expect(rendered).toHaveAttribute("sizes", /820px/);
-    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`${src}$`));
+    // 没有封面时分享图用自动生成的标题卡片，而不是正文截图
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/og\/tutorials\/\d+\?v=[\w-]+$/);
     // 点击正文图片放大，Esc 关闭
     await rendered.click();
     const zoom = page.getByRole("dialog", { name: "flexbox main axis" });

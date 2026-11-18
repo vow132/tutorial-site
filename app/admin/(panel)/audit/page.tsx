@@ -21,6 +21,12 @@ const LABELS: Record<string, string> = {
   "totp.disable": "关闭两步验证",
   "passkey.add": "添加通行密钥",
   "passkey.remove": "删除通行密钥",
+  "login.recovery_code": "用恢复码登录",
+  "recovery_codes.regenerate": "重新生成恢复码",
+  "tag.rename": "标签改名",
+  "tag.merge": "合并标签",
+  "tag.delete": "删除标签",
+  "about.update": "修改关于页面",
   "alerts.update": "修改告警设置",
   "tutorial.create": "新建教程",
   "tutorial.update": "编辑教程",
@@ -44,6 +50,7 @@ const WARNING = new Set([
   "site-update.denied",
   "account.reset_cli",
   "totp.disable",
+  "login.recovery_code",
 ]);
 
 const dateFormat = new Intl.DateTimeFormat("zh-CN", {

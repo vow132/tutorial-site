@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updateTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
+import { tagSuggestions, tutorialTagNames } from "@/lib/tag-sync";
 import TutorialForm from "../tutorial-form";
 
 export const metadata: Metadata = { title: "编辑教程" };
@@ -22,10 +23,14 @@ export default async function EditTutorialPage({
   });
   if (!tutorial) notFound();
 
-  const categoryRows = await prisma.category.findMany({
-    orderBy: [{ order: "asc" }, { id: "asc" }],
-    select: { id: true, name: true, parentId: true, order: true },
-  });
+  const [categoryRows, suggestions, tags] = await Promise.all([
+    prisma.category.findMany({
+      orderBy: [{ order: "asc" }, { id: "asc" }],
+      select: { id: true, name: true, parentId: true, order: true },
+    }),
+    tagSuggestions(),
+    tutorialTagNames(tutorial.id),
+  ]);
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
       id: node.id,
@@ -42,6 +47,7 @@ export default async function EditTutorialPage({
       <div className="mt-6">
         <TutorialForm
           categories={categories}
+          tagSuggestions={suggestions}
           action={boundAction}
           initial={{
             title: tutorial.title,
@@ -51,6 +57,7 @@ export default async function EditTutorialPage({
             categoryId: tutorial.categoryId,
             published: tutorial.published,
             cover: tutorial.cover,
+            tags,
           }}
         />
       </div>

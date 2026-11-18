@@ -9,6 +9,8 @@ import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { firstUploadedImage, thumbnailFor, uploadedImage } from "@/lib/article";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { clearSearchCache } from "@/lib/search";
+import { parseTagNames } from "@/lib/tags";
+import { setTutorialTags } from "@/lib/tag-sync";
 
 export type TutorialFormState = { error?: string };
 
@@ -33,6 +35,8 @@ async function parseForm(formData: FormData) {
   const categoryId = Number(formData.get("categoryId"));
   const published = formData.get("published") === "on";
   const cover = String(formData.get("cover") ?? "").trim() || null;
+  // 标签输入框里还没确认成标签的文字（tagsPending）也一起算上，免得点保存时丢掉。
+  const tags = parseTagNames(`${formData.get("tags") ?? ""},${formData.get("tagsPending") ?? ""}`);
   const slug = normalizeSlug(
     String(formData.get("slug") ?? "").trim(),
     title
@@ -43,6 +47,7 @@ async function parseForm(formData: FormData) {
   if (excerpt.length > 500) return { error: "摘要不能超过 500 个字符" as const };
   if (!content || content === "<p></p>") return { error: "正文不能为空" as const };
   if (!categoryId) return { error: "请选择分类" as const };
+  if ("error" in tags) return { error: tags.error };
   if (cover && (!COVER_URL.test(cover) || !(await uploadedImage(cover)))) {
     return { error: "封面图无效或文件已不存在，请重新上传" as const };
   }
@@ -52,6 +57,7 @@ async function parseForm(formData: FormData) {
 
   return {
     data: { title, slug, excerpt: excerpt || null, content, categoryId, published, cover, thumbnail },
+    tagNames: tags.names,
   };
 }
 
@@ -61,6 +67,7 @@ async function parseForm(formData: FormData) {
  */
 function revalidatePublic(...slugs: (string | null | undefined)[]) {
   revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
+  revalidateTag(CACHE_TAGS.tags, { expire: 0 });
   clearSearchCache();
   revalidatePath("/");
   revalidatePath("/tutorials");
@@ -85,6 +92,7 @@ export async function createTutorial(
   if (exists) return { error: "Slug 已被占用，请更换" };
 
   const created = await prisma.tutorial.create({ data: parsed.data });
+  await setTutorialTags(created.id, parsed.tagNames);
   await audit("tutorial.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
   revalidatePublic(created.slug);
   redirect("/admin/tutorials");
@@ -106,6 +114,7 @@ export async function updateTutorial(
 
   const before = await prisma.tutorial.findUnique({ where: { id }, select: { slug: true } });
   await prisma.tutorial.update({ where: { id }, data: parsed.data });
+  await setTutorialTags(id, parsed.tagNames);
   await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
   revalidatePublic(before?.slug, parsed.data.slug);
   redirect("/admin/tutorials");

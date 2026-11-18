@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { firstArticleImage, htmlToDescription, processArticle, uploadedImage } from "@/lib/article";
+import { htmlToDescription, processArticle, uploadedImage } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
 import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
 import { decodeSegment } from "@/lib/url";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
-import { DEFAULT_OG_IMAGE, breadcrumbJsonLd, pageMetadata, toAbsolute } from "@/lib/seo";
+import { breadcrumbJsonLd, pageMetadata, toAbsolute } from "@/lib/seo";
+import { SHARE_IMAGE_SIZE, shareImagePath } from "@/lib/share-image";
 import JsonLd from "@/components/json-ld";
 import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
@@ -18,6 +19,7 @@ import TutorialCard from "@/components/tutorial-card";
 import ViewBeacon from "@/components/view-beacon";
 import ArticleEnhancer from "@/components/article-enhancer";
 import { categoryTextStyle } from "@/lib/color";
+import TagChips from "@/components/tag-chips";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -50,12 +52,25 @@ async function coverImage(tutorial: PublishedTutorial) {
   return info && tutorial.cover ? { url: tutorial.cover, ...info } : null;
 }
 
-/** 分享卡片和结构化数据用的图：封面优先，其次正文第一张图。 */
-async function shareImage(tutorial: PublishedTutorial, html: string) {
+/**
+ * 分享卡片和结构化数据用的图：有封面用封面，否则用自动生成的「标题 + 分类」分享图
+ * （/og/tutorials/<id>，见 lib/share-image-render.tsx），比正文里随手截的图更适合做卡片。
+ */
+async function shareImage(tutorial: PublishedTutorial) {
   const cover = await coverImage(tutorial);
   if (cover) return { url: cover.url, width: cover.width, height: cover.height, alt: tutorial.title };
-  const image = firstArticleImage(html);
-  return image && { ...image, alt: image.alt ?? tutorial.title };
+  const { siteName, logoText } = await getSettings();
+  return {
+    url: shareImagePath(tutorial.id, {
+      title: tutorial.title,
+      categoryName: tutorial.category.name,
+      categoryColor: tutorial.category.color,
+      siteName,
+      logoText,
+    }),
+    ...SHARE_IMAGE_SIZE,
+    alt: tutorial.title,
+  };
 }
 
 export async function generateMetadata({
@@ -75,11 +90,12 @@ export async function generateMetadata({
     title: t.title,
     description: describe(t, html),
     path: tutorialPath(t.slug),
-    image: await shareImage(t, html),
+    image: await shareImage(t),
     article: {
       publishedTime: t.createdAt,
       modifiedTime: t.updatedAt,
       section: t.category.name,
+      tags: t.tags.map(({ tag }) => tag.name),
     },
   });
 }
@@ -96,7 +112,7 @@ export default async function TutorialDetailPage({
   if (!tutorial) notFound();
 
   // 上一篇 / 下一篇（同分类内按时间）
-  const [prev, next, processed, settings, relatedCandidates, cover] = await Promise.all([
+  const [prev, next, processed, settings, relatedCandidates, image] = await Promise.all([
     prisma.tutorial.findFirst({
       where: {
         published: true,
@@ -118,8 +134,9 @@ export default async function TutorialDetailPage({
     processArticle(tutorial.content),
     getSettings(),
     getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
-    coverImage(tutorial),
+    shareImage(tutorial),
   ]);
+  const cover = await coverImage(tutorial);
 
   // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
   const related = relatedCandidates
@@ -138,10 +155,11 @@ export default async function TutorialDetailPage({
         description: describe(tutorial, html),
         url: articleUrl,
         mainEntityOfPage: articleUrl,
-        image: [toAbsolute(cover?.url ?? firstArticleImage(html)?.url ?? DEFAULT_OG_IMAGE.url)],
+        image: [toAbsolute(image.url)],
         datePublished: tutorial.createdAt.toISOString(),
         dateModified: tutorial.updatedAt.toISOString(),
         articleSection: tutorial.category.name,
+        ...(tutorial.tags.length ? { keywords: tutorial.tags.map(({ tag }) => tag.name).join(",") } : {}),
         inLanguage: "zh-CN",
         author: site,
         publisher: site,
@@ -204,19 +222,26 @@ export default async function TutorialDetailPage({
               <h1 className="mt-4 text-3xl font-extrabold leading-tight text-ink md:text-4xl">
                 {tutorial.title}
               </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-4 border-b border-line pb-6 text-xs text-ink-3">
-                <span>
-                  发布于{" "}
-                  <time dateTime={tutorial.createdAt.toISOString()}>{formatDate(tutorial.createdAt)}</time>
-                </span>
-                {updated && (
+              <div className="border-b border-line pb-6">
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-ink-3">
                   <span>
-                    更新于{" "}
-                    <time dateTime={tutorial.updatedAt.toISOString()}>{formatDate(tutorial.updatedAt)}</time>
+                    发布于{" "}
+                    <time dateTime={tutorial.createdAt.toISOString()}>{formatDate(tutorial.createdAt)}</time>
                   </span>
-                )}
-                <span>约 {minutes} 分钟读完</span>
-                <span>{tutorial.views} 次阅读</span>
+                  {updated && (
+                    <span>
+                      更新于{" "}
+                      <time dateTime={tutorial.updatedAt.toISOString()}>{formatDate(tutorial.updatedAt)}</time>
+                    </span>
+                  )}
+                  <span>约 {minutes} 分钟读完</span>
+                  <span>{tutorial.views} 次阅读</span>
+                </div>
+                <TagChips
+                  label="标签"
+                  className="mt-4"
+                  tags={tutorial.tags.map(({ tag }) => tag)}
+                />
               </div>
             </header>
           </Reveal>
