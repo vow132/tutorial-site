@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ADMIN_STATE, collectErrors, uniqueSuffix } from "./helpers";
 
-test.use({ storageState: ADMIN_STATE });
+// 单个操作最多等 10 秒：卡住时报出是哪一步，而不是笼统的整条用例超时
+test.use({ storageState: ADMIN_STATE, actionTimeout: 10_000 });
 
 const SAVED = /\/admin\/tutorials(\?saved=[\w-]+)?$/;
 
@@ -35,8 +36,18 @@ test("the editor makes tables and code blocks with a chosen language", async ({ 
   const id = uniqueSuffix();
   const title = `E2E 表格 ${id}`;
   try {
-    await startTutorial(page, title, `e2e-table-${id}`, "下面是一张表：");
+    // 全程用键盘移动光标，不去点正文里的段落：工具栏是吸顶的，
+    // 字体不同时段落可能正好被它挡住，点击会一直重试到超时。
+    await startTutorial(page, title, `e2e-table-${id}`, "下面是一段代码：");
     await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "代码块" }).click();
+    await page.keyboard.type("SELECT 1;");
+    await page.getByLabel("代码语言").selectOption("sql");
+    await expect(page.locator('.ProseMirror pre code[class*="language-sql"]')).toHaveCount(1);
+
+    // 选完语言焦点回到编辑器、光标仍在代码末尾：按 ↓ 跳出代码块，接着插表格
+    await expect(page.locator(".ProseMirror")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
     await page.getByRole("button", { name: "▦ 表格" }).click();
     await page.keyboard.type("命令");
     await page.keyboard.press("Tab");
@@ -44,14 +55,7 @@ test("the editor makes tables and code blocks with a chosen language", async ({ 
     await page.getByRole("button", { name: "+行" }).click();
     await expect(page.locator(".ProseMirror table tr")).toHaveCount(4);
     await expect(page.locator(".ProseMirror table th")).toHaveCount(3);
-
-    // 跳出表格，插一个代码块并指定语言
-    await page.locator(".ProseMirror > p").first().click();
-    await page.keyboard.press("End");
-    await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "代码块" }).click();
-    await page.keyboard.type("SELECT 1;");
-    await page.getByLabel("代码语言").selectOption("sql");
+    await expect(page.locator(".ProseMirror pre")).toHaveCount(1);
 
     await page.getByRole("button", { name: "保存教程" }).click();
     await expect(page).toHaveURL(SAVED);
@@ -180,5 +184,22 @@ test("a schedule in the past is rejected and the form keeps its content", async 
   await page.getByRole("button", { name: "保存教程" }).click();
   await expect(page.getByText("定时发布时间要晚于现在")).toBeVisible();
   await expect(page.locator('input[name="title"]')).toHaveValue(`E2E 过去 ${id}`);
+  await page.evaluate(() => localStorage.removeItem("tutorial-draft:new"));
+});
+
+test("toolbar buttons leave the cursor in the editor so typing continues", async ({ page }) => {
+  await page.goto("/admin/tutorials/new");
+  await page.locator(".ProseMirror").click();
+  await page.keyboard.type("intro");
+  await page.keyboard.press("Enter");
+  // 模拟繁忙的机器：Tiptap 把焦点还给编辑器要等下一帧，这里把动画帧推迟 500ms
+  await page.evaluate(() => {
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => window.setTimeout(() => raf(callback), 500);
+  });
+  await page.getByRole("button", { name: "代码块" }).click();
+  // 紧接着打字（含空格）：按钮不抢焦点时，文字进代码块，空格也不会再按一次按钮
+  await page.keyboard.type("SELECT 1;");
+  await expect(page.locator(".ProseMirror pre code")).toHaveText("SELECT 1;");
   await page.evaluate(() => localStorage.removeItem("tutorial-draft:new"));
 });

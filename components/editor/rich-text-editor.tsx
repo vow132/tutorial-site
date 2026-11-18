@@ -285,7 +285,17 @@ export default function RichTextEditor({
       }`}
     >
       {/* 工具栏 */}
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-surface/95 px-2 py-1.5 backdrop-blur">
+      {/*
+        点工具栏按钮时不让按钮抢走焦点：光标留在正文里，接着就能打字。
+        否则 Tiptap 要等下一帧才把焦点还给编辑器，期间按的键会落在按钮上（空格还会再按一次按钮）。
+        下拉框和取色器需要焦点才能展开，不拦。
+      */}
+      <div
+        onMouseDown={(event) => {
+          if ((event.target as HTMLElement).closest("button")) event.preventDefault();
+        }}
+        className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-line bg-surface/95 px-2 py-1.5 backdrop-blur"
+      >
         <button
           type="button"
           title="撤销"
