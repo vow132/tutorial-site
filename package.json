@@ -10,6 +10,7 @@
     "test": "node --import tsx --test lib/*.test.ts && node --test scripts/*.test.mjs",
     "backup": "node scripts/backup.mjs",
     "backup:restore": "node scripts/backup-restore.mjs",
+    "uploads:clean": "node scripts/uploads-clean.mjs",
     "admin:reset": "tsx scripts/reset-admin.ts",
     "test:e2e": "playwright test",
     "images:variants": "tsx scripts/image-variants.ts"

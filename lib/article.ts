@@ -35,6 +35,7 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { imageSizeFromFile } from "image-size/fromFile";
 import { THUMBNAIL_WIDTH, VARIANT_WIDTHS, variantName } from "@/lib/image-variants";
+import { CODE_LANGUAGES } from "@/lib/code-languages";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 
 const languages = {
@@ -268,18 +269,11 @@ export function headingSlug(text: string) {
 }
 
 /** 代码块右上角显示的语言名。 */
-const LANGUAGE_LABELS: Record<string, string> = {
-  bash: "Shell", c: "C", cpp: "C++", csharp: "C#", css: "CSS", dart: "Dart",
-  dockerfile: "Dockerfile", go: "Go", graphql: "GraphQL", http: "HTTP", ini: "INI",
-  java: "Java", javascript: "JavaScript", json: "JSON", kotlin: "Kotlin", less: "Less",
-  markdown: "Markdown", nginx: "Nginx", objectivec: "Objective-C", php: "PHP",
-  powershell: "PowerShell", python: "Python", ruby: "Ruby", rust: "Rust", scss: "SCSS",
-  sql: "SQL", swift: "Swift", typescript: "TypeScript", xml: "HTML", yaml: "YAML",
-};
+
 
 /** 代码块外壳：语言标签 + 复制按钮（按钮由 components/article-enhancer.tsx 接管）。 */
 function codeBlock(language: string, highlighted: string) {
-  const label = LANGUAGE_LABELS[language] ?? "代码";
+  const label = language === "plaintext" ? "代码" : CODE_LANGUAGES[language] ?? "代码";
   return (
     `<div class="code-block"><div class="code-head"><span class="code-lang">${label}</span>` +
     `<button type="button" class="code-copy" data-copy-code aria-label="复制代码">复制</button></div>` +
@@ -322,6 +316,9 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
       }
     },
   );
+
+  // 宽表格在手机上横向滚动，而不是撑破正文栏
+  output = output.replace(/<table\b/g, '<div class="table-wrap"><table').replace(/<\/table>/g, "</table></div>");
 
   output = await replaceAsync(output, /<img\b[^>]*>/g, enhanceImageTag);
   return { html: output, toc };

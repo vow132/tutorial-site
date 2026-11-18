@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteTutorial, togglePublish } from "@/lib/actions/tutorials";
 import Pagination from "@/components/pagination";
 import DeleteButton from "./delete-button";
+import ClearDraft from "./clear-draft";
 import { categoryTextStyle } from "@/lib/color";
 
 export const metadata: Metadata = { title: "教程管理" };
@@ -16,10 +17,10 @@ const PAGE_SIZE = 20;
 export default async function AdminTutorialsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; saved?: string }>;
 }) {
   await requireAdminPage();
-  const { page: rawPage } = await searchParams;
+  const { page: rawPage, saved } = await searchParams;
   const requestedPage = Number.parseInt(rawPage ?? "1", 10);
   const total = await prisma.tutorial.count();
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -37,12 +38,14 @@ export default async function AdminTutorialsPage({
       slug: true,
       views: true,
       published: true,
+      publishAt: true,
       category: { select: { name: true, color: true } },
     },
   });
 
   return (
     <div>
+      {saved && /^(new|\d+)$/.test(saved) && <ClearDraft draftKey={saved} />}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">教程管理</h1>
@@ -108,22 +111,28 @@ export default async function AdminTutorialsPage({
                       <input type="hidden" name="id" value={t.id} />
                       <button
                         type="submit"
-                        title="点击切换状态"
+                        title={t.publishAt ? "定时发布中，点击立即发布" : "点击切换状态"}
                         className={`rounded-full px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-70 ${
                           t.published
                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : t.publishAt
+                              ? "bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                              : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                         }`}
                       >
-                        {t.published ? "已发布" : "草稿"}
+                        {t.published
+                          ? "已发布"
+                          : t.publishAt
+                            ? `定时 ${t.publishAt.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" })}`
+                            : "草稿"}
                       </button>
                     </form>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {/* 新标签页打开，预取没有意义；草稿的前台地址是 404，预取还会在控制台报错。 */}
+                      {/* 后台预览：草稿和定时发布的也能看；新标签页打开，不预取。 */}
                       <Link
-                        href={`/tutorials/${t.slug}`}
+                        href={`/admin/preview/${t.id}`}
                         target="_blank"
                         prefetch={false}
                         className="rounded-lg px-2.5 py-1.5 text-xs text-ink-3 transition-colors hover:bg-paper hover:text-ink"

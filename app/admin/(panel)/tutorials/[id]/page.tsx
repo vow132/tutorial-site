@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updateTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
@@ -23,13 +24,14 @@ export default async function EditTutorialPage({
   });
   if (!tutorial) notFound();
 
-  const [categoryRows, suggestions, tags] = await Promise.all([
+  const [categoryRows, suggestions, tags, revisionCount] = await Promise.all([
     prisma.category.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],
       select: { id: true, name: true, parentId: true, order: true },
     }),
     tagSuggestions(),
     tutorialTagNames(tutorial.id),
+    prisma.tutorialRevision.count({ where: { tutorialId: tutorial.id } }),
   ]);
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
@@ -42,10 +44,32 @@ export default async function EditTutorialPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-ink">编辑教程</h1>
-      <p className="mt-1 text-sm text-ink-3">/{tutorial.slug}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-ink">编辑教程</h1>
+          <p className="mt-1 text-sm text-ink-3">/{tutorial.slug}</p>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <Link
+            href={`/admin/preview/${tutorial.id}`}
+            target="_blank"
+            prefetch={false}
+            className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+          >
+            预览已保存的版本
+          </Link>
+          <Link
+            href={`/admin/tutorials/${tutorial.id}/revisions`}
+            className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+          >
+            历史版本（{revisionCount}）
+          </Link>
+        </div>
+      </div>
       <div className="mt-6">
         <TutorialForm
+          draftKey={String(tutorial.id)}
+          serverUpdatedAt={tutorial.updatedAt.toISOString()}
           categories={categories}
           tagSuggestions={suggestions}
           action={boundAction}
@@ -56,6 +80,7 @@ export default async function EditTutorialPage({
             content: tutorial.content,
             categoryId: tutorial.categoryId,
             published: tutorial.published,
+            publishAt: tutorial.publishAt?.toISOString() ?? null,
             cover: tutorial.cover,
             tags,
           }}

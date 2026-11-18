@@ -51,7 +51,7 @@ test("tutorial lifecycle keeps the cached article page in sync", async ({ page, 
   await page.goto("/admin/tutorials/new");
   await fillTutorial(page, { title, slug, excerpt: "端到端测试摘要", body: "端到端测试正文" });
   await save(page);
-  await expect(page).toHaveURL(/\/admin\/tutorials$/);
+  await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
 
   // 前台可见，第二次请求命中缓存
   await expect(page.goto(path).then((r) => r?.status())).resolves.toBe(200);
@@ -75,7 +75,7 @@ test("tutorial lifecycle keeps the cached article page in sync", async ({ page, 
   await page.locator(".ProseMirror").waitFor();
   await page.fill('input[name="title"]', renamed);
   await save(page);
-  await expect(page).toHaveURL(/\/admin\/tutorials$/);
+  await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
   await page.goto(path);
   await expect(page.locator("h1")).toHaveText(renamed);
 
@@ -85,7 +85,7 @@ test("tutorial lifecycle keeps the cached article page in sync", async ({ page, 
   await page.locator(".ProseMirror").waitFor();
   await page.fill('input[name="slug"]', newSlug);
   await save(page);
-  await expect(page).toHaveURL(/\/admin\/tutorials$/);
+  await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
   expect((await request.get(path)).status()).toBe(404);
   expect((await request.get(`/tutorials/${newSlug}`)).status()).toBe(200);
 
@@ -176,7 +176,7 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
   try {
     for (const url of uploaded) expect((await request.get(url)).status(), url).toBe(200);
     await save(page);
-    await expect(page).toHaveURL(/\/admin\/tutorials$/);
+    await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
 
     await page.goto(`/tutorials/e2e-image-${id}`);
     const rendered = page.locator("article img").first();
