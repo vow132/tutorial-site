@@ -11,11 +11,13 @@ export const getPublishedTutorial = cache(async (slug: string) =>
       slug: true,
       excerpt: true,
       content: true,
+      cover: true,
       views: true,
       categoryId: true,
       createdAt: true,
       updatedAt: true,
       category: true,
+      tags: { orderBy: { position: "asc" }, select: { tag: { select: { name: true, slug: true } } } },
     },
   }),
 );

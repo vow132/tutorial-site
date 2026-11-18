@@ -223,6 +223,7 @@ export default async function CategoryPage({
         </div>
       ) : (
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <h2 className="sr-only">{category.name}的教程</h2>
           {tutorials.map((tutorial, index) => (
             <Reveal key={tutorial.id} delay={Math.min(index, 5) * 0.05}>
               <TutorialCard
@@ -233,6 +234,7 @@ export default async function CategoryPage({
                 categoryColor={tutorial.category.color}
                 views={tutorial.views}
                 createdAt={tutorial.createdAt}
+                thumbnail={tutorial.thumbnail}
               />
             </Reveal>
           ))}

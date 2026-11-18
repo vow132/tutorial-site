@@ -11,6 +11,7 @@ import {
   normalizeVerificationCode,
   type SearchVerification,
 } from "@/lib/search-verification";
+import { normalizeSecurityContact } from "@/lib/security-txt";
 
 export type SettingsFormState = { error?: string; success?: string };
 
@@ -56,6 +57,11 @@ export async function updateSettings(
     if (code) verification[engine.key] = code;
   }
 
+  const securityContact = normalizeSecurityContact(text("securityContact"));
+  if (securityContact === null) {
+    return { error: "安全联系方式请填写邮箱，或 https:// 开头的网址" };
+  }
+
   const settings: SiteSettings = {
     siteName: text("siteName") || "教程网",
     logoText: text("logoText") || "教",
@@ -70,6 +76,7 @@ export async function updateSettings(
     copyright: text("copyright"),
     footerColumns,
     verification,
+    securityContact,
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };

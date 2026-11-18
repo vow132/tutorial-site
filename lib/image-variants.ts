@@ -1,10 +1,13 @@
 /** 正文图片响应式小图的命名约定（纯函数，渲染端不需要加载 sharp）。 */
 
 /**
- * 响应式小图宽度：800 给普通手机/2 倍屏的窄屏，1200 给 3 倍屏手机
+ * 响应式小图宽度：400 给列表卡片缩略图，800 给普通手机/2 倍屏的窄屏，1200 给 3 倍屏手机
  * （iPhone 正文栏约 360px × 3 ≈ 1080px，没有 1200 时浏览器只能下载 1600 的原图）。
  */
-export const VARIANT_WIDTHS = [800, 1200] as const;
+export const VARIANT_WIDTHS = [400, 800, 1200] as const;
+
+/** 列表卡片缩略图用的小图宽度（卡片里约 128px 宽，3 倍屏也够用）。 */
+export const THUMBNAIL_WIDTH = 400;
 /** 原图至少比小图宽 15% 才值得多存一份。 */
 export const VARIANT_MIN_GAIN = 1.15;
 

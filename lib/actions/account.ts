@@ -14,10 +14,24 @@ import {
 } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { passwordProblem } from "@/lib/password-policy";
+import { generateRecoveryCodes } from "@/lib/recovery-codes";
+import { LOCKED_TOTP_MESSAGE, sealTotpSecret, verifySecondFactor } from "@/lib/second-factor";
 import { readTotpSetup } from "@/lib/session";
 import { verifyTotp } from "@/lib/totp";
 
 export type CredentialsFormState = { error?: string; success?: string };
+/** 新生成的恢复码只在这一次响应里出现，页面展示后不再能看到。 */
+export type TwoFactorFormState = CredentialsFormState & { recoveryCodes?: string[] };
+
+/** 换一整套恢复码：旧的全部作废。 */
+async function replaceRecoveryCodes(adminId: number) {
+  const { codes, hashes } = generateRecoveryCodes();
+  await prisma.$transaction([
+    prisma.adminRecoveryCode.deleteMany({ where: { adminId } }),
+    prisma.adminRecoveryCode.createMany({ data: hashes.map((codeHash) => ({ adminId, codeHash })) }),
+  ]);
+  return codes;
+}
 
 export async function updateAdminCredentials(
   _prev: CredentialsFormState,
@@ -80,9 +94,9 @@ export async function updateAdminCredentials(
 }
 
 export async function enableTotp(
-  _prev: CredentialsFormState,
+  _prev: TwoFactorFormState,
   formData: FormData
-): Promise<CredentialsFormState> {
+): Promise<TwoFactorFormState> {
   const { admin } = await requireSession();
   if (admin.totpSecret) return { error: "两步验证已经开启" };
 
@@ -96,11 +110,14 @@ export async function enableTotp(
 
   await prisma.admin.update({
     where: { id: admin.id },
-    data: { totpSecret: secret, totpLastStep: step },
+    data: { totpSecret: sealTotpSecret(secret), totpLastStep: step },
   });
+  const recoveryCodes = await replaceRecoveryCodes(admin.id);
   await audit("totp.enable", { actor: admin.username });
-  revalidatePath("/admin/account");
-  return { success: "两步验证已开启，下次登录需要输入验证器中的 6 位数字" };
+  return {
+    success: "两步验证已开启，下次登录需要输入验证器中的 6 位数字",
+    recoveryCodes,
+  };
 }
 
 export async function disableTotp(
@@ -113,16 +130,41 @@ export async function disableTotp(
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
   if (confirmError) return { error: confirmError };
 
-  const step = verifyTotp(admin.totpSecret, String(formData.get("code") ?? ""), admin.totpLastStep);
-  if (step === null) return { error: "验证码不正确或已被使用" };
+  const factor = await verifySecondFactor(admin, String(formData.get("code") ?? ""));
+  if (!factor.ok) {
+    return { error: factor.reason === "locked" ? LOCKED_TOTP_MESSAGE : "验证码或恢复码不正确，或已被使用" };
+  }
 
-  await prisma.admin.update({
-    where: { id: admin.id },
-    data: { totpSecret: null, totpLastStep: null },
-  });
+  await prisma.$transaction([
+    prisma.admin.update({
+      where: { id: admin.id },
+      data: { totpSecret: null, totpLastStep: null },
+    }),
+    prisma.adminRecoveryCode.deleteMany({ where: { adminId: admin.id } }),
+  ]);
   await audit("totp.disable", { actor: admin.username });
   revalidatePath("/admin/account");
   return { success: "两步验证已关闭" };
+}
+
+/** 重新生成恢复码（旧码全部作废）。需要当前密码 + 验证码或一个恢复码。 */
+export async function regenerateRecoveryCodes(
+  _prev: TwoFactorFormState,
+  formData: FormData
+): Promise<TwoFactorFormState> {
+  const { admin } = await requireSession();
+  if (!admin.totpSecret) return { error: "请先开启两步验证" };
+
+  const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
+  if (confirmError) return { error: confirmError };
+  const factor = await verifySecondFactor(admin, String(formData.get("code") ?? ""));
+  if (!factor.ok) {
+    return { error: factor.reason === "locked" ? LOCKED_TOTP_MESSAGE : "验证码或恢复码不正确，或已被使用" };
+  }
+
+  const recoveryCodes = await replaceRecoveryCodes(admin.id);
+  await audit("recovery_codes.regenerate", { actor: admin.username });
+  return { success: "已生成新的恢复码，旧的恢复码全部作废", recoveryCodes };
 }
 
 export async function revokeOtherSessions() {

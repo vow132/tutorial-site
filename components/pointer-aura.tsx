@@ -13,6 +13,8 @@ import { useEffect } from "react";
 export default function PointerAura() {
   useEffect(() => {
     if (!window.matchMedia("(pointer: fine)").matches) return;
+    // 精简模式（低端设备）不做聚光灯、3D 倾斜和吉祥物跟随
+    if (document.documentElement.hasAttribute("data-lite")) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const mascot = document.querySelector<HTMLElement>(".site-mascot");

@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { expect, test } from "@playwright/test";
-import { ADMIN_STATE, admin, collectErrors } from "./helpers";
+import { ADMIN_STATE, admin, collectErrors, queryDatabase } from "./helpers";
 
 type Received = { event: string; title: string; lines: string[] };
 
@@ -50,6 +50,10 @@ test.describe.serial("security alerts", () => {
     await page.fill("#alert-password", admin.password);
     await page.getByRole("button", { name: "保存告警设置" }).click();
     await expect(page.getByText("已保存")).toBeVisible();
+    // 推送地址等密钥加密存库
+    const stored = queryDatabase<{ value: string }>('SELECT "value" FROM "Setting" WHERE "key" = ?', "alerts")!.value;
+    expect(stored).toMatch(/^enc:v1:/);
+    expect(stored).not.toContain("127.0.0.1");
 
     await page.getByRole("button", { name: "发送测试消息" }).click();
     await expect(page.getByText("测试消息已发出")).toBeVisible();

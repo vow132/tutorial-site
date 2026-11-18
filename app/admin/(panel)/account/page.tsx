@@ -13,7 +13,7 @@ import AccountForm from "./account-form";
 import AlertsForm from "./alerts-form";
 import Passkeys from "./passkeys";
 import { relyingParty } from "@/lib/passkeys";
-import { DisableTwoFactorForm, EnableTwoFactorForm } from "./two-factor-form";
+import { DisableTwoFactorForm, EnableTwoFactorForm, RegenerateRecoveryCodesForm } from "./two-factor-form";
 
 export const metadata: Metadata = { title: "账号安全" };
 export const dynamic = "force-dynamic";
@@ -38,7 +38,7 @@ export default async function AdminAccountPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const [alertConfig, alertStatus, passkeys] = await Promise.all([
+  const [alertConfig, alertStatus, passkeys, recoveryCodes] = await Promise.all([
     getAlertConfig(),
     getAlertStatus(),
     prisma.adminPasskey.findMany({
@@ -46,6 +46,7 @@ export default async function AdminAccountPage({
       orderBy: { createdAt: "asc" },
       select: { id: true, name: true, createdAt: true, lastUsedAt: true, backedUp: true },
     }),
+    prisma.adminRecoveryCode.count({ where: { adminId: admin.id } }),
   ]);
   const rp = relyingParty();
 
@@ -97,8 +98,30 @@ export default async function AdminAccountPage({
           <>
             <p className="mb-5 text-sm text-ink-2">
               登录时除密码外还需要验证器中的 6 位数字。关闭前需要验证当前密码和验证码；
-              手机丢失时可在服务器上运行 <code>npm run admin:reset</code> 重置。
+              手机丢失时用恢复码登录，恢复码也用完时可在服务器上运行 <code>npm run admin:reset</code> 重置。
             </p>
+            <div
+              className={`mb-5 rounded-2xl border px-5 py-4 text-sm ${
+                recoveryCodes >= 3
+                  ? "border-line bg-paper text-ink-2"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+              }`}
+            >
+              <p className="font-medium text-ink">恢复码：剩余 {recoveryCodes} 个</p>
+              <p className="mt-1">
+                {recoveryCodes === 0
+                  ? "还没有可用的恢复码，手机丢失时只能到服务器上重置。建议现在生成一组并妥善保存。"
+                  : recoveryCodes < 3
+                    ? "恢复码快用完了，建议重新生成一组（旧的会全部作废）。"
+                    : "每个恢复码只能用一次，用掉的会自动作废。"}
+              </p>
+              <details className="mt-3" open={recoveryCodes === 0}>
+                <summary className="cursor-pointer font-medium text-accent-ink">重新生成恢复码</summary>
+                <div className="mt-4">
+                  <RegenerateRecoveryCodesForm />
+                </div>
+              </details>
+            </div>
             <DisableTwoFactorForm />
           </>
         )}
@@ -150,6 +173,11 @@ export default async function AdminAccountPage({
           新设备登录、登录被锁定、修改密码或两步验证、网站更新结果、备份失败或过期时，
           实时推送到你的手机。推送失败不影响登录等操作本身。
         </p>
+        {alertConfig.locked && (
+          <p className="mb-5 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-500 dark:text-red-400">
+            已保存的告警设置无法解密（服务器上的 AUTH_SECRET 或 DATA_ENCRYPTION_KEY 被更换过），告警目前不会推送。请重新填写并保存。
+          </p>
+        )}
         {alertStatus.lastAt && (
           <p
             className={`mb-5 rounded-xl px-4 py-3 text-xs ${

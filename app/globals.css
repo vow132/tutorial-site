@@ -173,7 +173,7 @@ body {
  * 页面客户端代码尚未完成加载时，label 也能立即切换抽屉；
  * React 接管后继续负责滚动锁定、Esc 和焦点管理。
  */
-.mobile-drawer-toggle:focus-visible + .mobile-drawer-trigger {
+.mobile-drawer-toggle:focus-visible + label .mobile-drawer-trigger {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
@@ -198,19 +198,19 @@ body:has(.mobile-drawer-toggle:checked) {
 
 /* ---------- 移动端「本页目录」折叠卡片 ---------- */
 /* 仅移动端出现，由原生 checkbox 驱动，未 hydration 也能开关。 */
-.mobile-toc-toggle:focus-visible + .mobile-toc-trigger {
+.mobile-toc-toggle:focus-visible + label .mobile-toc-trigger {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
-.mobile-toc-toggle:checked + .mobile-toc-trigger {
+.mobile-toc-toggle:checked + label .mobile-toc-trigger {
   border-bottom-color: transparent;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
-.mobile-toc-toggle:checked + .mobile-toc-trigger .mobile-toc-caret {
+.mobile-toc-toggle:checked + label .mobile-toc-trigger .mobile-toc-caret {
   transform: rotate(180deg);
 }
-.mobile-toc-toggle:checked + .mobile-toc-trigger .mobile-toc-current {
+.mobile-toc-toggle:checked + label .mobile-toc-trigger .mobile-toc-current {
   display: none;
 }
 .mobile-toc-toggle:checked ~ .mobile-toc-panel {
@@ -275,6 +275,22 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   }
 }
 
+/* ---------- 精简模式：低端设备 / 省流量（根布局内联脚本设置 data-lite） ---------- */
+/* 毛玻璃（backdrop-filter）和大面积模糊光晕是这个站最贵的绘制，循环动画让页面一直在重绘。 */
+:root[data-lite] *,
+:root[data-lite] *::before,
+:root[data-lite] *::after {
+  /* 只写标准属性：构建时会自动补 -webkit- 前缀（两个都写反而会被压缩成只剩前缀版） */
+  backdrop-filter: none !important;
+}
+:root[data-lite] .blur-3xl { display: none; }
+:root[data-lite] .mascot-float,
+:root[data-lite] .mascot-eyes,
+:root[data-lite] .nav-aura,
+:root[data-lite] .nav-shine {
+  animation: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .reveal-rise,
@@ -331,6 +347,10 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .glow-card:hover .spotlight {
   opacity: 1;
 }
+
+/* 分类色做小号文字：颜色由 lib/color.ts 的 categoryTextStyle() 计算，保证对比度 ≥ 4.5:1 */
+.cat-text { color: var(--cat-ink); }
+:root[data-theme="dark"] .cat-text { color: var(--cat-ink-dark); }
 
 /* ---------- 文章排版 ---------- */
 .article-body {
@@ -400,6 +420,96 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   max-width: 100%;
 }
 .article-body hr { border: none; border-top: 1px solid var(--color-line); margin: 2.4em 0; }
+
+/* 提示框（components/editor/callout.ts）：标签与图标由 CSS 生成，正文 HTML 只有 data-callout 属性 */
+.article-body [data-callout],
+.tiptap-shell .ProseMirror [data-callout] {
+  --callout: #6366f1;
+  --callout-ink: #4f46e5;
+  margin: 1.4em 0;
+  padding: 0.8rem 1.1rem 0.85rem;
+  border: 1px solid color-mix(in oklab, var(--callout) 26%, transparent);
+  border-left-width: 4px;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--callout) 7%, var(--color-surface));
+}
+.article-body [data-callout]::before,
+.tiptap-shell .ProseMirror [data-callout]::before {
+  content: "💡 提示";
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--callout-ink);
+}
+.article-body [data-callout="warning"],
+.tiptap-shell .ProseMirror [data-callout="warning"] { --callout: #f59e0b; --callout-ink: #92400e; }
+.article-body [data-callout="warning"]::before,
+.tiptap-shell .ProseMirror [data-callout="warning"]::before { content: "⚠️ 注意"; }
+.article-body [data-callout="danger"],
+.tiptap-shell .ProseMirror [data-callout="danger"] { --callout: #ef4444; --callout-ink: #b91c1c; }
+.article-body [data-callout="danger"]::before,
+.tiptap-shell .ProseMirror [data-callout="danger"]::before { content: "⛔ 警告"; }
+:root[data-theme="dark"] .article-body [data-callout],
+:root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout] { --callout-ink: #a5b4fc; }
+:root[data-theme="dark"] .article-body [data-callout="warning"],
+:root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout="warning"] { --callout-ink: #fbbf24; }
+:root[data-theme="dark"] .article-body [data-callout="danger"],
+:root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout="danger"] { --callout-ink: #fca5a5; }
+.article-body [data-callout] > :first-child,
+.tiptap-shell .ProseMirror [data-callout] > :first-child { margin-top: 0; }
+.article-body [data-callout] > :last-child,
+.tiptap-shell .ProseMirror [data-callout] > :last-child { margin-bottom: 0; }
+
+/* 代码块：顶部语言标签 + 复制按钮（components/article-enhancer.tsx） */
+.article-body .code-block {
+  margin: 1.4em 0;
+  border-radius: 0.875rem;
+  overflow: hidden;
+  background: #10131a;
+}
+.article-body .code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.6rem 0.45rem 1.25rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.article-body .code-lang { color: #a6adc8; letter-spacing: 0.02em; }
+.article-body .code-copy {
+  color: #c9cfe0;
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.65rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.article-body .code-copy:hover { background: rgb(255 255 255 / 0.1); color: #fff; }
+.article-body .code-copy:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.article-body .code-block pre { margin: 0; border-radius: 0; }
+
+/* 标题旁的 # 链接：悬停或键盘聚焦时出现，点击复制本节地址 */
+.article-body .heading-anchor {
+  margin-left: 0.4em;
+  color: var(--color-ink-3);
+  text-decoration: none;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.article-body h2:hover .heading-anchor,
+.article-body h3:hover .heading-anchor,
+.article-body .heading-anchor:focus-visible { opacity: 1; }
+.article-body .heading-anchor:hover { color: var(--color-accent-ink); }
+@media (hover: none) {
+  .article-body .heading-anchor { opacity: 0.45; }
+}
+
+/* 正文图片可点击放大 */
+.article-body img { cursor: zoom-in; }
+.article-body a img { cursor: pointer; }
 .article-body table {
   width: 100%;
   border-collapse: collapse;
@@ -417,7 +527,8 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #c792ea; }
 .hljs-string, .hljs-attr, .hljs-selector-attr { color: #a5d6a7; }
 .hljs-number, .hljs-literal { color: #f78c6c; }
-.hljs-comment, .hljs-quote { color: #697098; font-style: italic; }
+/* 注释色 #8890b5 在 #10131a 上对比度 5.9:1（原 #697098 只有 3.9:1） */
+.hljs-comment, .hljs-quote { color: #8890b5; font-style: italic; }
 .hljs-function, .hljs-title { color: #82aaff; }
 .hljs-name, .hljs-tag { color: #f07178; }
 .hljs-attribute, .hljs-variable, .hljs-template-variable { color: #ffcb6b; }
@@ -499,3 +610,38 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-3); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+
+/* ---------- 打印 / 存为 PDF ---------- */
+@media print {
+  @page { margin: 16mm 14mm; }
+  html, body { background: #fff !important; color: #111 !important; }
+  /* 站点导航、页脚、目录、上下篇、相关推荐等只在屏幕上有意义（组件上标了 print-hide） */
+  .print-hide, .skip-link, [role="status"], .image-zoom, .code-copy, .heading-anchor { display: none !important; }
+  /* 滚动渐显动画在打印时不会触发：强制全部可见 */
+  .reveal, .reveal-rise, .reveal-scroll {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  main { padding: 0 !important; }
+  main > div { max-width: none !important; padding: 0 !important; }
+  /* 文章页去掉右侧目录栏后让正文铺满 */
+  .article-grid { display: block !important; }
+  .article-body { font-size: 11pt; line-height: 1.7; color: #111; }
+  .article-body h2, .article-body h3 { break-after: avoid; }
+  .article-body pre, .article-body .code-block, .article-body img,
+  .article-body blockquote, .article-body table, .article-body [data-callout] { break-inside: avoid; }
+  /* 打印机默认不印背景色：代码块改成白底深字，否则浅色代码会印不出来 */
+  .article-body .code-block { background: #fff !important; border: 1px solid #ccc; }
+  .article-body .code-head { border-bottom-color: #ddd; }
+  .article-body .code-lang { color: #555; }
+  .article-body pre { background: #fff !important; color: #111 !important; white-space: pre-wrap; word-break: break-word; }
+  .article-body pre * { color: #111 !important; font-style: normal !important; }
+  .article-body a { color: #111; }
+  /* 外部链接在纸上看不到地址，附在后面 */
+  .article-body a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #555; word-break: break-all; }
+  .glow-card { box-shadow: none !important; border-color: #ddd !important; }
+  /* 提示框保留底色和左侧色条，否则打印出来和普通段落分不清 */
+  .article-body [data-callout] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

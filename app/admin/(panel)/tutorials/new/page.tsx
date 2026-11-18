@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { createTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
+import { tagSuggestions } from "@/lib/tag-sync";
 import TutorialForm from "../tutorial-form";
 
 export const metadata: Metadata = { title: "写教程" };
@@ -11,10 +12,13 @@ export const dynamic = "force-dynamic";
 
 export default async function NewTutorialPage() {
   await requireAdminPage();
-  const categoryRows = await prisma.category.findMany({
-    orderBy: [{ order: "asc" }, { id: "asc" }],
-    select: { id: true, name: true, parentId: true, order: true },
-  });
+  const [categoryRows, suggestions] = await Promise.all([
+    prisma.category.findMany({
+      orderBy: [{ order: "asc" }, { id: "asc" }],
+      select: { id: true, name: true, parentId: true, order: true },
+    }),
+    tagSuggestions(),
+  ]);
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
       id: node.id,
@@ -29,7 +33,7 @@ export default async function NewTutorialPage() {
         像使用 Word 一样撰写，图片可直接拖入正文
       </p>
       <div className="mt-6">
-        <TutorialForm categories={categories} action={createTutorial} />
+        <TutorialForm categories={categories} tagSuggestions={suggestions} action={createTutorial} />
       </div>
     </div>
   );

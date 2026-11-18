@@ -5,6 +5,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import type { TutorialFormState } from "@/lib/actions/tutorials";
 import { submitKeepingValues } from "@/lib/form-submit";
+import CoverField from "./cover-field";
+import TagInput from "./tag-input";
 
 const RichTextEditor = dynamic(
   () => import("@/components/editor/rich-text-editor"),
@@ -20,6 +22,8 @@ type Category = { id: number; name: string };
 
 type Props = {
   categories: Category[];
+  /** 已有标签（按使用次数排序），输入时给出建议 */
+  tagSuggestions: string[];
   action: (prev: TutorialFormState, formData: FormData) => Promise<TutorialFormState>;
   initial?: {
     title: string;
@@ -28,13 +32,15 @@ type Props = {
     content: string;
     categoryId: number;
     published: boolean;
+    cover: string | null;
+    tags: string[];
   };
 };
 
 const inputCls =
   "h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
 
-export default function TutorialForm({ categories, action, initial }: Props) {
+export default function TutorialForm({ categories, tagSuggestions, action, initial }: Props) {
   const [state, formAction, pending] = useActionState<TutorialFormState, FormData>(
     action,
     {}
@@ -104,6 +110,10 @@ export default function TutorialForm({ categories, action, initial }: Props) {
           />
         </div>
       </div>
+
+      <TagInput initial={initial?.tags ?? []} suggestions={tagSuggestions} />
+
+      <CoverField initial={initial?.cover ?? null} />
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">

@@ -165,12 +165,12 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
 
   await page.goto("/admin/tutorials/new");
   await fillTutorial(page, { title: `E2E 图片 ${id}`, slug: `e2e-image-${id}`, body: "带图片的正文" });
-  await page.locator('input[type="file"]').setInputFiles(file);
+  await page.locator('.tiptap-shell input[type="file"]').setInputFiles(file);
   const image = page.locator(".ProseMirror img");
   await expect(image).toHaveAttribute("alt", "flexbox main axis");
   const src = (await image.getAttribute("src"))!;
   const base = src.replace(/\.[a-z]+$/, "");
-  const uploaded = [src, `${base}-800w.webp`, `${base}-1200w.webp`];
+  const uploaded = [src, `${base}-400w.webp`, `${base}-800w.webp`, `${base}-1200w.webp`];
   test.info().attach("uploads", { body: uploaded.join("\n") });
 
   try {
@@ -182,7 +182,15 @@ test("uploaded images get alt text, responsive variants and srcset", async ({ pa
     const rendered = page.locator("article img").first();
     await expect(rendered).toHaveAttribute("srcset", new RegExp(`-800w\\.webp 800w, .*-1200w\\.webp 1200w, .* 1600w$`));
     await expect(rendered).toHaveAttribute("sizes", /820px/);
-    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`${src}$`));
+    // 没有封面时分享图用自动生成的标题卡片，而不是正文截图
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/og\/tutorials\/\d+\?v=[\w-]+$/);
+    // 点击正文图片放大，Esc 关闭
+    await rendered.click();
+    const zoom = page.getByRole("dialog", { name: "flexbox main axis" });
+    await expect(zoom).toBeVisible();
+    await expect(zoom.getByRole("button", { name: "关闭大图" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(zoom).toHaveCount(0);
     // 在清理之前断言：删除时管理列表里对该文章的预取请求会正常返回 404。
     expect(errors).toEqual([]);
   } finally {

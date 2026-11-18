@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildCategoryTree } from "@/lib/categories";
 
@@ -11,6 +12,8 @@ export const CACHE_TAGS = {
   tutorials: "public-tutorials",
   categories: "public-categories",
   settings: "site-settings",
+  tags: "public-tags",
+  about: "about-page",
 } as const;
 
 const LIST_REVALIDATE_SECONDS = 300;
@@ -115,6 +118,7 @@ const cachedTutorialPage = unstable_cache(
         title: true,
         slug: true,
         excerpt: true,
+        thumbnail: true,
         views: true,
         createdAt: true,
         category: { select: { name: true, color: true } },
@@ -123,7 +127,7 @@ const cachedTutorialPage = unstable_cache(
     // 缓存以 JSON 存储，Date 会变成字符串；统一存 ISO 字符串，读取时再还原。
     return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
   },
-  ["published-tutorial-page"],
+  ["published-tutorial-page", "v2"],
   {
     tags: [CACHE_TAGS.tutorials, CACHE_TAGS.categories],
     revalidate: LIST_REVALIDATE_SECONDS,
@@ -163,26 +167,61 @@ const relatedTutorialSelect = {
   title: true,
   slug: true,
   excerpt: true,
+  thumbnail: true,
   views: true,
   createdAt: true,
   category: { select: { name: true, color: true } },
 } as const;
 
+type RelatedRow = Prisma.TutorialGetPayload<{ select: typeof relatedTutorialSelect }>;
+
 /**
- * 相关教程：先取同分类里阅读量高的，不够再从父分类、子分类、同级子分类补。
- * 顶级分类彼此不算相关（前端 ≠ 数据库），所以没有父分类时不取“同级”。
+ * 相关教程：先取共同标签最多的，再取同分类里阅读量高的，不够再从父分类、子分类、
+ * 同级子分类补。顶级分类彼此不算相关（前端 ≠ 数据库），所以没有父分类时不取“同级”。
  * 多取两篇，让页面去掉与“上一篇/下一篇”重复的之后仍然够数。
  */
 const cachedRelatedTutorials = unstable_cache(
   async (tutorialId: number, categoryId: number) => {
     const take = RELATED_TUTORIAL_LIMIT + 2;
     const orderBy = [{ views: "desc" as const }, { createdAt: "desc" as const }];
-    const rows = await prisma.tutorial.findMany({
-      where: { published: true, categoryId, id: { not: tutorialId } },
-      orderBy,
-      take,
-      select: relatedTutorialSelect,
-    });
+    const rows: RelatedRow[] = [];
+
+    const tagIds = (
+      await prisma.tutorialTag.findMany({ where: { tutorialId }, select: { tagId: true } })
+    ).map((row) => row.tagId);
+    if (tagIds.length > 0) {
+      const shared = await prisma.tutorialTag.groupBy({
+        by: ["tutorialId"],
+        where: { tagId: { in: tagIds }, tutorialId: { not: tutorialId }, tutorial: { published: true } },
+        _count: { tagId: true },
+        orderBy: { _count: { tagId: "desc" } },
+        take: 50,
+      });
+      const sharedCount = new Map(shared.map((row) => [row.tutorialId, row._count.tagId]));
+      const candidates = await prisma.tutorial.findMany({
+        where: { id: { in: [...sharedCount.keys()] } },
+        select: relatedTutorialSelect,
+      });
+      candidates.sort(
+        (a, b) =>
+          sharedCount.get(b.id)! - sharedCount.get(a.id)! ||
+          b.views - a.views ||
+          b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+      rows.push(...candidates.slice(0, take));
+    }
+    const exclude = () => [tutorialId, ...rows.map((row) => row.id)];
+
+    if (rows.length < take) {
+      rows.push(
+        ...(await prisma.tutorial.findMany({
+          where: { published: true, categoryId, id: { notIn: exclude() } },
+          orderBy,
+          take: take - rows.length,
+          select: relatedTutorialSelect,
+        })),
+      );
+    }
 
     if (rows.length < take) {
       const categories = await prisma.category.findMany({
@@ -201,7 +240,7 @@ const cachedRelatedTutorials = unstable_cache(
       if (nearby.length > 0) {
         rows.push(
           ...(await prisma.tutorial.findMany({
-            where: { published: true, categoryId: { in: nearby }, id: { not: tutorialId } },
+            where: { published: true, categoryId: { in: nearby }, id: { notIn: exclude() } },
             orderBy,
             take: take - rows.length,
             select: relatedTutorialSelect,
@@ -212,9 +251,9 @@ const cachedRelatedTutorials = unstable_cache(
 
     return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
   },
-  ["related-tutorials"],
+  ["related-tutorials", "v3"],
   {
-    tags: [CACHE_TAGS.tutorials, CACHE_TAGS.categories],
+    tags: [CACHE_TAGS.tutorials, CACHE_TAGS.categories, CACHE_TAGS.tags],
     revalidate: LIST_REVALIDATE_SECONDS,
   },
 );
@@ -226,4 +265,57 @@ const cachedRelatedTutorials = unstable_cache(
 export async function getRelatedTutorialCandidates(tutorialId: number, categoryId: number) {
   const rows = await cachedRelatedTutorials(tutorialId, categoryId);
   return rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) }));
+}
+
+export type PublishedTag = { id: number; name: string; slug: string; count: number };
+
+/** 有已发布教程的标签及篇数，按篇数降序（标签页、热门标签、sitemap 共用）。 */
+const cachedPublishedTags = unstable_cache(
+  async (): Promise<PublishedTag[]> => {
+    const counts = await prisma.tutorialTag.groupBy({
+      by: ["tagId"],
+      where: { tutorial: { published: true } },
+      _count: { tutorialId: true },
+    });
+    const count = new Map(counts.map((row) => [row.tagId, row._count.tutorialId]));
+    const tags = await prisma.tag.findMany({
+      where: { id: { in: [...count.keys()] } },
+      select: { id: true, name: true, slug: true },
+    });
+    return tags
+      .map((tag) => ({ ...tag, count: count.get(tag.id) ?? 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-CN"));
+  },
+  ["published-tags"],
+  { tags: [CACHE_TAGS.tutorials, CACHE_TAGS.tags], revalidate: LIST_REVALIDATE_SECONDS },
+);
+
+export const getPublishedTags = cache(() => cachedPublishedTags());
+
+const cachedTagTutorialPage = unstable_cache(
+  async (tagId: number, page: number, pageSize: number) => {
+    const rows = await prisma.tutorial.findMany({
+      where: { published: true, tags: { some: { tagId } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: relatedTutorialSelect,
+    });
+    return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  },
+  ["tag-tutorial-page"],
+  { tags: [CACHE_TAGS.tutorials, CACHE_TAGS.tags], revalidate: LIST_REVALIDATE_SECONDS },
+);
+
+/** 某个标签下的已发布教程分页；页码先收敛到合法范围。 */
+export async function getTagTutorialPage({ tag, page, pageSize }: { tag: PublishedTag; page: number; pageSize: number }) {
+  const totalPages = Math.max(1, Math.ceil(tag.count / pageSize));
+  const safePage = Math.min(Math.max(1, Math.floor(page) || 1), totalPages);
+  const rows = await cachedTagTutorialPage(tag.id, safePage, pageSize);
+  return {
+    total: tag.count,
+    totalPages,
+    page: safePage,
+    tutorials: rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
+  };
 }

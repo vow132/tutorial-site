@@ -36,6 +36,7 @@ export async function pageMetadata({
   path,
   image,
   article,
+  index = true,
 }: {
   /** 省略时沿用根布局的站点标题（首页）。 */
   title?: string;
@@ -43,7 +44,9 @@ export async function pageMetadata({
   /** 站内路径，已做 URL 编码，例如 `/tutorials/css-grid`。 */
   path: string;
   image?: SeoImage | null;
-  article?: { publishedTime: Date; modifiedTime: Date; section?: string };
+  article?: { publishedTime: Date; modifiedTime: Date; section?: string; tags?: string[] };
+  /** 不希望被收录时（如只有一篇教程的标签页）设为 false，仍允许爬虫顺着链接走。 */
+  index?: boolean;
 }): Promise<Metadata> {
   const settings = await getSettings();
   const shareTitle = title ?? settings.siteTitle;
@@ -61,6 +64,7 @@ export async function pageMetadata({
   return {
     ...(title ? { title } : {}),
     description,
+    ...(index ? {} : { robots: { index: false, follow: true } }),
     alternates: { canonical: path, types: RSS_FEED },
     openGraph: article
       ? {
@@ -69,6 +73,7 @@ export async function pageMetadata({
           publishedTime: article.publishedTime.toISOString(),
           modifiedTime: article.modifiedTime.toISOString(),
           section: article.section,
+          ...(article.tags?.length ? { tags: article.tags } : {}),
         }
       : { ...common, type: "website" },
     twitter: {

@@ -86,3 +86,12 @@ test("password policy rejects defaults and weak passwords", () => {
   assert.ok(passwordProblem("密".repeat(30), "admin"), "over 72 bytes");
   assert.equal(passwordProblem("correct-horse-battery", "admin"), null);
 });
+
+test("callout boxes keep only the known types", () => {
+  const safe = '<div data-callout="warning"><p>注意</p><ul><li>x</li></ul></div>';
+  assert.equal(sanitizeArticleHtml(safe), safe);
+  assert.equal(
+    sanitizeArticleHtml('<div data-callout="x" onclick="alert(1)" style="color:red" class="a"><p>y</p></div>'),
+    "<div><p>y</p></div>",
+  );
+});

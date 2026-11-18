@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import ThemeToggle from "@/components/theme-toggle";
+import LabelButton from "@/components/label-button";
 
 type AdminItem = {
   href: string;
@@ -28,6 +29,21 @@ const items: AdminItem[] = [
     href: "/admin/categories",
     label: "分类管理",
     icon: <path d="M3.5 3.5h6v6h-6zM11.5 3.5h6v6h-6zM3.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z" />,
+  },
+  {
+    href: "/admin/tags",
+    label: "标签管理",
+    icon: <path d="M3 3h7.5l8 8-7.5 7.5-8-8zM7 7h.01" />,
+  },
+  {
+    href: "/admin/about",
+    label: "关于页面",
+    icon: (
+      <>
+        <circle cx="11" cy="11" r="8" />
+        <path d="M11 10v5M11 7h.01" />
+      </>
+    ),
   },
   {
     href: "/admin/settings",
@@ -153,7 +169,7 @@ export default function AdminSidebar() {
   const toggleId = useId();
   const drawerId = useId();
   const toggleRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLLabelElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
 
   const currentItem =
@@ -228,10 +244,9 @@ export default function AdminSidebar() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <label
+            <LabelButton
               ref={triggerRef}
               htmlFor={toggleId}
-              role="button"
               tabIndex={0}
               aria-label="打开后台菜单"
               aria-controls={drawerId}
@@ -256,7 +271,7 @@ export default function AdminSidebar() {
             >
               <path d="M2.5 5h13M2.5 9h13M2.5 13h13" />
             </svg>
-            </label>
+            </LabelButton>
           </div>
         </div>
 
@@ -264,9 +279,8 @@ export default function AdminSidebar() {
           ref={shellRef}
           className="admin-mobile-drawer-shell pointer-events-none fixed inset-0 z-[90] md:hidden"
         >
-          <label
+          <LabelButton
             htmlFor={toggleId}
-            role="button"
             tabIndex={0}
             aria-label="关闭后台菜单"
             className="admin-mobile-drawer-backdrop absolute inset-0 cursor-pointer bg-scrim/45 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
@@ -288,9 +302,8 @@ export default function AdminSidebar() {
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
-                <label
+                <LabelButton
                   htmlFor={toggleId}
-                  role="button"
                   tabIndex={0}
                   aria-label="关闭后台菜单"
                   onKeyDown={(event) => {
@@ -313,7 +326,7 @@ export default function AdminSidebar() {
                 >
                   <path d="M4 4l10 10M14 4 4 14" />
                 </svg>
-                </label>
+                </LabelButton>
               </div>
             </div>
 

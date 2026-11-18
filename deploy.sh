@@ -53,6 +53,9 @@ if app_online; then
   DATABASE_URL="file:$SNAPSHOT" npx prisma db seed
 
   echo "=== 4. 基于快照生产构建（站点继续服务） ==="
+  # Next 的数据缓存（unstable_cache）存在 .next/cache/fetch-cache，而后台改动触发的失效只记在
+  # 运行中进程的内存里；不清掉的话，构建可能把失效前的旧数据烘焙进新版本。清掉后构建直接查快照库。
+  rm -rf .next/cache/fetch-cache
   DATABASE_URL="file:$SNAPSHOT" npm run build
   cleanup_snapshot
 
@@ -73,7 +76,8 @@ else
   npx prisma db seed
 
   echo "=== 5. 生产构建 ==="
-  # 先迁移/种子再构建，避免静态主页把空数据库内容烘焙进 .next。
+  # 先迁移/种子再构建，避免静态主页把空数据库内容烘焙进 .next；清掉旧的数据缓存，构建直接查库。
+  rm -rf .next/cache/fetch-cache
   npm run build
 
   echo "=== 6. 启动 PM2 ==="

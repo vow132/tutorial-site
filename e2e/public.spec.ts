@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import sharp from "sharp";
 import { collectErrors } from "./helpers";
 
 async function firstHref(page: import("@playwright/test").Page, prefix: string) {
@@ -76,4 +77,24 @@ test("the view beacon rejects cross-site and malformed requests", async ({ reque
   });
   expect(crossSite.status()).toBe(403);
   expect((await request.post("/api/views", { data: { id: "x" } })).status()).toBe(400);
+});
+
+test("articles without a cover get a generated 1200×630 share image", async ({ page, request }) => {
+  await page.goto("/tutorials/css-flexbox-guide");
+  const content = (await page.locator('meta[property="og:image"]').getAttribute("content"))!;
+  expect(content).toMatch(/\/og\/tutorials\/\d+\?v=[\w-]+$/);
+  await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute("content", content);
+
+  const url = new URL(content);
+  const image = await request.get(url.pathname + url.search);
+  expect(image.status()).toBe(200);
+  expect(image.headers()["content-type"]).toBe("image/png");
+  expect(image.headers()["cache-control"]).toContain("immutable");
+  const meta = await sharp(await image.body()).metadata();
+  expect([meta.width, meta.height]).toEqual([1200, 630]);
+
+  // 旧版本号只短期缓存；不存在或未发布的文章 404
+  const stale = await request.get(`${url.pathname}?v=old`);
+  expect(stale.headers()["cache-control"]).toBe("public, max-age=300");
+  expect((await request.get("/og/tutorials/999999")).status()).toBe(404);
 });

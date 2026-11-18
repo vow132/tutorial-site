@@ -1,5 +1,6 @@
 import IntentLink from "./intent-link";
 import GlowCard from "./glow-card";
+import { categoryTextStyle } from "@/lib/color";
 
 type Props = {
   title: string;
@@ -9,6 +10,8 @@ type Props = {
   categoryColor: string;
   views: number;
   createdAt: Date;
+  /** 列表缩略图（封面或正文第一张图的小图） */
+  thumbnail?: string | null;
 };
 
 export default function TutorialCard({
@@ -19,16 +22,17 @@ export default function TutorialCard({
   categoryColor,
   views,
   createdAt,
+  thumbnail,
 }: Props) {
   return (
     <IntentLink href={`/tutorials/${slug}`} className="group block h-full">
       <GlowCard className="flex h-full flex-col p-6">
-        <div className="flex items-center gap-2 text-xs text-ink-3">
+        <div className="flex items-center gap-2 whitespace-nowrap text-xs text-ink-3">
           <span
-            className="h-2 w-2 rounded-full"
+            className="h-2 w-2 shrink-0 rounded-full"
             style={{ backgroundColor: categoryColor }}
           />
-          <span className="font-medium" style={{ color: categoryColor }}>
+          <span className="cat-text truncate font-medium" style={categoryTextStyle(categoryColor)}>
             {categoryName}
           </span>
           <span>·</span>
@@ -40,12 +44,28 @@ export default function TutorialCard({
             })}
           </time>
         </div>
-        <h3 className="mt-3 text-lg font-bold leading-snug text-ink transition-colors group-hover:text-accent">
-          {title}
-        </h3>
-        <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-2 line-clamp-2">
-          {excerpt ?? "暂无摘要"}
-        </p>
+        <div className="mt-3 flex flex-1 gap-4">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h3 className="text-lg font-bold leading-snug text-ink transition-colors group-hover:text-accent">
+              {title}
+            </h3>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-2 line-clamp-2">
+              {excerpt ?? "暂无摘要"}
+            </p>
+          </div>
+          {thumbnail && (
+            // eslint-disable-next-line @next/next/no-img-element -- 上传目录里的 400px 宽 WebP 小图
+            <img
+              src={thumbnail}
+              alt=""
+              width={128}
+              height={72}
+              loading="lazy"
+              decoding="async"
+              className="card-thumb mt-1 aspect-video w-24 shrink-0 self-start rounded-lg border border-line bg-paper object-cover sm:w-28"
+            />
+          )}
+        </div>
         <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-ink-3">
           <span className="flex items-center gap-1">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">

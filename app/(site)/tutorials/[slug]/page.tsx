@@ -2,20 +2,24 @@ import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { firstArticleImage, htmlToDescription, processArticle } from "@/lib/article";
+import { htmlToDescription, processArticle, uploadedImage } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
 import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
 import { decodeSegment } from "@/lib/url";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
-import { DEFAULT_OG_IMAGE, breadcrumbJsonLd, pageMetadata, toAbsolute } from "@/lib/seo";
+import { breadcrumbJsonLd, pageMetadata, toAbsolute } from "@/lib/seo";
+import { SHARE_IMAGE_SIZE, shareImagePath } from "@/lib/share-image";
 import JsonLd from "@/components/json-ld";
 import GlowCard from "@/components/glow-card";
 import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 import ViewBeacon from "@/components/view-beacon";
+import ArticleEnhancer from "@/components/article-enhancer";
+import { categoryTextStyle } from "@/lib/color";
+import TagChips from "@/components/tag-chips";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -30,6 +34,9 @@ export function generateStaticParams() {
   return [];
 }
 
+const formatDate = (date: Date) =>
+  date.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
+
 type PublishedTutorial = NonNullable<Awaited<ReturnType<typeof getPublishedTutorial>>>;
 
 const tutorialPath = (slug: string) => `/tutorials/${encodeURIComponent(slug)}`;
@@ -37,6 +44,33 @@ const tutorialPath = (slug: string) => `/tutorials/${encodeURIComponent(slug)}`;
 /** 摘要优先；没写摘要时取正文开头（已过滤的 HTML），再不行用标题。 */
 function describe(tutorial: PublishedTutorial, html: string) {
   return tutorial.excerpt?.trim() || htmlToDescription(html) || tutorial.title;
+}
+
+/** 封面（带尺寸和 srcset）；没有封面或文件丢失时为 null。 */
+async function coverImage(tutorial: PublishedTutorial) {
+  const info = tutorial.cover ? await uploadedImage(tutorial.cover) : null;
+  return info && tutorial.cover ? { url: tutorial.cover, ...info } : null;
+}
+
+/**
+ * 分享卡片和结构化数据用的图：有封面用封面，否则用自动生成的「标题 + 分类」分享图
+ * （/og/tutorials/<id>，见 lib/share-image-render.tsx），比正文里随手截的图更适合做卡片。
+ */
+async function shareImage(tutorial: PublishedTutorial) {
+  const cover = await coverImage(tutorial);
+  if (cover) return { url: cover.url, width: cover.width, height: cover.height, alt: tutorial.title };
+  const { siteName, logoText } = await getSettings();
+  return {
+    url: shareImagePath(tutorial.id, {
+      title: tutorial.title,
+      categoryName: tutorial.category.name,
+      categoryColor: tutorial.category.color,
+      siteName,
+      logoText,
+    }),
+    ...SHARE_IMAGE_SIZE,
+    alt: tutorial.title,
+  };
 }
 
 export async function generateMetadata({
@@ -52,16 +86,16 @@ export async function generateMetadata({
   if (!t) notFound();
   // 与页面渲染共用同一份处理结果（processArticle 按内容哈希缓存）。
   const { html } = await processArticle(t.content);
-  const image = firstArticleImage(html);
   return pageMetadata({
     title: t.title,
     description: describe(t, html),
     path: tutorialPath(t.slug),
-    image: image && { ...image, alt: image.alt ?? t.title },
+    image: await shareImage(t),
     article: {
       publishedTime: t.createdAt,
       modifiedTime: t.updatedAt,
       section: t.category.name,
+      tags: t.tags.map(({ tag }) => tag.name),
     },
   });
 }
@@ -78,7 +112,7 @@ export default async function TutorialDetailPage({
   if (!tutorial) notFound();
 
   // 上一篇 / 下一篇（同分类内按时间）
-  const [prev, next, processed, settings, relatedCandidates] = await Promise.all([
+  const [prev, next, processed, settings, relatedCandidates, image] = await Promise.all([
     prisma.tutorial.findFirst({
       where: {
         published: true,
@@ -100,7 +134,9 @@ export default async function TutorialDetailPage({
     processArticle(tutorial.content),
     getSettings(),
     getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
+    shareImage(tutorial),
   ]);
+  const cover = await coverImage(tutorial);
 
   // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
   const related = relatedCandidates
@@ -119,10 +155,11 @@ export default async function TutorialDetailPage({
         description: describe(tutorial, html),
         url: articleUrl,
         mainEntityOfPage: articleUrl,
-        image: [toAbsolute(firstArticleImage(html)?.url ?? DEFAULT_OG_IMAGE.url)],
+        image: [toAbsolute(image.url)],
         datePublished: tutorial.createdAt.toISOString(),
         dateModified: tutorial.updatedAt.toISOString(),
         articleSection: tutorial.category.name,
+        ...(tutorial.tags.length ? { keywords: tutorial.tags.map(({ tag }) => tag.name).join(",") } : {}),
         inLanguage: "zh-CN",
         author: site,
         publisher: site,
@@ -137,6 +174,8 @@ export default async function TutorialDetailPage({
       ]),
     ],
   };
+  // 修改日期与发布日期不是同一天时才显示「更新于」（阅读量计数不会改动 updatedAt）。
+  const updated = formatDate(tutorial.updatedAt) !== formatDate(tutorial.createdAt);
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;
   const minutes = Math.max(1, Math.round(words / 400));
 
@@ -144,9 +183,10 @@ export default async function TutorialDetailPage({
     <div className="mx-auto max-w-6xl px-4 pt-12">
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
+      <ArticleEnhancer />
       {/* 面包屑 */}
       <Reveal>
-        <nav className="flex items-center gap-2 text-sm text-ink-3">
+        <nav className="print-hide flex items-center gap-2 text-sm text-ink-3">
           <IntentLink href="/" className="transition-colors hover:text-accent">首页</IntentLink>
           <span>/</span>
           <IntentLink
@@ -161,16 +201,16 @@ export default async function TutorialDetailPage({
         </nav>
       </Reveal>
 
-      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px] xl:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="article-grid mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_230px] xl:grid-cols-[minmax(0,1fr)_260px]">
         <div>
           {/* 头部 */}
           <Reveal fade={false}>
             <header>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+                className="cat-text inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
                 style={{
                   backgroundColor: `${tutorial.category.color}14`,
-                  color: tutorial.category.color,
+                  ...categoryTextStyle(tutorial.category.color),
                 }}
               >
                 <span
@@ -182,22 +222,45 @@ export default async function TutorialDetailPage({
               <h1 className="mt-4 text-3xl font-extrabold leading-tight text-ink md:text-4xl">
                 {tutorial.title}
               </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-4 border-b border-line pb-6 text-xs text-ink-3">
-                <span>
-                  发布于{" "}
-                  <time dateTime={tutorial.createdAt.toISOString()}>
-                    {tutorial.createdAt.toLocaleDateString("zh-CN", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </time>
-                </span>
-                <span>约 {minutes} 分钟读完</span>
-                <span>{tutorial.views} 次阅读</span>
+              <div className="border-b border-line pb-6">
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-ink-3">
+                  <span>
+                    发布于{" "}
+                    <time dateTime={tutorial.createdAt.toISOString()}>{formatDate(tutorial.createdAt)}</time>
+                  </span>
+                  {updated && (
+                    <span>
+                      更新于{" "}
+                      <time dateTime={tutorial.updatedAt.toISOString()}>{formatDate(tutorial.updatedAt)}</time>
+                    </span>
+                  )}
+                  <span>约 {minutes} 分钟读完</span>
+                  <span>{tutorial.views} 次阅读</span>
+                </div>
+                <TagChips
+                  label="标签"
+                  className="mt-4"
+                  tags={tutorial.tags.map(({ tag }) => tag)}
+                />
               </div>
             </header>
           </Reveal>
+
+          {/* 封面头图：首屏主图，提高下载优先级 */}
+          {cover && (
+            // eslint-disable-next-line @next/next/no-img-element -- 上传目录的静态文件，自带响应式小图
+            <img
+              src={cover.url}
+              srcSet={cover.srcSet}
+              sizes="(min-width: 1280px) 820px, (min-width: 1024px) calc(100vw - 302px), calc(100vw - 32px)"
+              width={cover.width}
+              height={cover.height}
+              alt={tutorial.title}
+              fetchPriority="high"
+              decoding="async"
+              className="article-cover mt-8 aspect-video w-full rounded-2xl border border-line bg-paper object-cover"
+            />
+          )}
 
           {/* 移动端本页目录（可自行开关） */}
           <MobileToc items={toc} />
@@ -212,7 +275,7 @@ export default async function TutorialDetailPage({
 
           {/* 上一篇 / 下一篇 */}
           <Reveal mode="scroll">
-            <nav className="mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <nav className="print-hide mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {prev ? (
                 <IntentLink href={`/tutorials/${prev.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5">
@@ -240,7 +303,7 @@ export default async function TutorialDetailPage({
 
           {/* 相关教程：给读者下一步，也让爬虫更快发现同主题文章 */}
           {related.length > 0 && (
-            <section aria-labelledby="related-heading" className="mt-14">
+            <section aria-labelledby="related-heading" className="print-hide mt-14">
               <Reveal mode="scroll">
                 <h2 id="related-heading" className="text-lg font-bold text-ink">
                   相关教程
@@ -257,6 +320,7 @@ export default async function TutorialDetailPage({
                       categoryColor={item.category.color}
                       views={item.views}
                       createdAt={item.createdAt}
+                      thumbnail={item.thumbnail}
                     />
                   </Reveal>
                 ))}

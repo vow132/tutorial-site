@@ -1,8 +1,10 @@
 import IntentLink from "./intent-link";
+import SearchShortcut from "./search-shortcut";
 
 export default function SearchInput() {
   return (
     <>
+      <SearchShortcut />
       {/* 小屏使用图标入口，避免窄屏输入框挤压 Logo。 */}
       <IntentLink
         href="/search"
@@ -30,8 +32,16 @@ export default function SearchInput() {
           aria-label="搜索教程"
           enterKeyHint="search"
           placeholder="搜索教程…"
+          aria-keyshortcuts="/ Control+K Meta+K"
           className="w-24 bg-transparent text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 transition-all placeholder:text-ink-3 focus:w-40 sm:w-32"
         />
+        <kbd
+          className="hidden rounded-md border border-line px-1.5 font-sans text-[11px] leading-5 text-ink-3 lg:inline"
+          title="按 / 或 Ctrl+K 快速搜索"
+          aria-hidden="true"
+        >
+          /
+        </kbd>
         <button
           type="submit"
           className="flex h-8 w-8 items-center justify-center rounded-full bg-btn text-white transition-transform hover:scale-105"

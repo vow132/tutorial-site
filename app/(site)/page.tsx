@@ -12,6 +12,7 @@ import GlowCard from "@/components/glow-card";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 import JsonLd from "@/components/json-ld";
+import { categoryTextStyle } from "@/lib/color";
 import { pageMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site-url";
 
@@ -39,6 +40,7 @@ export default async function HomePage() {
         title: true,
         slug: true,
         excerpt: true,
+        thumbnail: true,
         views: true,
         createdAt: true,
         category: { select: { name: true, color: true } },
@@ -243,8 +245,8 @@ export default async function HomePage() {
                       style={{ backgroundColor: latest[0].category.color }}
                     />
                     <span
-                      className="font-medium"
-                      style={{ color: latest[0].category.color }}
+                      className="cat-text font-medium"
+                      style={categoryTextStyle(latest[0].category.color)}
                     >
                       {latest[0].category.name}
                     </span>
@@ -264,7 +266,19 @@ export default async function HomePage() {
                     {latest[0].excerpt ?? "暂无摘要"}
                   </p>
                 </div>
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line text-ink-2 transition-colors group-hover:border-accent group-hover:bg-accent-soft group-hover:text-accent">
+                {latest[0].thumbnail && (
+                  // eslint-disable-next-line @next/next/no-img-element -- 上传目录里的 WebP 小图
+                  <img
+                    src={latest[0].thumbnail}
+                    alt=""
+                    width={224}
+                    height={126}
+                    loading="lazy"
+                    decoding="async"
+                    className="card-thumb hidden aspect-video w-56 shrink-0 rounded-2xl border border-line bg-paper object-cover transition-transform duration-300 group-hover:scale-[1.02] sm:block"
+                  />
+                )}
+                <span className={`${latest[0].thumbnail ? "sm:hidden " : ""}flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line text-ink-2 transition-colors group-hover:border-accent group-hover:bg-accent-soft group-hover:text-accent`}>
                   <svg className="transition-transform duration-200 group-hover:translate-x-0.5" width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                     <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
                   </svg>
@@ -284,6 +298,7 @@ export default async function HomePage() {
                 categoryColor={t.category.color}
                 views={t.views}
                 createdAt={t.createdAt}
+                thumbnail={t.thumbnail}
               />
             </Reveal>
           ))}
