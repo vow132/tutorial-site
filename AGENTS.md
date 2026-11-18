@@ -25,6 +25,7 @@ npm test                 # 单元测试（lib/*.test.ts + scripts/*.test.mjs）
 npm run test:e2e         # 端到端测试（Playwright，需先 npm run build；会建/删 e2e- 前缀的数据，勿连生产库）
 npm run backup           # SQLite 在线备份到 backups/（设置 BACKUP_PASSPHRASE 时加密为 .db.gz.enc）
 npm run backup:restore -- <文件>  # 把备份解为独立的 restored-*.db 并做完整性检查（不动线上库）
+npm run uploads:clean    # 列出没被引用的上传图片（-- --apply 移到 uploads-trash/）
 npm run admin:reset      # 应急：重置管理员密码、关闭两步验证（含恢复码）、删除通行密钥、退出所有设备
 ```
 
@@ -44,6 +45,10 @@ npm run admin:reset      # 应急：重置管理员密码、关闭两步验证�
 - **关于页**：内容存 `Setting` key=`about`（`lib/about.ts`），后台 `/admin/about` 复用正文编辑器与白名单，正文为空时 `/about` 404 且不进 sitemap
 - **文章分享图**：没有封面时 OG/Twitter/JSON-LD 用 `/og/tutorials/<id>?v=<内容哈希>`（`lib/share-image.ts` 算地址，`lib/share-image-render.tsx` 用 next/og 绘制，结果按版本在内存缓存）。字体是打包在 `assets/fonts/` 的思源黑体 GB2312 子集；**只绘制字体里有的字符**（`lib/font-coverage.ts` 读 cmap），否则 next/og 会去 Google Fonts/jsDelivr 下载补字，国内服务器会卡住。改模板时把 `TEMPLATE_VERSION` 加一
 - **Next 数据缓存的已知限制**：`revalidateTag/revalidatePath` 的失效记录只存在当前进程内存里，进程重启后磁盘上的缓存页/数据缓存会按各自的 revalidate 时间才刷新，所以 `deploy.sh` 构建前会清掉 `.next/cache/fetch-cache`
+- **编辑器**：表格是基于 `@tiptap/pm/tables` 的自写扩展（`components/editor/table.ts`，没装 @tiptap/extension-table：它的 peer 版本和已装的 Tiptap 对不上），代码块语言表在 `lib/code-languages.ts`（与文章页标签共用）。工具栏按选区显示表格/代码语言按钮，所以 `onSelectionUpdate` 会触发重渲染
+- **本地草稿**：教程表单每 3 秒把字段快照存到 localStorage（`app/admin/(panel)/tutorials/use-draft.ts`），和服务器版本不同就保存；保存成功后 action 跳到 `/admin/tutorials?saved=<key>`，列表页据此清除草稿。改表单字段时同步 `use-draft.ts` 的 FIELDS 和 `tutorial-form.tsx` 的 `toDraft()`
+- **历史版本 / 预览 / 定时发布**：`updateTutorial` 内容有变时先 `saveRevision()`（`lib/revisions.ts`，每篇最多 30 个），`/admin/tutorials/[id]/revisions` 查看和恢复；`/admin/preview/[id]` 预览已保存内容（含草稿）。`Tutorial.publishAt` 到点由 `lib/scheduled-publish.ts` 的定时器发布：定时器在请求外，不能 revalidateTag，所以带进程内随机口令请求本机 `/api/internal/publish-due` 去发布并刷新缓存。教程变动后的前台缓存刷新统一用 `lib/revalidate-public.ts`
+- **搜索**：≥3 个字走 FTS5 trigram（`TutorialSearch`，SQL 触发器维护）；1–2 个字查标题摘要 + 中文两两切词索引 `TutorialBigram`（`lib/search-index.ts`，应用维护：启动和每次 `revalidatePublic()` 时按 updatedAt 增量同步）；标签名完全相同的教程排在最前
 - **正文提示框**：`components/editor/callout.ts`（Tiptap 节点，`<div data-callout="tip|warning|danger">`），类型表在 `lib/callouts.ts`，白名单在 `lib/sanitize.ts` 的 `transformTags.div`，标签文字/配色在 `globals.css`
 - **精简模式**：根布局内联脚本在省流量、内存 < 4GB、CPU < 4 核或系统要求减少透明效果时给 `<html>` 加 `data-lite`；`globals.css` 据此关掉 backdrop-filter、`blur-3xl` 光晕和循环动画，`pointer-aura` 也不启动。新增毛玻璃/循环动画时确认精简模式下能关掉
 - **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`，宽图另存 `-400w`/`-800w`/`-1200w.webp` 响应式小图（命名在 `lib/image-variants.ts`），`lib/article.ts` 渲染时自动加 `srcset`/`sizes`；旧图用 `npm run images:variants` 补生成。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供

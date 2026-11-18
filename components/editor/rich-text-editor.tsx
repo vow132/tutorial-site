@@ -10,6 +10,8 @@ import { Placeholder } from "@tiptap/extensions";
 import { altFromFileName } from "@/lib/image-alt";
 import { CALLOUT_TYPES } from "@/lib/callouts";
 import { Callout } from "./callout";
+import { ArticleTable } from "./table";
+import { CODE_LANGUAGES } from "@/lib/code-languages";
 
 async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
@@ -108,6 +110,8 @@ export default function RichTextEditor({
   const [dragging, setDragging] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
   const [calloutOpen, setCalloutOpen] = useState(false);
+  // 光标移进表格/代码块时工具栏要出现对应按钮：选区变化也重新渲染一次
+  const [, setSelectionTick] = useState(0);
   const calloutRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -124,6 +128,7 @@ export default function RichTextEditor({
       Color,
       Image.configure({ inline: false, allowBase64: false }),
       Callout,
+      ArticleTable,
       Placeholder.configure({
         placeholder: "开始撰写正文… 支持直接拖拽或粘贴图片",
       }),
@@ -136,6 +141,7 @@ export default function RichTextEditor({
       editorRef.current = null;
     },
     onUpdate: ({ editor }) => setHtml(editor.getHTML()),
+    onSelectionUpdate: () => setSelectionTick((tick) => tick + 1),
     editorProps: {
       handleDrop: (view, event, _slice, moved) => {
         if (moved) return false;
@@ -389,6 +395,52 @@ export default function RichTextEditor({
         >
           代码块
         </button>
+        {/* 代码块语言：光标在代码块里时出现 */}
+        {editor.isActive("codeBlock") && (
+          <select
+            aria-label="代码语言"
+            value={(editor.getAttributes("codeBlock").language as string | null) ?? ""}
+            onChange={(event) =>
+              editor.chain().focus().updateAttributes("codeBlock", { language: event.target.value || null }).run()
+            }
+            className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink-2 outline-none focus:border-accent"
+          >
+            <option value="">自动识别语言</option>
+            {Object.entries(CODE_LANGUAGES).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          title="插入表格（3×3，首行为表头）"
+          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3 }).run()}
+          disabled={editor.isActive("table")}
+          className={btn(false, editor.isActive("table"))}
+        >
+          ▦ 表格
+        </button>
+        {editor.isActive("table") && (
+          <>
+            <button type="button" title="在下方加一行" onClick={() => editor.chain().focus().addRowAfter().run()} className={btn(false)}>
+              +行
+            </button>
+            <button type="button" title="在右侧加一列" onClick={() => editor.chain().focus().addColumnAfter().run()} className={btn(false)}>
+              +列
+            </button>
+            <button type="button" title="删除当前行" onClick={() => editor.chain().focus().deleteRow().run()} className={btn(false)}>
+              −行
+            </button>
+            <button type="button" title="删除当前列" onClick={() => editor.chain().focus().deleteColumn().run()} className={btn(false)}>
+              −列
+            </button>
+            <button type="button" title="删除整个表格" onClick={() => editor.chain().focus().deleteTable().run()} className={`${btn(false)} text-red-500`}>
+              删表格
+            </button>
+          </>
+        )}
         {/* 提示框：提示 / 注意 / 警告 */}
         <div ref={calloutRef} className="relative">
           <button

@@ -33,6 +33,7 @@ const LABELS: Record<string, string> = {
   "tutorial.delete": "删除教程",
   "tutorial.publish": "发布教程",
   "tutorial.unpublish": "撤回教程",
+  "tutorial.restore": "恢复历史版本",
   "category.create": "新建分类",
   "category.update": "编辑分类",
   "category.delete": "删除分类",

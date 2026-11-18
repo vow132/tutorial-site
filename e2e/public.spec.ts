@@ -98,3 +98,22 @@ test("articles without a cover get a generated 1200×630 share image", async ({ 
   expect(stale.headers()["cache-control"]).toBe("public, max-age=300");
   expect((await request.get("/og/tutorials/999999")).status()).toBe(404);
 });
+
+test("two-character Chinese words and tag names find articles", async ({ page }) => {
+  // 「指纹」只出现在示例文章《五分钟理解 HTTP 缓存》的正文里
+  await page.goto(`/search?q=${encodeURIComponent("指纹")}`);
+  await expect(page.locator('main a[href="/tutorials/http-cache-in-5-min"]').first()).toBeVisible();
+  // 「前端基础」是示例标签
+  await page.goto(`/search?q=${encodeURIComponent("前端基础")}`);
+  await expect(page.locator('main a[href="/tutorials/css-flexbox-guide"]').first()).toBeVisible();
+  await expect(page.locator('main a[href="/tutorials/http-cache-in-5-min"]').first()).toBeVisible();
+});
+
+test("the health check reports status and the internal publish hook is hidden", async ({ request }) => {
+  const health = await request.get("/api/health");
+  expect(health.status()).toBe(200);
+  expect(health.headers()["cache-control"]).toBe("no-store");
+  expect(await health.json()).toEqual({ status: "ok", database: "ok" });
+  expect((await request.post("/api/internal/publish-due")).status()).toBe(404);
+  expect((await request.post("/api/internal/publish-due", { headers: { "x-scheduler-token": "guess" } })).status()).toBe(404);
+});

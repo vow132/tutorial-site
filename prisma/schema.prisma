@@ -26,22 +26,25 @@ model Category {
 }
 
 model Tutorial {
-  id         Int           @id @default(autoincrement())
+  id         Int                @id @default(autoincrement())
   title      String
-  slug       String        @unique
+  slug       String             @unique
   excerpt    String?
   content    String
   /// 后台上传的封面图（/uploads/…），文章页头图与分享卡片使用
   cover      String?
-  /// 列表卡片缩略图：封面，没有封面时取正文第一张上传图片（优先 800w 小图）；保存时计算
+  /// 列表卡片缩略图：封面，没有封面时取正文第一张上传图片（优先 400w 小图）；保存时计算
   thumbnail  String?
-  published  Boolean       @default(false)
-  views      Int           @default(0)
+  published  Boolean            @default(false)
+  /// 定时发布时间：未发布且到了这个时间，由后台定时任务自动发布（lib/scheduled-publish.ts）
+  publishAt  DateTime?
+  views      Int                @default(0)
   categoryId Int
-  category   Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category   Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   tags       TutorialTag[]
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  revisions  TutorialRevision[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 
   @@index([categoryId])
   @@index([published, createdAt])
@@ -51,6 +54,25 @@ model Tutorial {
   @@index([published, updatedAt, slug])
   // 后台教程列表按最近修改排序
   @@index([updatedAt])
+  // 定时发布任务：找到期的草稿
+  @@index([published, publishAt])
+}
+
+/// 教程的历史版本：每次保存前把旧内容存一份（每篇最多保留 30 个），可在后台查看和恢复。
+model TutorialRevision {
+  id         Int      @id @default(autoincrement())
+  tutorialId Int
+  tutorial   Tutorial @relation(fields: [tutorialId], references: [id], onDelete: Cascade)
+  title      String
+  excerpt    String?
+  content    String
+  /// 这个版本当初保存的时间
+  savedAt    DateTime
+  /// 用新内容替换掉这个版本的管理员
+  replacedBy String?
+  createdAt  DateTime @default(now())
+
+  @@index([tutorialId, savedAt])
 }
 
 model Admin {

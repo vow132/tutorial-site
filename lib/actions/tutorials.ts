@@ -1,14 +1,14 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { firstUploadedImage, thumbnailFor, uploadedImage } from "@/lib/article";
-import { CACHE_TAGS } from "@/lib/public-data";
-import { clearSearchCache } from "@/lib/search";
+import { revalidatePublic } from "@/lib/revalidate-public";
+import { contentChanged, saveRevision } from "@/lib/revisions";
 import { parseTagNames } from "@/lib/tags";
 import { setTutorialTags } from "@/lib/tag-sync";
 
@@ -33,7 +33,10 @@ async function parseForm(formData: FormData) {
   // 不信任客户端：Server Action 可被绕过编辑器直接调用，入库前按白名单过滤。
   const content = sanitizeArticleHtml(String(formData.get("content") ?? "")).trim();
   const categoryId = Number(formData.get("categoryId"));
-  const published = formData.get("published") === "on";
+  let published = formData.get("published") === "on";
+  // 定时发布：浏览器把本地时间换算成 ISO 字符串放在 publishAt 里
+  const publishAtRaw = String(formData.get("publishAt") ?? "").trim();
+  const publishAt = publishAtRaw ? new Date(publishAtRaw) : null;
   const cover = String(formData.get("cover") ?? "").trim() || null;
   // 标签输入框里还没确认成标签的文字（tagsPending）也一起算上，免得点保存时丢掉。
   const tags = parseTagNames(`${formData.get("tags") ?? ""},${formData.get("tagsPending") ?? ""}`);
@@ -48,6 +51,12 @@ async function parseForm(formData: FormData) {
   if (!content || content === "<p></p>") return { error: "正文不能为空" as const };
   if (!categoryId) return { error: "请选择分类" as const };
   if ("error" in tags) return { error: tags.error };
+  if (publishAt) {
+    if (Number.isNaN(publishAt.getTime())) return { error: "定时发布时间无效" as const };
+    if (publishAt.getTime() <= Date.now()) return { error: "定时发布时间要晚于现在" as const };
+    if (publishAt.getTime() > Date.now() + 366 * 24 * 60 * 60 * 1000) return { error: "定时发布最多提前一年" as const };
+    published = false; // 到点前保持草稿
+  }
   if (cover && (!COVER_URL.test(cover) || !(await uploadedImage(cover)))) {
     return { error: "封面图无效或文件已不存在，请重新上传" as const };
   }
@@ -56,27 +65,11 @@ async function parseForm(formData: FormData) {
   const thumbnail = await thumbnailFor(cover ?? firstUploadedImage(content));
 
   return {
-    data: { title, slug, excerpt: excerpt || null, content, categoryId, published, cover, thumbnail },
+    data: { title, slug, excerpt: excerpt || null, content, categoryId, published, publishAt, cover, thumbnail },
     tagNames: tags.names,
   };
 }
 
-/**
- * 文章页是 ISR 缓存页：改 slug 时旧地址、删除时原地址都要显式失效，
- * 否则在 revalidate 周期内还会继续返回旧内容。
- */
-function revalidatePublic(...slugs: (string | null | undefined)[]) {
-  revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
-  revalidateTag(CACHE_TAGS.tags, { expire: 0 });
-  clearSearchCache();
-  revalidatePath("/");
-  revalidatePath("/tutorials");
-  for (const slug of new Set(slugs.filter((item): item is string => Boolean(item)))) {
-    // 中文 slug 的缓存键是编码后的路径；两种写法都失效一遍，确保命中。
-    revalidatePath(`/tutorials/${slug}`);
-    revalidatePath(`/tutorials/${encodeURIComponent(slug)}`);
-  }
-}
 
 export async function createTutorial(
   _prev: TutorialFormState,
@@ -95,7 +88,8 @@ export async function createTutorial(
   await setTutorialTags(created.id, parsed.tagNames);
   await audit("tutorial.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
   revalidatePublic(created.slug);
-  redirect("/admin/tutorials");
+  // ?saved= 让列表页清掉这篇的本地草稿（见 app/admin/(panel)/tutorials/clear-draft.tsx）
+  redirect("/admin/tutorials?saved=new");
 }
 
 export async function updateTutorial(
@@ -112,12 +106,17 @@ export async function updateTutorial(
   });
   if (conflict) return { error: "Slug 已被其他教程占用" };
 
-  const before = await prisma.tutorial.findUnique({ where: { id }, select: { slug: true } });
+  const before = await prisma.tutorial.findUnique({
+    where: { id },
+    select: { slug: true, title: true, excerpt: true, content: true, updatedAt: true },
+  });
+  // 内容有改动时先把旧版本存进历史，误改后可以在「历史版本」里恢复
+  if (before && contentChanged(before, parsed.data)) await saveRevision(id, before, admin.username);
   await prisma.tutorial.update({ where: { id }, data: parsed.data });
   await setTutorialTags(id, parsed.tagNames);
   await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
   revalidatePublic(before?.slug, parsed.data.slug);
-  redirect("/admin/tutorials");
+  redirect(`/admin/tutorials?saved=${id}`);
 }
 
 export async function deleteTutorial(formData: FormData) {
@@ -138,7 +137,8 @@ export async function togglePublish(formData: FormData) {
   if (!t) return;
   await prisma.tutorial.update({
     where: { id },
-    data: { published: !t.published },
+    // 手动切换状态时取消定时发布
+    data: { published: !t.published, publishAt: null },
   });
   await audit(t.published ? "tutorial.unpublish" : "tutorial.publish", {
     actor: admin.username,
@@ -146,4 +146,35 @@ export async function togglePublish(formData: FormData) {
   });
   revalidatePublic(t.slug);
   revalidatePath("/admin/tutorials");
+}
+
+/** 恢复到某个历史版本：当前内容先存成一个新的历史版本，所以恢复本身也能撤销。 */
+export async function restoreRevision(formData: FormData) {
+  const admin = await requireAuth();
+  const revisionId = Number(formData.get("revisionId"));
+  const revision = revisionId
+    ? await prisma.tutorialRevision.findUnique({
+        where: { id: revisionId },
+        include: { tutorial: { select: { id: true, slug: true, title: true, excerpt: true, content: true, cover: true, updatedAt: true } } },
+      })
+    : null;
+  if (!revision) return;
+  const { tutorial } = revision;
+  await saveRevision(tutorial.id, tutorial, admin.username);
+  await prisma.tutorial.update({
+    where: { id: tutorial.id },
+    data: {
+      title: revision.title,
+      excerpt: revision.excerpt,
+      content: revision.content,
+      thumbnail: await thumbnailFor(tutorial.cover ?? firstUploadedImage(revision.content)),
+    },
+  });
+  await audit("tutorial.restore", {
+    actor: admin.username,
+    detail: `#${tutorial.id} ${revision.title}（恢复到 ${revision.savedAt.toISOString().slice(0, 16).replace("T", " ")} UTC 的版本）`,
+  });
+  revalidatePublic(tutorial.slug);
+  revalidatePath(`/admin/tutorials/${tutorial.id}`);
+  redirect(`/admin/tutorials/${tutorial.id}/revisions?restored=1`);
 }

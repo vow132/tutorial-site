@@ -522,6 +522,27 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   text-align: left;
 }
 .article-body th { background: var(--code-bg); font-weight: 650; }
+.article-body .table-wrap { overflow-x: auto; margin: 1.4em 0; }
+.article-body .table-wrap table { margin: 0; }
+.article-body th > p, .article-body td > p { margin: 0; }
+
+/* 编辑器里的表格（components/editor/table.ts） */
+.tiptap-shell .ProseMirror table { width: 100%; border-collapse: collapse; margin: 1em 0; table-layout: fixed; }
+.tiptap-shell .ProseMirror th, .tiptap-shell .ProseMirror td {
+  position: relative;
+  border: 1px solid var(--color-line);
+  padding: 0.4rem 0.7rem;
+  vertical-align: top;
+}
+.tiptap-shell .ProseMirror th { background: var(--code-bg); font-weight: 650; text-align: left; }
+.tiptap-shell .ProseMirror th > p, .tiptap-shell .ProseMirror td > p { margin: 0; }
+.tiptap-shell .ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+  pointer-events: none;
+}
 
 /* ---------- highlight.js（深色，与 pre 底色一致） ---------- */
 .hljs-keyword, .hljs-selector-tag, .hljs-built_in { color: #c792ea; }

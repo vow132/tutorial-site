@@ -33,7 +33,7 @@ export default async function NewTutorialPage() {
         像使用 Word 一样撰写，图片可直接拖入正文
       </p>
       <div className="mt-6">
-        <TutorialForm categories={categories} tagSuggestions={suggestions} action={createTutorial} />
+        <TutorialForm draftKey="new" categories={categories} tagSuggestions={suggestions} action={createTutorial} />
       </div>
     </div>
   );

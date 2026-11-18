@@ -37,7 +37,7 @@ test.describe("covers and callouts", () => {
       await expect(page.locator('.ProseMirror [data-callout="warning"]')).toContainText("先备份数据库再升级");
 
       await page.getByRole("button", { name: "保存教程" }).click();
-      await expect(page).toHaveURL(/\/admin\/tutorials$/);
+      await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
 
       await page.goto(`/tutorials/${slug}`);
       const hero = page.locator("img.article-cover");
@@ -58,7 +58,7 @@ test.describe("covers and callouts", () => {
       await page.getByRole("row").filter({ hasText: title }).locator('a[href^="/admin/tutorials/"]').first().click();
       await page.getByRole("button", { name: "移除封面" }).click();
       await page.getByRole("button", { name: "保存教程" }).click();
-      await expect(page).toHaveURL(/\/admin\/tutorials$/);
+      await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
       await page.goto(`/tutorials/${slug}`);
       await expect(page.locator("img.article-cover")).toHaveCount(0);
       await page.goto("/tutorials");

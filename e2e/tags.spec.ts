@@ -19,7 +19,7 @@ async function createTutorial(page: Page, data: { title: string; slug: string; c
   await page.locator(".ProseMirror").click();
   await page.keyboard.type(`${data.title} 的正文`);
   await page.getByRole("button", { name: "保存教程" }).click();
-  await expect(page).toHaveURL(/\/admin\/tutorials$/);
+  await expect(page).toHaveURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
 }
 
 async function deleteTutorial(page: Page, title: string) {

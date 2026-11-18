@@ -12,7 +12,8 @@ const PORT = Number(process.env.E2E_PORT ?? 3100);
  */
 const SITE_URL = process.env.SITE_URL ?? `http://localhost:${PORT}`;
 const serverEnv = Object.fromEntries(
-  Object.entries({ ...process.env, SITE_URL }).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  // 定时发布每 2 秒检查一次（默认 60 秒），测试不用等一分钟
+  Object.entries({ SCHEDULE_CHECK_SECONDS: "2", ...process.env, SITE_URL }).filter((entry): entry is [string, string] => entry[1] !== undefined),
 );
 
 export default defineConfig({

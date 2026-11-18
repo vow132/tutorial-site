@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { stripHtml } from "@/lib/article";
 import { sharedLimiter } from "@/lib/rate-limit";
+import { bigramMatchQuery } from "@/lib/search-index";
+import { tagSlug } from "@/lib/tags";
 
 export type TutorialSearchResult = {
   id: number;
@@ -75,6 +77,73 @@ async function titleSearch(query: string): Promise<TutorialSearchResult[]> {
   return rows.map(toResult);
 }
 
+/** 两个字的中文词（及单字、两个字母的单词）在正文里查：走 TutorialBigram（lib/search-index.ts）。 */
+async function bigramSearch(match: string): Promise<TutorialSearchResult[]> {
+  try {
+    const rows = await prisma.$queryRaw<RawSearchResult[]>`
+      SELECT
+        t."id", t."title", t."slug", t."excerpt",
+        substr(t."content", 1, ${CONTENT_HEAD}) AS "contentHead",
+        t."views",
+        c."name" AS "categoryName",
+        c."color" AS "categoryColor"
+      FROM "TutorialBigram"
+      JOIN "Tutorial" AS t ON t."id" = "TutorialBigram"."rowid"
+      JOIN "Category" AS c ON c."id" = t."categoryId"
+      WHERE "TutorialBigram" MATCH ${match}
+        AND t."published" = 1
+      ORDER BY bm25("TutorialBigram"), t."views" DESC
+      LIMIT ${SEARCH_LIMIT}
+    `;
+    return rows.map(toResult);
+  } catch {
+    // 索引表还没建好（迁移未执行）时只用标题结果
+    return [];
+  }
+}
+
+/** 标签名和查询完全一样（不分大小写，或别名相同）的教程排在最前面。 */
+async function tagSearch(query: string): Promise<TutorialSearchResult[]> {
+  const slug = tagSlug(query);
+  const rows = await prisma.$queryRaw<RawSearchResult[]>`
+    SELECT
+      t."id", t."title", t."slug", t."excerpt",
+      substr(t."content", 1, ${CONTENT_HEAD}) AS "contentHead",
+      t."views",
+      c."name" AS "categoryName",
+      c."color" AS "categoryColor"
+    FROM "Tutorial" AS t
+    JOIN "Category" AS c ON c."id" = t."categoryId"
+    WHERE t."published" = 1
+      AND EXISTS (
+        SELECT 1 FROM "TutorialTag" AS tt JOIN "Tag" AS g ON g."id" = tt."tagId"
+        WHERE tt."tutorialId" = t."id" AND (lower(g."name") = lower(${query}) OR g."slug" = ${slug})
+      )
+    ORDER BY t."views" DESC
+    LIMIT ${SEARCH_LIMIT}
+  `;
+  return rows.map(toResult);
+}
+
+/** 合并多路结果：按顺序去重，最多 SEARCH_LIMIT 条。 */
+function mergeResults(...lists: TutorialSearchResult[][]) {
+  const seen = new Set<number>();
+  const merged: TutorialSearchResult[] = [];
+  for (const item of lists.flat()) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    merged.push(item);
+  }
+  return merged.slice(0, SEARCH_LIMIT);
+}
+
+/** 短查询：标题/摘要命中优先，再补正文里的两字词命中。 */
+async function shortSearch(query: string): Promise<TutorialSearchResult[]> {
+  const match = bigramMatchQuery(query);
+  const [byTitle, byBody] = await Promise.all([titleSearch(query), match ? bigramSearch(match) : []]);
+  return mergeResults(byTitle, byBody);
+}
+
 async function fullTextSearch(query: string): Promise<TutorialSearchResult[]> {
   // A quoted MATCH expression keeps punctuation and spaces literal. Doubling a
   // quote is FTS5's string escape syntax; the value is still SQL-parameterized.
@@ -141,7 +210,9 @@ export function searchPublishedTutorials(
   if (wait > 0) return Promise.reject(new SearchBusyError(wait));
   budget.hit("all", now);
 
-  const promise = (isShortQuery(query) ? titleSearch(query) : fullTextSearch(query)).catch(
+  const promise = Promise.all([tagSearch(query), isShortQuery(query) ? shortSearch(query) : fullTextSearch(query)])
+    .then(([byTag, rest]) => mergeResults(byTag, rest))
+    .catch(
     (error) => {
       cache.delete(key);
       throw error;
