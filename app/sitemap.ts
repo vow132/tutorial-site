@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/site-url";
 import { MIN_INDEXABLE_TAG_TUTORIALS, tagPath } from "@/lib/tags";
 import { ABOUT_KEY, hasAboutContent, parseAbout } from "@/lib/about";
+import { MIN_INDEXABLE_SERIES_TUTORIALS, seriesPath } from "@/lib/series";
 
 // 每小时重新生成一次，爬虫频繁抓取也不会每次都查库。
 export const revalidate = 3600;
@@ -16,7 +17,7 @@ const MAX_TUTORIAL_URLS = 45000;
  * 阅读量计数不会改动 updatedAt（见 lib/view-counter.ts），所以它是可信的。
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [tutorials, categories, latestByCategory, tagCounts, aboutRow] = await Promise.all([
+  const [tutorials, categories, latestByCategory, tagCounts, aboutRow, seriesCounts] = await Promise.all([
     prisma.tutorial.findMany({
       where: { published: true },
       orderBy: { updatedAt: "desc" },
@@ -35,6 +36,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       _count: { tutorialId: true },
     }),
     prisma.setting.findUnique({ where: { key: ABOUT_KEY } }),
+    prisma.tutorial.groupBy({
+      by: ["seriesId"],
+      where: { published: true, seriesId: { not: null } },
+      _count: { id: true },
+      _max: { updatedAt: true },
+    }),
   ]);
   const about = parseAbout(aboutRow?.value);
   // 标签页：只放够收录门槛的（只有一篇教程的标签页是 noindex）。
@@ -43,6 +50,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .map((row) => row.tagId);
   const tags = indexableTagIds.length
     ? await prisma.tag.findMany({ where: { id: { in: indexableTagIds } }, select: { slug: true } })
+    : [];
+
+  // 系列页：同样只放够收录门槛的；lastmod 取系列里最近修改的教程
+  const indexableSeries = seriesCounts.filter((row) => row._count.id >= MIN_INDEXABLE_SERIES_TUTORIALS);
+  const seriesUpdated = new Map(indexableSeries.map((row) => [row.seriesId, row._max.updatedAt]));
+  const series = indexableSeries.length
+    ? await prisma.series.findMany({ where: { id: { in: [...seriesUpdated.keys()].filter((id): id is number => id !== null) } }, select: { id: true, slug: true } })
     : [];
 
   const latest = tutorials[0]?.updatedAt;
@@ -83,6 +97,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: absoluteUrl(tagPath(tag.slug)),
       changeFrequency: "weekly" as const,
       priority: 0.5,
+    })),
+    ...(seriesCounts.length
+      ? [{ url: absoluteUrl("/series"), changeFrequency: "weekly" as const, priority: 0.5 }]
+      : []),
+    ...series.map((item) => ({
+      url: absoluteUrl(seriesPath(item.slug)),
+      lastModified: seriesUpdated.get(item.id) ?? undefined,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
     })),
     ...tutorials.map((t) => ({
       url: absoluteUrl(`/tutorials/${encodeURIComponent(t.slug)}`),
