@@ -24,7 +24,7 @@ export default async function EditTutorialPage({
   });
   if (!tutorial) notFound();
 
-  const [categoryRows, suggestions, tags, revisionCount] = await Promise.all([
+  const [categoryRows, suggestions, tags, revisionCount, series] = await Promise.all([
     prisma.category.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],
       select: { id: true, name: true, parentId: true, order: true },
@@ -32,6 +32,7 @@ export default async function EditTutorialPage({
     tagSuggestions(),
     tutorialTagNames(tutorial.id),
     prisma.tutorialRevision.count({ where: { tutorialId: tutorial.id } }),
+    prisma.series.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, title: true } }),
   ]);
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
@@ -71,6 +72,7 @@ export default async function EditTutorialPage({
           draftKey={String(tutorial.id)}
           serverUpdatedAt={tutorial.updatedAt.toISOString()}
           categories={categories}
+          series={series}
           tagSuggestions={suggestions}
           action={boundAction}
           initial={{
@@ -79,6 +81,7 @@ export default async function EditTutorialPage({
             excerpt: tutorial.excerpt,
             content: tutorial.content,
             categoryId: tutorial.categoryId,
+            seriesId: tutorial.seriesId,
             published: tutorial.published,
             publishAt: tutorial.publishAt?.toISOString() ?? null,
             cover: tutorial.cover,

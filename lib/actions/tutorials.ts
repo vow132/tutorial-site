@@ -33,6 +33,7 @@ async function parseForm(formData: FormData) {
   // 不信任客户端：Server Action 可被绕过编辑器直接调用，入库前按白名单过滤。
   const content = sanitizeArticleHtml(String(formData.get("content") ?? "")).trim();
   const categoryId = Number(formData.get("categoryId"));
+  const seriesId = Number(formData.get("seriesId")) || null;
   let published = formData.get("published") === "on";
   // 定时发布：浏览器把本地时间换算成 ISO 字符串放在 publishAt 里
   const publishAtRaw = String(formData.get("publishAt") ?? "").trim();
@@ -57,6 +58,9 @@ async function parseForm(formData: FormData) {
     if (publishAt.getTime() > Date.now() + 366 * 24 * 60 * 60 * 1000) return { error: "定时发布最多提前一年" as const };
     published = false; // 到点前保持草稿
   }
+  if (seriesId && !(await prisma.series.findUnique({ where: { id: seriesId }, select: { id: true } }))) {
+    return { error: "所选系列不存在或已被删除，请重新选择" as const };
+  }
   if (cover && (!COVER_URL.test(cover) || !(await uploadedImage(cover)))) {
     return { error: "封面图无效或文件已不存在，请重新上传" as const };
   }
@@ -65,11 +69,19 @@ async function parseForm(formData: FormData) {
   const thumbnail = await thumbnailFor(cover ?? firstUploadedImage(content));
 
   return {
-    data: { title, slug, excerpt: excerpt || null, content, categoryId, published, publishAt, cover, thumbnail },
+    data: { title, slug, excerpt: excerpt || null, content, categoryId, seriesId, published, publishAt, cover, thumbnail },
     tagNames: tags.names,
   };
 }
 
+
+/** 加入（或换到）某个系列时排在末尾；系列没变保持原位；不在系列里时为 0。 */
+async function seriesOrderFor(seriesId: number | null, current?: { seriesId: number | null; seriesOrder: number } | null) {
+  if (!seriesId) return 0;
+  if (current?.seriesId === seriesId) return current.seriesOrder;
+  const last = await prisma.tutorial.aggregate({ where: { seriesId }, _max: { seriesOrder: true } });
+  return (last._max.seriesOrder ?? 0) + 1;
+}
 
 export async function createTutorial(
   _prev: TutorialFormState,
@@ -84,7 +96,9 @@ export async function createTutorial(
   });
   if (exists) return { error: "Slug 已被占用，请更换" };
 
-  const created = await prisma.tutorial.create({ data: parsed.data });
+  const created = await prisma.tutorial.create({
+    data: { ...parsed.data, seriesOrder: await seriesOrderFor(parsed.data.seriesId) },
+  });
   await setTutorialTags(created.id, parsed.tagNames);
   await audit("tutorial.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
   revalidatePublic(created.slug);
@@ -108,11 +122,14 @@ export async function updateTutorial(
 
   const before = await prisma.tutorial.findUnique({
     where: { id },
-    select: { slug: true, title: true, excerpt: true, content: true, updatedAt: true },
+    select: { slug: true, title: true, excerpt: true, content: true, updatedAt: true, seriesId: true, seriesOrder: true },
   });
   // 内容有改动时先把旧版本存进历史，误改后可以在「历史版本」里恢复
   if (before && contentChanged(before, parsed.data)) await saveRevision(id, before, admin.username);
-  await prisma.tutorial.update({ where: { id }, data: parsed.data });
+  await prisma.tutorial.update({
+    where: { id },
+    data: { ...parsed.data, seriesOrder: await seriesOrderFor(parsed.data.seriesId, before) },
+  });
   await setTutorialTags(id, parsed.tagNames);
   await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
   revalidatePublic(before?.slug, parsed.data.slug);

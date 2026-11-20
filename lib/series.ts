@@ -1,0 +1,37 @@
+/**
+ * 教程系列的纯函数：表单校验、URL、系列内的位置（后台、前台、测试共用）。
+ */
+import { tagSlug } from "@/lib/tags";
+
+export const MAX_SERIES_TITLE = 60;
+export const MAX_SERIES_DESCRIPTION = 300;
+/** 系列页至少有这么多篇已发布教程才允许搜索引擎收录。 */
+export const MIN_INDEXABLE_SERIES_TUTORIALS = 2;
+
+export const seriesPath = (slug: string) => `/series/${encodeURIComponent(slug)}`;
+
+/** 校验后台填写的系列信息；别名留空时按标题生成（规则与标签相同：小写、保留中文）。 */
+export function parseSeriesInput(input: { title: unknown; slug: unknown; description: unknown }):
+  | { data: { title: string; slug: string; description: string | null } }
+  | { error: string } {
+  const title = String(input.title ?? "").replace(/\s+/g, " ").trim();
+  const description = String(input.description ?? "").trim();
+  if (!title) return { error: "请输入系列名称" };
+  if (Array.from(title).length > MAX_SERIES_TITLE) return { error: `系列名称最多 ${MAX_SERIES_TITLE} 个字` };
+  if (Array.from(description).length > MAX_SERIES_DESCRIPTION) return { error: `系列简介最多 ${MAX_SERIES_DESCRIPTION} 个字` };
+  const slug = tagSlug(String(input.slug ?? "").trim() || title);
+  if (!slug) return { error: "网址别名需要包含文字或数字" };
+  return { data: { title, slug, description: description || null } };
+}
+
+/** 某篇在系列里的位置，以及前后两篇（都只算已发布的）。不在系列里时返回 null。 */
+export function seriesPosition<T extends { id: number }>(tutorials: T[], id: number) {
+  const index = tutorials.findIndex((tutorial) => tutorial.id === id);
+  if (index === -1) return null;
+  return {
+    number: index + 1,
+    total: tutorials.length,
+    prev: tutorials[index - 1] ?? null,
+    next: tutorials[index + 1] ?? null,
+  };
+}

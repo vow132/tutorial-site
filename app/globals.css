@@ -49,10 +49,13 @@
   --chart-amber: #f59e0b;
   --chart-sky: #0ea5e9;
   --chart-pink: #ec4899;
+  /* 仪表盘阅读趋势折线（亮/暗各取一档，均在图表亮度带内且与卡片底色对比 ≥ 3:1） */
+  --chart-trend: #6366f1;
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
+  --chart-trend: #7c83f6;
   --background: #0d1117;
   --foreground: #f3f4f6;
   --surface: #161d27;
@@ -91,6 +94,8 @@
 .skip-link:focus {
   transform: translateY(0);
 }
+/* 「回到顶部」把焦点移到 main 上（只为让下一次 Tab 从页面开头开始），不需要焦点框 */
+#main[tabindex="-1"]:focus { outline: none; }
 
 html {
   background: var(--background);

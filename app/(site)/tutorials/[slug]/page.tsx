@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { htmlToDescription, processArticle, uploadedImage } from "@/lib/article";
 import { categoryLinkTarget, getCategoryHref } from "@/lib/categories";
 import { getPublishedTutorial } from "@/lib/tutorial-data";
-import { RELATED_TUTORIAL_LIMIT, getRelatedTutorialCandidates } from "@/lib/public-data";
+import { RELATED_TUTORIAL_LIMIT, getPublishedSeries, getRelatedTutorialCandidates } from "@/lib/public-data";
+import { seriesPath, seriesPosition } from "@/lib/series";
 import { decodeSegment } from "@/lib/url";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
@@ -17,9 +18,12 @@ import Toc, { MobileToc } from "@/components/toc";
 import Reveal from "@/components/reveal";
 import TutorialCard from "@/components/tutorial-card";
 import ViewBeacon from "@/components/view-beacon";
+import ReadingProgress from "@/components/reading-progress";
 import ArticleEnhancer from "@/components/article-enhancer";
 import { categoryTextStyle } from "@/lib/color";
 import TagChips from "@/components/tag-chips";
+import SeriesBox from "@/components/series-box";
+import HelpfulFeedback from "@/components/helpful-feedback";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -111,8 +115,8 @@ export default async function TutorialDetailPage({
   const tutorial = slug ? await getPublishedTutorial(slug) : null;
   if (!tutorial) notFound();
 
-  // 上一篇 / 下一篇（同分类内按时间）
-  const [prev, next, processed, settings, relatedCandidates, image] = await Promise.all([
+  // 上一篇 / 下一篇：属于系列时按系列顺序，否则同分类内按时间
+  const [categoryPrev, categoryNext, processed, settings, relatedCandidates, image, allSeries] = await Promise.all([
     prisma.tutorial.findFirst({
       where: {
         published: true,
@@ -135,8 +139,14 @@ export default async function TutorialDetailPage({
     getSettings(),
     getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
     shareImage(tutorial),
+    tutorial.seriesId ? getPublishedSeries() : Promise.resolve([]),
   ]);
   const cover = await coverImage(tutorial);
+  const series = allSeries.find((item) => item.id === tutorial.seriesId) ?? null;
+  const position = series ? seriesPosition(series.tutorials, tutorial.id) : null;
+  const prev = position ? position.prev : categoryPrev;
+  const next = position ? position.next : categoryNext;
+  const neighborNote = position ? "（本系列）" : "";
 
   // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
   const related = relatedCandidates
@@ -159,6 +169,12 @@ export default async function TutorialDetailPage({
         datePublished: tutorial.createdAt.toISOString(),
         dateModified: tutorial.updatedAt.toISOString(),
         articleSection: tutorial.category.name,
+        ...(series && position
+          ? {
+              isPartOf: { "@type": "CreativeWorkSeries", name: series.title, url: absoluteUrl(seriesPath(series.slug)) },
+              position: position.number,
+            }
+          : {}),
         ...(tutorial.tags.length ? { keywords: tutorial.tags.map(({ tag }) => tag.name).join(",") } : {}),
         inLanguage: "zh-CN",
         author: site,
@@ -184,6 +200,7 @@ export default async function TutorialDetailPage({
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
       <ArticleEnhancer />
+      <ReadingProgress />
       {/* 面包屑 */}
       <Reveal>
         <nav className="print-hide flex items-center gap-2 text-sm text-ink-3">
@@ -262,6 +279,10 @@ export default async function TutorialDetailPage({
             />
           )}
 
+          {series && (
+            <SeriesBox title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+          )}
+
           {/* 移动端本页目录（可自行开关） */}
           <MobileToc items={toc} />
 
@@ -273,13 +294,15 @@ export default async function TutorialDetailPage({
             />
           </Reveal>
 
+          <HelpfulFeedback id={tutorial.id} />
+
           {/* 上一篇 / 下一篇 */}
           <Reveal mode="scroll">
             <nav className="print-hide mt-14 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {prev ? (
                 <IntentLink href={`/tutorials/${prev.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5">
-                    <span className="text-xs text-ink-3">← 上一篇</span>
+                    <span className="text-xs text-ink-3">← 上一篇{neighborNote}</span>
                     <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
                       {prev.title}
                     </p>
@@ -291,7 +314,7 @@ export default async function TutorialDetailPage({
               {next && (
                 <IntentLink href={`/tutorials/${next.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5 text-right">
-                    <span className="text-xs text-ink-3">下一篇 →</span>
+                    <span className="text-xs text-ink-3">下一篇{neighborNote} →</span>
                     <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
                       {next.title}
                     </p>

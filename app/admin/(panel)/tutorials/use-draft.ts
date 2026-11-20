@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 export type DraftValues = Record<string, string>;
 type StoredDraft = { savedAt: string; values: DraftValues };
 
-const FIELDS = ["title", "slug", "excerpt", "categoryId", "tags", "tagsPending", "cover", "content", "published", "publishAt"];
+const FIELDS = ["title", "slug", "excerpt", "categoryId", "seriesId", "tags", "tagsPending", "cover", "content", "published", "publishAt"];
 export const draftStorageKey = (key: string) => `tutorial-draft:${key}`;
 
 function snapshot(form: HTMLFormElement): DraftValues {
