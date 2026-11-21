@@ -1,5 +1,7 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { stripHtml } from "@/lib/article";
+import { htmlFragmentToText, snippetAround, snippetShowsKeyword } from "@/lib/search-snippet";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { bigramMatchQuery } from "@/lib/search-index";
 import { tagSlug } from "@/lib/tags";
@@ -174,6 +176,47 @@ async function fullTextSearch(query: string): Promise<TutorialSearchResult[]> {
   }
 }
 
+/** 正文里关键词前后各取多少字符的 HTML 来做摘要（HTML 里有标签，取得比显示的宽一些）。 */
+const NEAR_LEAD = 300;
+const NEAR_WINDOW = 900;
+
+/**
+ * 摘要里看不到关键词的结果（关键词在正文中间），换成关键词前后的一段正文。
+ * 只对最终的 ≤20 条结果各查一次 instr，不在大结果集上做全文扫描。
+ */
+async function refineSnippets(results: TutorialSearchResult[], query: string) {
+  const ids = results.filter((item) => !snippetShowsKeyword(item.snippet, query)).map((item) => item.id);
+  if (ids.length === 0) return results;
+  try {
+    const rows = await prisma.$queryRaw<Array<{ id: number | bigint; near: string; startsAt: number | bigint; total: number | bigint }>>`
+      SELECT "id",
+        substr("content", max(1, "pos" - ${NEAR_LEAD}), ${NEAR_WINDOW}) AS "near",
+        max(1, "pos" - ${NEAR_LEAD}) AS "startsAt",
+        length("content") AS "total"
+      FROM (
+        SELECT "id", "content", instr(lower("content"), lower(${query})) AS "pos"
+        FROM "Tutorial" WHERE "id" IN (${Prisma.join(ids)})
+      )
+      WHERE "pos" > 0
+    `;
+    const near = new Map(
+      rows.map((row) => {
+        const startsAt = Number(row.startsAt);
+        const text = htmlFragmentToText(row.near);
+        const snippet = snippetAround(text, query, {
+          openStart: startsAt > 1,
+          openEnd: startsAt - 1 + NEAR_WINDOW < Number(row.total),
+        });
+        return [Number(row.id), snippet] as const;
+      }),
+    );
+    // 关键词被标签拆开（如 <strong>缓</strong>存）或只出现在属性里时找不到，保留原摘要
+    return results.map((item) => ({ ...item, snippet: near.get(item.id) ?? item.snippet }));
+  } catch {
+    return results;
+  }
+}
+
 /** 发布、撤回、删除教程或改分类后清空，避免搜到已下线的文章。 */
 export function clearSearchCache() {
   cache.clear();
@@ -211,7 +254,7 @@ export function searchPublishedTutorials(
   budget.hit("all", now);
 
   const promise = Promise.all([tagSearch(query), isShortQuery(query) ? shortSearch(query) : fullTextSearch(query)])
-    .then(([byTag, rest]) => mergeResults(byTag, rest))
+    .then(([byTag, rest]) => refineSnippets(mergeResults(byTag, rest), query))
     .catch(
     (error) => {
       cache.delete(key);

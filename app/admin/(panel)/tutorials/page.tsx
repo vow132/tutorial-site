@@ -7,6 +7,9 @@ import Pagination from "@/components/pagination";
 import DeleteButton from "./delete-button";
 import ClearDraft from "./clear-draft";
 import { categoryTextStyle } from "@/lib/color";
+import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
+import { helpfulSummary } from "@/lib/feedback";
+import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata: Metadata = { title: "教程管理" };
 
@@ -14,21 +17,57 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
 
+const STATUSES = {
+  published: { label: "已发布", where: { published: true } },
+  draft: { label: "草稿", where: { published: false, publishAt: null } },
+  scheduled: { label: "定时发布", where: { published: false, publishAt: { not: null } } },
+} satisfies Record<string, { label: string; where: Prisma.TutorialWhereInput }>;
+
+type Status = keyof typeof STATUSES;
+
+const fieldCls =
+  "h-10 rounded-xl border border-line bg-surface px-3 text-sm outline-none transition-colors focus:border-accent";
+
 export default async function AdminTutorialsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; saved?: string }>;
+  searchParams: Promise<{ page?: string; saved?: string; q?: string; status?: string; category?: string }>;
 }) {
   await requireAdminPage();
-  const { page: rawPage, saved } = await searchParams;
+  const { page: rawPage, saved, q: rawQuery, status: rawStatus, category: rawCategory } = await searchParams;
+  const query = (rawQuery ?? "").trim().slice(0, 100);
+  const status = rawStatus && rawStatus in STATUSES ? (rawStatus as Status) : null;
+  const categoryId = Number(rawCategory) || null;
+  const where: Prisma.TutorialWhereInput = {
+    ...(query ? { OR: [{ title: { contains: query } }, { slug: { contains: query } }] } : {}),
+    ...(status ? STATUSES[status].where : {}),
+    ...(categoryId ? { categoryId } : {}),
+  };
+  const filtered = Boolean(query || status || categoryId);
+  // 分页链接带上当前筛选条件
+  const filterQuery: Record<string, string> = {
+    ...(query ? { q: query } : {}),
+    ...(status ? { status } : {}),
+    ...(categoryId ? { category: String(categoryId) } : {}),
+  };
+
   const requestedPage = Number.parseInt(rawPage ?? "1", 10);
-  const total = await prisma.tutorial.count();
+  const [total, all, categoryRows] = await Promise.all([
+    prisma.tutorial.count({ where }),
+    filtered ? prisma.tutorial.count() : null,
+    prisma.category.findMany({
+      orderBy: [{ order: "asc" }, { id: "asc" }],
+      select: { id: true, name: true, parentId: true, order: true },
+    }),
+  ]);
+  const categories = flattenCategoryTree(buildCategoryTree(categoryRows));
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Number.isFinite(requestedPage)
     ? Math.min(Math.max(requestedPage, 1), totalPages)
     : 1;
 
   const tutorials = await prisma.tutorial.findMany({
+    where,
     orderBy: { updatedAt: "desc" },
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
@@ -39,6 +78,8 @@ export default async function AdminTutorialsPage({
       views: true,
       published: true,
       publishAt: true,
+      helpfulYes: true,
+      helpfulNo: true,
       category: { select: { name: true, color: true } },
     },
   });
@@ -49,7 +90,9 @@ export default async function AdminTutorialsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">教程管理</h1>
-          <p className="mt-1 text-sm text-ink-3">共 {total} 篇</p>
+          <p className="mt-1 text-sm text-ink-3">
+            {filtered ? `筛选出 ${total} 篇（共 ${all} 篇）` : `共 ${total} 篇`}
+          </p>
         </div>
         <Link
           href="/admin/tutorials/new"
@@ -62,19 +105,56 @@ export default async function AdminTutorialsPage({
         </Link>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-surface">
+      <form role="search" aria-label="筛选教程" className="mt-6 flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="搜索标题或 Slug"
+          aria-label="搜索标题或 Slug"
+          className={`${fieldCls} min-w-0 flex-1 sm:max-w-xs`}
+        />
+        <select name="status" defaultValue={status ?? ""} aria-label="按状态筛选" className={fieldCls}>
+          <option value="">全部状态</option>
+          {Object.entries(STATUSES).map(([value, item]) => (
+            <option key={value} value={value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <select name="category" defaultValue={categoryId ?? ""} aria-label="按分类筛选" className={`${fieldCls} max-w-[12rem]`}>
+          <option value="">全部分类</option>
+          {categories.map(({ node, depth }) => (
+            <option key={node.id} value={node.id}>
+              {"　".repeat(depth)}
+              {node.name}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="h-10 rounded-full border border-line px-4 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink">
+          筛选
+        </button>
+        {filtered && (
+          <Link href="/admin/tutorials" className="px-2 text-sm text-ink-3 hover:text-ink">
+            清除筛选
+          </Link>
+        )}
+      </form>
+
+      <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface">
         {tutorials.length === 0 ? (
           <p className="py-20 text-center text-sm text-ink-3">
-            还没有教程，点击右上角开始创作
+            {filtered ? "没有符合条件的教程" : "还没有教程，点击右上角开始创作"}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-3">
-                <th className="px-6 py-3.5 font-medium">标题</th>
+                <th className="w-[40%] px-6 py-3.5 font-medium">标题</th>
                 <th className="hidden px-4 py-3.5 font-medium md:table-cell">分类</th>
                 <th className="hidden px-4 py-3.5 font-medium sm:table-cell">阅读</th>
+                <th className="hidden px-4 py-3.5 font-medium lg:table-cell">读者反馈</th>
                 <th className="px-4 py-3.5 font-medium">状态</th>
                 <th className="px-6 py-3.5 text-right font-medium">操作</th>
               </tr>
@@ -89,7 +169,7 @@ export default async function AdminTutorialsPage({
                     >
                       {t.title}
                     </Link>
-                    <span className="text-xs text-ink-3">/{t.slug}</span>
+                    <span className="block truncate text-xs text-ink-3">/{t.slug}</span>
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-4 md:table-cell">
                     <span
@@ -105,6 +185,9 @@ export default async function AdminTutorialsPage({
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-4 text-ink-2 sm:table-cell">
                     {t.views}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-4 py-4 text-xs text-ink-2 lg:table-cell">
+                    {helpfulSummary(t.helpfulYes, t.helpfulNo).text}
                   </td>
                   <td className="whitespace-nowrap px-4 py-4">
                     <form action={togglePublish}>
@@ -159,6 +242,7 @@ export default async function AdminTutorialsPage({
         page={page}
         totalPages={totalPages}
         basePath="/admin/tutorials"
+        query={filterQuery}
       />
     </div>
   );

@@ -26,25 +26,33 @@ model Category {
 }
 
 model Tutorial {
-  id         Int                @id @default(autoincrement())
-  title      String
-  slug       String             @unique
-  excerpt    String?
-  content    String
+  id          Int                 @id @default(autoincrement())
+  title       String
+  slug        String              @unique
+  excerpt     String?
+  content     String
   /// 后台上传的封面图（/uploads/…），文章页头图与分享卡片使用
-  cover      String?
+  cover       String?
   /// 列表卡片缩略图：封面，没有封面时取正文第一张上传图片（优先 400w 小图）；保存时计算
-  thumbnail  String?
-  published  Boolean            @default(false)
+  thumbnail   String?
+  published   Boolean             @default(false)
   /// 定时发布时间：未发布且到了这个时间，由后台定时任务自动发布（lib/scheduled-publish.ts）
-  publishAt  DateTime?
-  views      Int                @default(0)
-  categoryId Int
-  category   Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  tags       TutorialTag[]
-  revisions  TutorialRevision[]
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  publishAt   DateTime?
+  views       Int                 @default(0)
+  /// 读者在文末点的「有帮助 / 没帮助」次数（原生 SQL 自增，不刷新 updatedAt）
+  helpfulYes  Int                 @default(0)
+  helpfulNo   Int                 @default(0)
+  /// 所属系列与在系列里的顺序（从 1 开始）；不属于任何系列时为空
+  seriesId    Int?
+  series      Series?             @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesOrder Int                 @default(0)
+  dailyViews  TutorialDailyView[]
+  categoryId  Int
+  category    Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tags        TutorialTag[]
+  revisions   TutorialRevision[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@index([categoryId])
   @@index([published, createdAt])
@@ -56,6 +64,31 @@ model Tutorial {
   @@index([updatedAt])
   // 定时发布任务：找到期的草稿
   @@index([published, publishAt])
+  // 系列目录
+  @@index([seriesId, seriesOrder])
+}
+
+/// 教程系列：几篇教程按顺序组成一组（如「从零搭建博客」第 1–5 篇），文章页显示系列目录。
+model Series {
+  id          Int        @id @default(autoincrement())
+  title       String
+  /// URL 别名：/series/<slug>
+  slug        String     @unique
+  description String?
+  tutorials   Tutorial[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+/// 每篇教程每天的阅读量（仪表盘的 30 天趋势和热门文章），day 是北京时间的 YYYY-MM-DD。
+model TutorialDailyView {
+  tutorialId Int
+  tutorial   Tutorial @relation(fields: [tutorialId], references: [id], onDelete: Cascade)
+  day        String
+  views      Int      @default(0)
+
+  @@id([tutorialId, day])
+  @@index([day])
 }
 
 /// 教程的历史版本：每次保存前把旧内容存一份（每篇最多保留 30 个），可在后台查看和恢复。

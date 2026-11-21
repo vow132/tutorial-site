@@ -46,8 +46,12 @@ test("'/' and Ctrl+K focus the search box", async ({ page }) => {
   await page.goto(ARTICLE);
   const focusedName = () => page.evaluate(() => document.activeElement?.getAttribute("name"));
 
-  await page.keyboard.press("/");
-  expect(await focusedName()).toBe("q");
+  // 快捷键在页面脚本运行（hydration）之后才生效；CI 机器慢时 load 事件之后还要等一会儿，
+  // 所以重复按到生效为止。生效前按 / 落在页面上什么也不会发生，不会往输入框里多打字。
+  await expect(async () => {
+    await page.keyboard.press("/");
+    expect(await focusedName()).toBe("q");
+  }).toPass({ timeout: 10_000 });
   // 输入框里再敲 / 是正常输入，不会被拦截
   await page.keyboard.type("a/b");
   expect(await page.evaluate(() => (document.activeElement as HTMLInputElement).value)).toBe("a/b");

@@ -1,21 +1,26 @@
 import { prisma } from "@/lib/prisma";
 import { RateLimiter } from "@/lib/rate-limit";
+import { recentDays, siteDay } from "@/lib/site-day";
 
 const FLUSH_DELAY_MS = 2_000;
 const MAX_PENDING_EVENTS = 32;
+/** 每日阅读明细保留约一年多，更早的每天第一次写入时顺手删掉。 */
+const DAILY_VIEW_RETENTION_DAYS = 400;
 
 type ViewCounterState = {
   pending: Map<number, number>;
   pendingEvents: number;
   timer: ReturnType<typeof setTimeout> | null;
   flushing: boolean;
+  /** 今天是否已经清理过过期的每日明细 */
+  prunedDay?: string;
 };
 
 const globalForViewCounter = globalThis as typeof globalThis & {
   __tutorialViewCounter?: ViewCounterState;
 };
 
-const state =
+const state: ViewCounterState =
   globalForViewCounter.__tutorialViewCounter ??
   (globalForViewCounter.__tutorialViewCounter = {
     pending: new Map(),
@@ -43,14 +48,26 @@ async function flushTutorialViews() {
   state.pendingEvents = 0;
 
   try {
+    const day = siteDay();
     // 用原生 SQL：Prisma 的 update/updateMany 会顺带刷新 @updatedAt，
     // 每次阅读都会让 sitemap lastmod、文章 modified_time 变成“刚刚修改”。
+    // 每日明细用 INSERT … SELECT：教程刚被删掉时插不进去也不报错（否则这批会一直重试）。
     await prisma.$transaction(
-      [...batch].map(
-        ([id, increment]) =>
-          prisma.$executeRaw`UPDATE "Tutorial" SET "views" = "views" + ${increment} WHERE "id" = ${id}`,
-      ),
+      [...batch].flatMap(([id, increment]) => [
+        prisma.$executeRaw`UPDATE "Tutorial" SET "views" = "views" + ${increment} WHERE "id" = ${id}`,
+        prisma.$executeRaw`
+          INSERT INTO "TutorialDailyView" ("tutorialId", "day", "views")
+          SELECT "id", ${day}, ${increment} FROM "Tutorial" WHERE "id" = ${id}
+          ON CONFLICT ("tutorialId", "day") DO UPDATE SET "views" = "views" + excluded."views"
+        `,
+      ]),
     );
+    if (state.prunedDay !== day) {
+      state.prunedDay = day;
+      const [oldest] = recentDays(DAILY_VIEW_RETENTION_DAYS);
+      // 单独处理失败：上面这批已经写进去了，不能因为清理失败再重新计一遍
+      await prisma.$executeRaw`DELETE FROM "TutorialDailyView" WHERE "day" < ${oldest}`.catch(() => undefined);
+    }
   } catch {
     for (const [id, increment] of batch) {
       state.pending.set(id, (state.pending.get(id) ?? 0) + increment);
@@ -81,7 +98,7 @@ export function queueTutorialView(id: number) {
 }
 
 /** 爬虫、监控和脚本的 UA；它们的访问不计入阅读量。 */
-const NON_HUMAN_AGENT =
+export const NON_HUMAN_AGENT =
   /bot|crawl|spider|slurp|preview|monitor|fetch|curl|wget|python|java\/|go-http|httpclient|okhttp|axios|headless|lighthouse/i;
 
 /** 同一 IP 30 分钟内重复打开同一篇只算一次（需要 TRUST_PROXY 才能拿到 IP）。 */

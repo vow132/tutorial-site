@@ -14,6 +14,7 @@ export const getPublishedTutorial = cache(async (slug: string) =>
       cover: true,
       views: true,
       categoryId: true,
+      seriesId: true,
       createdAt: true,
       updatedAt: true,
       category: true,

@@ -15,6 +15,9 @@ export function revalidatePublic(...slugs: (string | null | undefined)[]) {
   void syncSearchIndex().then((count) => count > 0 && clearSearchCache());
   revalidatePath("/");
   revalidatePath("/tutorials");
+  // 系列页列出系列里的已发布教程：教程发布/撤回/改标题都会影响，系列不多，全部失效即可
+  revalidatePath("/series");
+  revalidatePath("/series/[slug]", "page");
   for (const slug of new Set(slugs.filter((item): item is string => Boolean(item)))) {
     // 中文 slug 的缓存键是编码后的路径；两种写法都失效一遍，确保命中。
     revalidatePath(`/tutorials/${slug}`);

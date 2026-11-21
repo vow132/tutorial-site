@@ -21,6 +21,7 @@ const RichTextEditor = dynamic(
 );
 
 type Category = { id: number; name: string };
+type SeriesOption = { id: number; title: string };
 
 type Initial = {
   title: string;
@@ -28,6 +29,7 @@ type Initial = {
   excerpt: string | null;
   content: string;
   categoryId: number;
+  seriesId: number | null;
   published: boolean;
   publishAt: string | null;
   cover: string | null;
@@ -36,6 +38,7 @@ type Initial = {
 
 type Props = {
   categories: Category[];
+  series: SeriesOption[];
   /** 已有标签（按使用次数排序），输入时给出建议 */
   tagSuggestions: string[];
   action: (prev: TutorialFormState, formData: FormData) => Promise<TutorialFormState>;
@@ -53,6 +56,7 @@ function fromDraft(values: DraftValues): Initial {
     excerpt: values.excerpt || null,
     content: values.content ?? "",
     categoryId: Number(values.categoryId) || 0,
+    seriesId: Number(values.seriesId) || null,
     published: values.published === "on",
     publishAt: values.publishAt || null,
     cover: values.cover || null,
@@ -69,6 +73,7 @@ function toDraft(initial: Initial | undefined): DraftValues {
     slug: initial?.slug ?? "",
     excerpt: initial?.excerpt ?? "",
     categoryId: initial?.categoryId ? String(initial.categoryId) : "",
+    seriesId: initial?.seriesId ? String(initial.seriesId) : "",
     tags: initial?.tags.join(",") ?? "",
     tagsPending: "",
     cover: initial?.cover ?? "",
@@ -146,6 +151,7 @@ export default function TutorialForm({
 
 function TutorialFields({
   categories,
+  series,
   tagSuggestions,
   action,
   initial,
@@ -206,6 +212,24 @@ function TutorialFields({
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label htmlFor="tutorial-series" className="mb-1.5 block text-sm font-medium text-ink-2">
+            所属系列
+            <Link href="/admin/series" className="ml-2 text-xs font-normal text-accent-ink hover:underline">
+              管理系列
+            </Link>
+          </label>
+          <select id="tutorial-series" name="seriesId" defaultValue={initial?.seriesId ?? ""} className={inputCls}>
+            <option value="">不属于任何系列</option>
+            {series.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-ink-3">新加入的教程排在系列末尾，顺序可在「系列」页面调整。</p>
         </div>
 
         <div className="md:col-span-2">

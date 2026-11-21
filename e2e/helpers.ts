@@ -38,3 +38,31 @@ export function queryDatabase<T>(sql: string, ...params: unknown[]): T | undefin
     db.close();
   }
 }
+
+/** 通过后台表单新建一篇教程（正文一次性插入，比逐字输入快）。 */
+export async function createTutorialViaForm(
+  page: Page,
+  data: { title: string; slug: string; body?: string; series?: string; draft?: boolean },
+) {
+  await page.goto("/admin/tutorials/new");
+  await page.locator(".ProseMirror").waitFor();
+  await page.fill('input[name="title"]', data.title);
+  await page.fill('input[name="slug"]', data.slug);
+  await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
+  if (data.series) await page.locator('select[name="seriesId"]').selectOption({ label: data.series });
+  await page.locator(".ProseMirror").click();
+  await page.keyboard.insertText(data.body ?? `${data.title} 的正文`);
+  if (data.draft) await page.getByLabel("存为草稿").check();
+  await page.getByRole("button", { name: "保存教程" }).click();
+  await page.waitForURL(/\/admin\/tutorials(\?saved=[\w-]+)?$/);
+}
+
+/** 在后台列表里删除教程（不存在时跳过），用于测试清理。 */
+export async function deleteTutorialRow(page: Page, title: string) {
+  await page.goto(`/admin/tutorials?q=${encodeURIComponent(title)}`);
+  const row = page.getByRole("row").filter({ hasText: title });
+  if (!(await row.count())) return;
+  page.once("dialog", (dialog) => dialog.accept());
+  await row.getByRole("button", { name: "删除" }).click();
+  await row.waitFor({ state: "detached" });
+}

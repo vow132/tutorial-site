@@ -14,6 +14,7 @@ export const CACHE_TAGS = {
   settings: "site-settings",
   tags: "public-tags",
   about: "about-page",
+  series: "public-series",
 } as const;
 
 const LIST_REVALIDATE_SECONDS = 300;
@@ -319,3 +320,53 @@ export async function getTagTutorialPage({ tag, page, pageSize }: { tag: Publish
     tutorials: rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) })),
   };
 }
+
+export type PublishedSeries = {
+  id: number;
+  title: string;
+  slug: string;
+  description: string | null;
+  updatedAt: Date;
+  tutorials: (RelatedRow & { updatedAt: Date })[];
+};
+
+/**
+ * 有已发布教程的系列，每个系列带上按顺序排好的已发布教程。系列通常不多、每个十几篇，
+ * 一次全取出来缓存，系列页、系列列表、文章页的系列目录和 sitemap 共用这一份。
+ */
+const cachedPublishedSeries = unstable_cache(
+  async () => {
+    const rows = await prisma.series.findMany({
+      where: { tutorials: { some: { published: true } } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        description: true,
+        updatedAt: true,
+        tutorials: {
+          where: { published: true },
+          orderBy: [{ seriesOrder: "asc" }, { createdAt: "asc" }],
+          select: { ...relatedTutorialSelect, updatedAt: true },
+        },
+      },
+    });
+    // 缓存以 JSON 存储，日期先转成字符串，读取时再还原
+    return rows.map((row) => ({
+      ...row,
+      updatedAt: row.updatedAt.toISOString(),
+      tutorials: row.tutorials.map((t) => ({ ...t, createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString() })),
+    }));
+  },
+  ["published-series"],
+  { tags: [CACHE_TAGS.tutorials, CACHE_TAGS.series], revalidate: LIST_REVALIDATE_SECONDS },
+);
+
+export const getPublishedSeries = cache(async (): Promise<PublishedSeries[]> =>
+  (await cachedPublishedSeries()).map((row) => ({
+    ...row,
+    updatedAt: new Date(row.updatedAt),
+    tutorials: row.tutorials.map((t) => ({ ...t, createdAt: new Date(t.createdAt), updatedAt: new Date(t.updatedAt) })),
+  })),
+);
