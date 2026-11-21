@@ -59,6 +59,13 @@ export default async function EditTutorialPage({
           >
             预览已保存的版本
           </Link>
+          <a
+            href={`/admin/tutorials/${tutorial.id}/markdown`}
+            download
+            className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+          >
+            导出 Markdown
+          </a>
           <Link
             href={`/admin/tutorials/${tutorial.id}/revisions`}
             className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"

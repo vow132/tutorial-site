@@ -1,18 +1,38 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { sendBeacon } from "./view-beacon";
+
+/** 读到正文末尾、并且在页面上停留了这么久，才算「读完」（快速划到底不算）。 */
+const MIN_READ_MS = 10_000;
 
 /**
  * 文章页顶部的阅读进度条 + 右下角「回到顶部」。
  * 进度按正文（.article-body）计算：正文顶部到达屏幕顶端时为 0，正文末尾进入屏幕底部时为 100%。
  * 滚动监听是被动的，每帧最多算一次；打印时两者都隐藏。
+ * 传了 tutorialId 时，正文末尾出现在屏幕上且停留满 10 秒，上报一次「读完」（仪表盘的读完率）。
  */
-export default function ReadingProgress({ target = ".article-body" }: { target?: string }) {
+export default function ReadingProgress({ target = ".article-body", tutorialId }: { target?: string; tutorialId?: number }) {
   const bar = useRef<HTMLDivElement>(null);
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
     let frame = 0;
+    const startedAt = Date.now();
+    let reachedEnd = false;
+    let reported = false;
+    const reportRead = () => {
+      if (reported || !tutorialId || !reachedEnd || Date.now() - startedAt < MIN_READ_MS) return;
+      reported = true;
+      try {
+        const key = `read:${tutorialId}`;
+        if (sessionStorage.getItem(key)) return;
+        sessionStorage.setItem(key, "1");
+      } catch {
+        // 存储不可用时照常上报，由服务端去重
+      }
+      sendBeacon({ id: tutorialId, read: true });
+    };
     const update = () => {
       frame = 0;
       const body = document.querySelector<HTMLElement>(target);
@@ -22,7 +42,9 @@ export default function ReadingProgress({ target = ".article-body" }: { target?:
         const box = body.getBoundingClientRect();
         const distance = box.height - viewport;
         progress = distance <= 0 ? (box.top <= 0 ? 1 : 0) : -box.top / distance;
+        if (box.bottom <= viewport) reachedEnd = true;
       }
+      reportRead();
       bar.current?.style.setProperty("transform", `scaleX(${Math.min(1, Math.max(0, progress))})`);
       setShowTop(window.scrollY > viewport * 1.5);
     };
@@ -30,14 +52,17 @@ export default function ReadingProgress({ target = ".article-body" }: { target?:
       if (!frame) frame = requestAnimationFrame(update);
     };
     update();
+    // 早早划到了末尾的读者：停留满 10 秒时再检查一次
+    const readTimer = window.setTimeout(reportRead, MIN_READ_MS + 50);
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     return () => {
+      window.clearTimeout(readTimer);
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
-  }, [target]);
+  }, [target, tutorialId]);
 
   const backToTop = () => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

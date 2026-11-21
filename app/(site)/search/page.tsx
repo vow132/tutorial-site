@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
-import { getClientIp } from "@/lib/client-ip";
+import { getClientIp, getUserAgent } from "@/lib/client-ip";
+import { recordSearch } from "@/lib/search-stats";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { SearchBusyError, isShortQuery, searchPublishedTutorials } from "@/lib/search";
 import GlowCard from "@/components/glow-card";
@@ -67,6 +68,8 @@ export default async function SearchPage({
         },
       );
   const { results, busy } = outcome;
+  // 搜索词统计（后台仪表盘的「热门搜索」「没找到结果的搜索」）；只记真正执行了的搜索
+  if (query && !throttled && !busy) recordSearch(query, results.length, { ip, userAgent: await getUserAgent() });
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-14">
