@@ -7,7 +7,9 @@ import type { TutorialFormState } from "@/lib/actions/tutorials";
 import { submitKeepingValues } from "@/lib/form-submit";
 import CoverField from "./cover-field";
 import TagInput from "./tag-input";
-import { useDraft, type DraftValues } from "./use-draft";
+import { snapshot, useDraft, type DraftValues } from "./use-draft";
+import MarkdownImport from "./markdown-import";
+import type { ImportedTutorial } from "@/lib/markdown-import";
 import PublishControl from "./publish-control";
 
 const RichTextEditor = dynamic(
@@ -106,6 +108,24 @@ export default function TutorialForm({
   const [restored, setRestored] = useState<Initial | null>(null);
   const [version, setVersion] = useState(0);
 
+  /** 导入 Markdown：在表单当前的值（含没保存的修改，如已选的分类）上替换正文和文件里给出的字段。 */
+  const applyImport = (imported: ImportedTutorial) => {
+    const current = formRef.current ? fromDraft(snapshot(formRef.current)) : (restored ?? initial);
+    setRestored({
+      ...(current ?? fromDraft({})),
+      title: imported.title || current?.title || "",
+      slug: imported.slug || current?.slug || "",
+      excerpt: imported.excerpt || current?.excerpt || null,
+      tags: imported.tags.length ? imported.tags : (current?.tags ?? []),
+      content: imported.content,
+    });
+    setVersion((value) => value + 1);
+  };
+  const hasContent = () => {
+    const values = formRef.current ? snapshot(formRef.current) : null;
+    return Boolean(values && values.content.replace(/<[^>]*>/g, "").trim());
+  };
+
   return (
     <>
       {draft.pending && (
@@ -138,6 +158,7 @@ export default function TutorialForm({
           </button>
         </div>
       )}
+      <MarkdownImport onImport={applyImport} hasContent={hasContent} />
       <TutorialFields
         key={version}
         {...props}

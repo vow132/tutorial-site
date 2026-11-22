@@ -5,9 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { getAlertConfig } from "@/lib/alerts";
 import { ALERT_CHANNELS } from "@/lib/alert-channels.mjs";
 import { describeBackup, getBackupStatus } from "@/lib/backup-status";
-import { helpfulSummary } from "@/lib/feedback";
-import { getTopTutorials, getViewTrend } from "@/lib/view-stats";
+import { helpfulSummary, readRate } from "@/lib/feedback";
+import { getSearchStats } from "@/lib/search-stats";
+import { getTopTutorials, getTrafficSources, getViewTrend } from "@/lib/view-stats";
 import GitHubUpdate from "./github-update";
+import { SearchInsights, TrafficSources } from "./reader-insights";
 import ViewTrend from "./view-trend";
 
 export const metadata: Metadata = { title: "仪表盘" };
@@ -16,8 +18,22 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   await requireAdminPage();
-  const [tutorialCount, publishedCount, draftCount, categoryCount, viewAgg, recent, backup, alertConfig, trend, top] =
-    await Promise.all([
+  const [
+    tutorialCount,
+    publishedCount,
+    draftCount,
+    categoryCount,
+    viewAgg,
+    recent,
+    backup,
+    alertConfig,
+    trend,
+    top,
+    sources,
+    topSearches,
+    missingSearches,
+    unreadMessages,
+  ] = await Promise.all([
       prisma.tutorial.count(),
       prisma.tutorial.count({ where: { published: true } }),
       prisma.tutorial.count({ where: { published: false } }),
@@ -39,6 +55,10 @@ export default async function AdminDashboard() {
       // 取 60 天：后 30 天画图，前 30 天用来算环比
       getViewTrend(60),
       getTopTutorials(30, 10),
+      getTrafficSources(30),
+      getSearchStats(30, 10),
+      getSearchStats(30, 10, true),
+      prisma.feedbackMessage.count({ where: { read: false } }),
     ]);
 
   const current = trend.slice(-30);
@@ -125,6 +145,18 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
+      {unreadMessages > 0 && (
+        <Link
+          href="/admin/feedback"
+          className="mt-4 flex items-center justify-between gap-3 rounded-3xl border border-accent/40 bg-accent-soft/60 px-5 py-4 text-sm transition-colors hover:bg-accent-soft"
+        >
+          <span className="text-ink">
+            有 <span className="font-semibold">{unreadMessages}</span> 条未读的读者留言
+          </span>
+          <span className="text-accent-ink">去看看 →</span>
+        </Link>
+      )}
+
       <section aria-labelledby="trend-heading" className="mt-10">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 id="trend-heading" className="text-lg font-bold text-ink">近 30 天阅读</h2>
@@ -152,13 +184,16 @@ export default async function AdminDashboard() {
           {top.length === 0 ? (
             <p className="py-12 text-center text-sm text-ink-3">暂无数据</p>
           ) : (
-            <table className="w-full min-w-[600px] table-fixed text-sm">
+            <table className="w-full min-w-[680px] table-fixed text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-ink-3">
                   <th scope="col" className="w-12 py-3 pl-6 font-medium">#</th>
                   <th scope="col" className="py-3 pr-4 font-medium">教程</th>
                   <th scope="col" className="w-24 py-3 pr-4 text-right font-medium">近 30 天</th>
                   <th scope="col" className="w-20 py-3 pr-4 text-right font-medium">累计</th>
+                  <th scope="col" className="w-20 py-3 pr-4 text-right font-medium" title="读到文末并停留 10 秒以上的比例；近 30 天阅读少于 10 次时不显示">
+                    读完率
+                  </th>
                   <th scope="col" className="w-44 py-3 pr-6 text-right font-medium">读者反馈</th>
                 </tr>
               </thead>
@@ -174,12 +209,29 @@ export default async function AdminDashboard() {
                     </td>
                     <td className="py-3 pr-4 text-right font-semibold text-ink tabular-nums">{t.recentViews.toLocaleString("zh-CN")}</td>
                     <td className="py-3 pr-4 text-right text-ink-2 tabular-nums">{t.totalViews.toLocaleString("zh-CN")}</td>
+                    <td className="py-3 pr-4 text-right text-ink-2 tabular-nums">
+                      {readRate(t.recentViews, t.recentReads) === null ? "—" : `${readRate(t.recentViews, t.recentReads)}%`}
+                    </td>
                     <td className="whitespace-nowrap py-3 pr-6 text-right text-xs text-ink-2">{helpfulSummary(t.helpfulYes, t.helpfulNo).text}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+        </div>
+      </section>
+
+      <section aria-labelledby="sources-heading" className="mt-10">
+        <h2 id="sources-heading" className="text-lg font-bold text-ink">近 30 天阅读来源</h2>
+        <div className="mt-4 rounded-3xl border border-line bg-surface p-5">
+          <TrafficSources sources={sources} />
+        </div>
+      </section>
+
+      <section aria-labelledby="search-heading" className="mt-10">
+        <h2 id="search-heading" className="text-lg font-bold text-ink">近 30 天读者在搜什么</h2>
+        <div className="mt-4">
+          <SearchInsights top={topSearches} missing={missingSearches} />
         </div>
       </section>
 

@@ -24,6 +24,7 @@ import { categoryTextStyle } from "@/lib/color";
 import TagChips from "@/components/tag-chips";
 import SeriesBox from "@/components/series-box";
 import HelpfulFeedback from "@/components/helpful-feedback";
+import ShareButtons from "@/components/share-buttons";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -200,7 +201,7 @@ export default async function TutorialDetailPage({
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
       <ArticleEnhancer />
-      <ReadingProgress />
+      <ReadingProgress tutorialId={tutorial.id} />
       {/* 面包屑 */}
       <Reveal>
         <nav className="print-hide flex items-center gap-2 text-sm text-ink-3">
@@ -295,6 +296,7 @@ export default async function TutorialDetailPage({
           </Reveal>
 
           <HelpfulFeedback id={tutorial.id} />
+          <ShareButtons url={articleUrl} title={tutorial.title} />
 
           {/* 上一篇 / 下一篇 */}
           <Reveal mode="scroll">

@@ -30,7 +30,7 @@ test.describe("admin", () => {
           return top.textContent();
         }, { timeout: 15_000, intervals: [1000] })
         .toContain(title);
-      await expect(page.getByRole("heading", { name: "近 30 天阅读" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "近 30 天阅读", exact: true })).toBeVisible();
       const chart = page.getByRole("group", { name: /每日阅读量折线图/ });
       await expect(chart).toBeVisible();
       // 键盘也能逐日查看

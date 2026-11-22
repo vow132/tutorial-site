@@ -15,7 +15,7 @@ type StoredDraft = { savedAt: string; values: DraftValues };
 const FIELDS = ["title", "slug", "excerpt", "categoryId", "seriesId", "tags", "tagsPending", "cover", "content", "published", "publishAt"];
 export const draftStorageKey = (key: string) => `tutorial-draft:${key}`;
 
-function snapshot(form: HTMLFormElement): DraftValues {
+export function snapshot(form: HTMLFormElement): DraftValues {
   const data = new FormData(form);
   const values: DraftValues = {};
   for (const field of FIELDS) values[field] = field === "published" ? (data.get(field) ? "on" : "") : String(data.get(field) ?? "");

@@ -26,33 +26,34 @@ model Category {
 }
 
 model Tutorial {
-  id          Int                 @id @default(autoincrement())
-  title       String
-  slug        String              @unique
-  excerpt     String?
-  content     String
+  id               Int                 @id @default(autoincrement())
+  title            String
+  slug             String              @unique
+  excerpt          String?
+  content          String
   /// 后台上传的封面图（/uploads/…），文章页头图与分享卡片使用
-  cover       String?
+  cover            String?
   /// 列表卡片缩略图：封面，没有封面时取正文第一张上传图片（优先 400w 小图）；保存时计算
-  thumbnail   String?
-  published   Boolean             @default(false)
+  thumbnail        String?
+  published        Boolean             @default(false)
   /// 定时发布时间：未发布且到了这个时间，由后台定时任务自动发布（lib/scheduled-publish.ts）
-  publishAt   DateTime?
-  views       Int                 @default(0)
+  publishAt        DateTime?
+  views            Int                 @default(0)
   /// 读者在文末点的「有帮助 / 没帮助」次数（原生 SQL 自增，不刷新 updatedAt）
-  helpfulYes  Int                 @default(0)
-  helpfulNo   Int                 @default(0)
+  helpfulYes       Int                 @default(0)
+  helpfulNo        Int                 @default(0)
   /// 所属系列与在系列里的顺序（从 1 开始）；不属于任何系列时为空
-  seriesId    Int?
-  series      Series?             @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  seriesOrder Int                 @default(0)
-  dailyViews  TutorialDailyView[]
-  categoryId  Int
-  category    Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  tags        TutorialTag[]
-  revisions   TutorialRevision[]
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  seriesId         Int?
+  series           Series?             @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  seriesOrder      Int                 @default(0)
+  dailyViews       TutorialDailyView[]
+  feedbackMessages FeedbackMessage[]
+  categoryId       Int
+  category         Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tags             TutorialTag[]
+  revisions        TutorialRevision[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@index([categoryId])
   @@index([published, createdAt])
@@ -82,13 +83,50 @@ model Series {
 
 /// 每篇教程每天的阅读量（仪表盘的 30 天趋势和热门文章），day 是北京时间的 YYYY-MM-DD。
 model TutorialDailyView {
-  tutorialId Int
-  tutorial   Tutorial @relation(fields: [tutorialId], references: [id], onDelete: Cascade)
-  day        String
-  views      Int      @default(0)
+  tutorialId  Int
+  tutorial    Tutorial @relation(fields: [tutorialId], references: [id], onDelete: Cascade)
+  day         String
+  views       Int      @default(0)
+  /// 读到正文末尾的次数（停留 10 秒以上才算），读完率 = completions / views
+  completions Int      @default(0)
 
   @@id([tutorialId, day])
   @@index([day])
+}
+
+/// 每天的搜索词统计（仪表盘看热门搜索和「没找到」的搜索）。query 已规整：小写、合并空白、最多 100 字。
+model SearchQueryDaily {
+  day     String
+  query   String
+  count   Int    @default(0)
+  /// 最近一次搜索的结果数，0 表示没找到
+  results Int    @default(0)
+
+  @@id([day, query])
+  @@index([day])
+}
+
+/// 每天的阅读来源：source 是来源网站的域名，或 (direct) 直接访问、(internal) 站内跳转。
+model ReferrerDaily {
+  day    String
+  source String
+  views  Int    @default(0)
+
+  @@id([day, source])
+  @@index([day])
+}
+
+/// 读者点「没帮助」之后留下的话，只在后台可见。
+model FeedbackMessage {
+  id         Int      @id @default(autoincrement())
+  tutorialId Int
+  tutorial   Tutorial @relation(fields: [tutorialId], references: [id], onDelete: Cascade)
+  message    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([read, createdAt])
+  @@index([tutorialId])
 }
 
 /// 教程的历史版本：每次保存前把旧内容存一份（每篇最多保留 30 个），可在后台查看和恢复。

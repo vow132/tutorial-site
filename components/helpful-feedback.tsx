@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
+import { MAX_FEEDBACK_MESSAGE } from "@/lib/feedback";
 
 type Choice = "yes" | "no";
 
@@ -27,7 +28,26 @@ function subscribe(onChange: () => void) {
 export default function HelpfulFeedback({ id }: { id: number }) {
   const stored = useSyncExternalStore(subscribe, () => readChoice(id), () => null);
   const [voted, setVoted] = useState<Choice | null>(null);
+  const [note, setNote] = useState<"idle" | "sending" | "sent" | "failed">("idle");
   const choice = voted ?? stored;
+
+  // 「没帮助」之后可以留一句话（只发给站长，不公开）
+  const sendNote = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = String(new FormData(event.currentTarget).get("message") ?? "").trim();
+    if (message.length < 2) return;
+    setNote("sending");
+    try {
+      const response = await fetch("/api/feedback/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, message }),
+      });
+      setNote(response.ok ? "sent" : "failed");
+    } catch {
+      setNote("failed");
+    }
+  };
 
   const vote = (value: Choice) => {
     if (choice) return;
@@ -78,8 +98,39 @@ export default function HelpfulFeedback({ id }: { id: number }) {
         {button("no", "没帮助", "👎")}
       </div>
       <p role="status" className="min-h-5 text-sm text-ink-3">
-        {choice === "yes" ? "谢谢你的反馈！" : choice === "no" ? "谢谢反馈，我们会继续改进这篇教程。" : ""}
+        {note === "sent"
+          ? "收到了，谢谢你花时间写下来！"
+          : choice === "yes"
+            ? "谢谢你的反馈！"
+            : choice === "no"
+              ? "谢谢反馈，我们会继续改进这篇教程。"
+              : ""}
       </p>
+      {voted === "no" && note !== "sent" && (
+        <form onSubmit={sendNote} className="w-full max-w-lg text-left">
+          <label htmlFor="helpful-note" className="mb-1.5 block text-sm text-ink-2">
+            哪里没讲清楚？<span className="text-ink-3">（选填，只有站长能看到）</span>
+          </label>
+          <textarea
+            id="helpful-note"
+            name="message"
+            rows={3}
+            maxLength={MAX_FEEDBACK_MESSAGE}
+            placeholder="例如：第三步的命令在 Windows 上报错……"
+            className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent"
+          />
+          <div className="mt-2 flex items-center justify-end gap-3">
+            {note === "failed" && <span className="text-xs text-red-500 dark:text-red-400">没发出去，请稍后再试</span>}
+            <button
+              type="submit"
+              disabled={note === "sending"}
+              className="h-9 rounded-full bg-btn px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {note === "sending" ? "发送中…" : "发送"}
+            </button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }
