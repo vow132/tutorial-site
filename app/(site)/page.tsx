@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import IntentLink from "@/components/intent-link";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
-import { getHomeCategories } from "@/lib/public-data";
+import { getHomeCategories, getPublishedSeries } from "@/lib/public-data";
+import { pickStartHereSeries } from "@/lib/settings-extras";
+import { seriesPath } from "@/lib/series";
 import {
   categoryLinkTarget,
   flattenCategoryTree,
@@ -28,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, categories, latest, tutorialStats] = await Promise.all([
+  const [settings, categories, latest, tutorialStats, allSeries] = await Promise.all([
     getSettings(),
     getHomeCategories(),
     prisma.tutorial.findMany({
@@ -51,7 +53,10 @@ export default async function HomePage() {
       _count: { _all: true },
       _sum: { views: true },
     }),
+    getPublishedSeries(),
   ]);
+  // 首页「从这里开始」：后台选的系列，没选就取最新的 3 个；没有已发布的系列时整块不显示
+  const startSeries = settings.startHere.enabled ? pickStartHereSeries(allSeries, settings.startHere.seriesSlugs) : [];
 
   // 教程只归属自身分类，卡片仅显示该分类自身的教程数。
   const countCategoryTutorials = (
@@ -165,6 +170,46 @@ export default async function HomePage() {
           </Reveal>
         ))}
       </section>
+
+      {/* ---------- 从这里开始 ---------- */}
+      {startSeries.length > 0 && (
+        <section aria-labelledby="start-here-heading" className="start-here pt-20">
+          <Reveal mode="scroll">
+            <h2 id="start-here-heading" className="text-2xl font-bold text-ink md:text-3xl">
+              {settings.startHere.title}
+            </h2>
+            {settings.startHere.intro && <p className="mt-2 text-sm text-ink-2">{settings.startHere.intro}</p>}
+          </Reveal>
+          <ol className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {startSeries.map((series, index) => (
+              <li key={series.id}>
+                <Reveal mode="scroll" delay={index * 0.06}>
+                  <GlowCard className="flex h-full flex-col p-6">
+                    <span className="text-xs font-medium text-accent-ink">
+                      路线 {index + 1} · 共 {series.tutorials.length} 篇
+                    </span>
+                    <h3 className="mt-2 text-lg font-bold text-ink">
+                      <IntentLink href={seriesPath(series.slug)} className="transition-colors hover:text-accent-ink">
+                        {series.title}
+                      </IntentLink>
+                    </h3>
+                    {series.description && (
+                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-2">{series.description}</p>
+                    )}
+                    <IntentLink
+                      href={`/tutorials/${series.tutorials[0].slug}`}
+                      className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-medium text-accent-ink hover:underline"
+                    >
+                      <span className="truncate">从第 1 篇开始：{series.tutorials[0].title}</span>
+                      <span aria-hidden="true">→</span>
+                    </IntentLink>
+                  </GlowCard>
+                </Reveal>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {/* ---------- 分类宫格 ---------- */}
       <section id="categories" className="scroll-mt-24 pt-20">

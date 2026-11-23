@@ -25,6 +25,9 @@ import TagChips from "@/components/tag-chips";
 import SeriesBox from "@/components/series-box";
 import HelpfulFeedback from "@/components/helpful-feedback";
 import ShareButtons from "@/components/share-buttons";
+import SupportBox from "@/components/support-box";
+import SubscribeForm from "@/components/subscribe-form";
+import { getSubscriptionEnabled } from "@/lib/mail";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -142,6 +145,7 @@ export default async function TutorialDetailPage({
     shareImage(tutorial),
     tutorial.seriesId ? getPublishedSeries() : Promise.resolve([]),
   ]);
+  const subscribeEnabled = await getSubscriptionEnabled();
   const cover = await coverImage(tutorial);
   const series = allSeries.find((item) => item.id === tutorial.seriesId) ?? null;
   const position = series ? seriesPosition(series.tutorials, tutorial.id) : null;
@@ -197,7 +201,7 @@ export default async function TutorialDetailPage({
   const minutes = Math.max(1, Math.round(words / 400));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-12">
+    <div className="mx-auto max-w-6xl px-4 pt-12" data-motion={settings.articleMotion}>
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
       <ArticleEnhancer />
@@ -297,6 +301,14 @@ export default async function TutorialDetailPage({
 
           <HelpfulFeedback id={tutorial.id} />
           <ShareButtons url={articleUrl} title={tutorial.title} />
+          <SupportBox support={settings.support} />
+          {subscribeEnabled && (
+            <section aria-labelledby="subscribe-heading" className="subscribe-box print-hide mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
+              <h2 id="subscribe-heading" className="text-base font-semibold text-ink">订阅新教程</h2>
+              <p className="mt-1 text-sm text-ink-2">有新教程时发邮件提醒你，随时可以退订。</p>
+              <SubscribeForm className="mt-4" />
+            </section>
+          )}
 
           {/* 上一篇 / 下一篇 */}
           <Reveal mode="scroll">

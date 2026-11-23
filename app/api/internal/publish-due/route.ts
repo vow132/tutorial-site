@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { audit } from "@/lib/audit";
 import { revalidatePublic } from "@/lib/revalidate-public";
 import { publishDueTutorials, schedulerToken } from "@/lib/scheduled-publish";
+import { notifyNewTutorial } from "@/lib/subscription-notify";
 
 /** 只给本进程的定时器调用（见 lib/scheduled-publish.ts），口令不对一律 404。 */
 export async function POST(request: Request) {
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     revalidatePublic(...published.map((tutorial) => tutorial.slug));
     for (const tutorial of published) {
       await audit("tutorial.publish", { actor: "定时发布", detail: `#${tutorial.id} ${tutorial.title}` });
+      notifyNewTutorial(tutorial.id);
     }
   }
   return Response.json({ published: published.length }, { headers: { "Cache-Control": "no-store" } });

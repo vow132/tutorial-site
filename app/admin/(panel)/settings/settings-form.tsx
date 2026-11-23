@@ -5,6 +5,7 @@ import { updateSettings, type SettingsFormState } from "@/lib/actions/settings";
 import type { SiteSettings, FooterColumn } from "@/lib/settings";
 import { SEARCH_ENGINES } from "@/lib/search-verification";
 import { submitKeepingValues } from "@/lib/form-submit";
+import ImageField from "./image-field";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -70,7 +71,7 @@ function Section({
   );
 }
 
-export default function SettingsForm({ settings }: { settings: SiteSettings }) {
+export default function SettingsForm({ settings, series }: { settings: SiteSettings; series: { slug: string; title: string; published: boolean }[] }) {
   const [state, action, pending] = useActionState<SettingsFormState, FormData>(
     updateSettings,
     {}
@@ -152,6 +153,73 @@ export default function SettingsForm({ settings }: { settings: SiteSettings }) {
           <Field label="高亮词（彩色）" name="heroAccent" defaultValue={settings.heroAccent} placeholder="简单明白" />
         </div>
         <Field label="副标题" name="heroSubtitle" defaultValue={settings.heroSubtitle} multiline />
+      </Section>
+
+      {/* ---------- 从这里开始 ---------- */}
+      <Section title="首页「从这里开始」" desc="首页大标题下面的入门路线：展示几个系列和它们的第一篇，帮新读者找到起点">
+        <label className="flex items-center gap-2 text-sm text-ink-2">
+          <input type="checkbox" name="startHere.enabled" defaultChecked={settings.startHere.enabled} className="h-4 w-4 accent-[var(--color-accent)]" />
+          在首页显示
+        </label>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Field label="标题" name="startHere.title" defaultValue={settings.startHere.title} placeholder="从这里开始" />
+          <div className="md:col-span-2">
+            <Field label="说明" name="startHere.intro" defaultValue={settings.startHere.intro} placeholder="不知道先看哪篇？挑一个系列，从第一篇读起。" />
+          </div>
+        </div>
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-ink-2">
+            展示哪些系列
+            <span className="ml-2 text-xs font-normal text-ink-3">都不勾时自动展示最新的 3 个；最多 6 个，只显示有已发布教程的系列</span>
+          </legend>
+          {series.length === 0 ? (
+            <p className="text-xs text-ink-3">还没有系列，可以在「教程系列」里创建。</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {series.map((item) => (
+                <label key={item.slug} className="flex items-center gap-2 text-sm text-ink-2">
+                  <input
+                    type="checkbox"
+                    name="startHere.series"
+                    value={item.slug}
+                    defaultChecked={settings.startHere.seriesSlugs.includes(item.slug)}
+                    className="h-4 w-4 accent-[var(--color-accent)]"
+                  />
+                  {item.title}
+                  {!item.published && <span className="text-xs text-ink-3">（暂无已发布教程）</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </fieldset>
+      </Section>
+
+      {/* ---------- 文章页 ---------- */}
+      <Section title="文章页动效" desc="教程页面以阅读为主：精简时卡片不倾斜、没有聚光灯，吉祥物不跟随鼠标；首页等其他页面不受影响">
+        <div className="flex flex-wrap gap-5 text-sm text-ink-2">
+          <label className="flex items-center gap-2">
+            <input type="radio" name="articleMotion" value="calm" defaultChecked={settings.articleMotion === "calm"} className="h-4 w-4 accent-[var(--color-accent)]" />
+            精简（推荐）
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="radio" name="articleMotion" value="full" defaultChecked={settings.articleMotion === "full"} className="h-4 w-4 accent-[var(--color-accent)]" />
+            完整（和首页一样）
+          </label>
+        </div>
+      </Section>
+
+      {/* ---------- 赞助与打赏 ---------- */}
+      <Section title="赞助与打赏" desc="显示在每篇教程的文末；都留空时不显示。收款码请用自己的微信 / 支付宝「收款码」截图">
+        <Field label="打赏按钮文字" name="support.donationText" defaultValue={settings.support.donationText} placeholder="觉得有用？请作者喝杯咖啡" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <ImageField name="support.wechatQr" label="微信收款码" initial={settings.support.wechatQr} />
+          <ImageField name="support.alipayQr" label="支付宝收款码" initial={settings.support.alipayQr} />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="赞助文字" name="support.sponsorText" defaultValue={settings.support.sponsorText} placeholder="本站由 某某云 赞助服务器" />
+          <Field label="赞助链接" name="support.sponsorUrl" defaultValue={settings.support.sponsorUrl} placeholder="https://example.com" hint="会加上 rel=sponsored" />
+        </div>
+        <ImageField name="support.sponsorImage" label="赞助图片" hint="可选，横幅或 logo" initial={settings.support.sponsorImage} />
       </Section>
 
       {/* ---------- 页脚 ---------- */}

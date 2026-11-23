@@ -64,7 +64,9 @@ export default function PointerAura() {
     };
 
     const onMove = (e: PointerEvent) => {
-      const target = e.target instanceof Element
+      // 文章页开了「精简动效」：卡片不倾斜、吉祥物留在原位（布局跨页面保留，所以每次都要看）
+      const calm = document.querySelector('[data-motion="calm"]') !== null;
+      const target = !calm && e.target instanceof Element
         ? e.target.closest<HTMLElement>(".glow-card")
         : null;
       if (target !== card) {
@@ -95,7 +97,10 @@ export default function PointerAura() {
       }
 
       if (mascot) {
-        if (mascotBase) {
+        if (calm) {
+          tgx = 0;
+          tgy = 0;
+        } else if (mascotBase) {
           tgx = e.clientX - mascotBase.x;
           tgy = e.clientY - mascotBase.y - 30; // 悬停在指针上方一点
         }

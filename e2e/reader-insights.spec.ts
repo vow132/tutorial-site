@@ -19,8 +19,11 @@ test.describe("admin", () => {
     const missing = `没有这篇教程${id}`;
     const context = await reader(browser);
     const visitor = await context.newPage();
-    await visitor.goto(`/search?q=${encodeURIComponent(missing)}`);
-    await expect(visitor.getByText("没有找到相关教程")).toBeVisible();
+    // 搜 3 次：仪表盘只列次数最多的前 10 个，库里已有别的只搜过 1 次的词时也能排进去
+    for (let i = 0; i < 3; i++) {
+      await visitor.goto(`/search?q=${encodeURIComponent(missing)}`);
+      await expect(visitor.getByText("没有找到相关教程")).toBeVisible();
+    }
     await visitor.goto(`/search?q=${encodeURIComponent("Flexbox")}`);
     await context.close();
 

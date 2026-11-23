@@ -11,6 +11,7 @@ import { revalidatePublic } from "@/lib/revalidate-public";
 import { contentChanged, saveRevision } from "@/lib/revisions";
 import { parseTagNames } from "@/lib/tags";
 import { setTutorialTags } from "@/lib/tag-sync";
+import { notifyNewTutorial } from "@/lib/subscription-notify";
 
 export type TutorialFormState = { error?: string };
 
@@ -102,6 +103,8 @@ export async function createTutorial(
   await setTutorialTags(created.id, parsed.tagNames);
   await audit("tutorial.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
   revalidatePublic(created.slug);
+  // 邮件订阅：直接发布的新教程通知订阅者（后台发送，每篇只发一次）
+  if (created.published) notifyNewTutorial(created.id);
   // ?saved= 让列表页清掉这篇的本地草稿（见 app/admin/(panel)/tutorials/clear-draft.tsx）
   redirect("/admin/tutorials?saved=new");
 }
@@ -122,7 +125,7 @@ export async function updateTutorial(
 
   const before = await prisma.tutorial.findUnique({
     where: { id },
-    select: { slug: true, title: true, excerpt: true, content: true, updatedAt: true, seriesId: true, seriesOrder: true },
+    select: { slug: true, title: true, excerpt: true, content: true, updatedAt: true, seriesId: true, seriesOrder: true, published: true },
   });
   // 内容有改动时先把旧版本存进历史，误改后可以在「历史版本」里恢复
   if (before && contentChanged(before, parsed.data)) await saveRevision(id, before, admin.username);
@@ -133,6 +136,7 @@ export async function updateTutorial(
   await setTutorialTags(id, parsed.tagNames);
   await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
   revalidatePublic(before?.slug, parsed.data.slug);
+  if (before && !before.published && parsed.data.published) notifyNewTutorial(id);
   redirect(`/admin/tutorials?saved=${id}`);
 }
 
@@ -163,6 +167,7 @@ export async function togglePublish(formData: FormData) {
   });
   revalidatePublic(t.slug);
   revalidatePath("/admin/tutorials");
+  if (!t.published) notifyNewTutorial(id);
 }
 
 /** 恢复到某个历史版本：当前内容先存成一个新的历史版本，所以恢复本身也能撤销。 */

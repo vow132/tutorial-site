@@ -48,6 +48,8 @@ model Tutorial {
   seriesOrder      Int                 @default(0)
   dailyViews       TutorialDailyView[]
   feedbackMessages FeedbackMessage[]
+  /// 已经给订阅者发过「新教程」邮件的时间；每篇只发一次（撤回再发布不会重发）
+  notifiedAt       DateTime?
   categoryId       Int
   category         Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   tags             TutorialTag[]
@@ -244,4 +246,17 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+/// 邮件订阅者：点了确认邮件里的链接才算订阅（confirmedAt），退订即删除整行。
+model Subscriber {
+  id            Int       @id @default(autoincrement())
+  /// 小写、去掉首尾空白
+  email         String    @unique
+  confirmedAt   DateTime?
+  /// 最近一次发确认邮件的时间：同一地址 10 分钟内不重发，免得被拿来给别人刷邮件
+  confirmSentAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([confirmedAt])
 }

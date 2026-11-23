@@ -353,6 +353,11 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   opacity: 1;
 }
 
+/* 文章页「精简动效」（站点设置 → 文章页动效）：卡片不倾斜、没有聚光灯；吉祥物不跟随由 pointer-aura 判断 */
+[data-motion="calm"] .glow-card-tilt,
+[data-motion="calm"] .glow-card-tilt:hover { transform: none; }
+[data-motion="calm"] .glow-card .spotlight { display: none; }
+
 /* 分类色做小号文字：颜色由 lib/color.ts 的 categoryTextStyle() 计算，保证对比度 ≥ 4.5:1 */
 .cat-text { color: var(--cat-ink); }
 :root[data-theme="dark"] .cat-text { color: var(--cat-ink-dark); }
