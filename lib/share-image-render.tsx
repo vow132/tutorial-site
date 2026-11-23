@@ -46,6 +46,10 @@ export async function renderShareImage(key: string, card: ShareCard): Promise<Ui
   // 分类小字：在 #f7f8fa 底和分类色淡底上都达到 4.5:1
   const categoryInk = readableOn(card.categoryColor, ["#f7f8fa", overlay(card.categoryColor, 0x1f / 255, "#f7f8fa")], "#000000");
   const host = new URL(SITE_URL).host;
+  const accent = /^#[0-9a-f]{6}$/i.test(card.accent ?? "") ? card.accent! : "#6366f1";
+  // Logo 方块上的白字、右下角的小字都要看得清
+  const badge = readableOn(accent, ["#ffffff"], "#000000", 4.5);
+  const ctaInk = readableOn(accent, ["#f7f8fa"], "#000000");
 
   const response = new ImageResponse(
     (
@@ -59,7 +63,7 @@ export async function renderShareImage(key: string, card: ShareCard): Promise<Ui
           padding: "64px 72px",
           backgroundColor: "#f7f8fa",
           backgroundImage:
-            "radial-gradient(circle at 88% 0%, rgba(99,102,241,0.20), rgba(99,102,241,0) 55%), radial-gradient(circle at 0% 100%, rgba(14,165,233,0.12), rgba(14,165,233,0) 50%)",
+            `radial-gradient(circle at 88% 0%, ${accent}33, ${accent}00 55%), radial-gradient(circle at 0% 100%, rgba(14,165,233,0.12), rgba(14,165,233,0) 50%)`,
           fontFamily: FONT_NAME,
           color: "#111827",
         }}
@@ -70,7 +74,7 @@ export async function renderShareImage(key: string, card: ShareCard): Promise<Ui
               width: 60,
               height: 60,
               borderRadius: 18,
-              backgroundColor: "#6366f1",
+              backgroundColor: badge,
               color: "#ffffff",
               fontSize: 32,
               display: "flex",
@@ -108,7 +112,7 @@ export async function renderShareImage(key: string, card: ShareCard): Promise<Ui
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 26, color: "#6b7280" }}>
           <div>{draw(host)}</div>
-          <div style={{ color: "#4f46e5" }}>{"阅读教程 →"}</div>
+          <div style={{ color: ctaInk }}>{draw(card.cta ?? "阅读教程 →") || "→"}</div>
         </div>
       </div>
     ),

@@ -1,3 +1,4 @@
+import SiteLogo from "./site-logo";
 import IntentLink from "./intent-link";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategoryTree } from "@/lib/public-data";
@@ -35,9 +36,7 @@ export default async function SiteHeader() {
           href="/"
           className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-line bg-surface/85 px-2.5 shadow-capsule backdrop-blur-md lg:flex-none lg:justify-start lg:px-4"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">
-            {settings.logoText}
-          </span>
+          <SiteLogo settings={settings} className="h-6 w-6 text-xs" />
           <span className="max-w-[46vw] truncate text-sm font-bold tracking-wide max-[359px]:hidden lg:max-w-none">
             {settings.siteName}
           </span>

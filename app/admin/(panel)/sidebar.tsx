@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import ThemeToggle from "@/components/theme-toggle";
 import LabelButton from "@/components/label-button";
+import { SITE_REPOSITORY_URL } from "@/lib/site-update-types";
 
 type AdminItem = {
   href: string;
@@ -94,9 +95,11 @@ function isActivePath(pathname: string, href: string) {
 
 function SidebarLinks({
   pathname,
+  version,
   onNavigate,
 }: {
   pathname: string;
+  version: string;
   onNavigate?: () => void;
 }) {
   return (
@@ -174,12 +177,21 @@ function SidebarLinks({
             退出登录
           </button>
         </form>
+        <a
+          href={`${SITE_REPOSITORY_URL}/blob/master/CHANGELOG.md`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block px-4 pt-2 text-xs text-ink-3 transition-colors hover:text-ink"
+          title="查看更新日志"
+        >
+          程序版本 <span className="admin-version font-mono">{version}</span>
+        </a>
       </div>
     </>
   );
 }
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ version }: { version: string }) {
   const pathname = usePathname();
   const toggleId = useId();
   const drawerId = useId();
@@ -348,6 +360,7 @@ export default function AdminSidebar() {
             <div className="flex-1 overflow-y-auto p-3">
               <SidebarLinks
                 pathname={pathname}
+                version={version}
                 onNavigate={() => closeMobileMenu()}
               />
             </div>
@@ -360,7 +373,7 @@ export default function AdminSidebar() {
           <span className="text-sm font-semibold text-ink">后台管理</span>
           <ThemeToggle />
         </div>
-        <SidebarLinks pathname={pathname} />
+        <SidebarLinks pathname={pathname} version={version} />
       </aside>
     </>
   );

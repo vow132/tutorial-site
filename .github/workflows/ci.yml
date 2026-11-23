@@ -68,6 +68,40 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  # Docker 镜像能构建、第一次启动能建库，并且页面是按真实数据生成的（不是构建时的空库）。
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 构建镜像
+        run: docker build --build-arg NPM_REGISTRY=https://registry.npmjs.org/ -t tutorial-site:ci .
+
+      - name: 启动容器并检查
+        run: |
+          docker run -d --name site -p 3000:3000 \
+            -e AUTH_SECRET=ci-docker-only-never-use-in-production \
+            -e ADMIN_PASSWORD=ci-admin-password \
+            tutorial-site:ci
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000/api/health > /dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:3000/api/health
+          curl -sf http://127.0.0.1:3000/ | grep -q "Flexbox"
+          test "$(curl -sf http://127.0.0.1:3000/sitemap.xml | grep -c '<url>')" -gt 2
+          # 重启后不会重复写入种子数据
+          docker restart site
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000/api/health > /dev/null && break
+            sleep 2
+          done
+          test "$(docker logs site 2>&1 | grep -c '第一次启动')" -eq 1
+
+      - name: 容器日志
+        if: always()
+        run: docker logs site
+
   # 依赖出现高危漏洞时单独标红，不影响上面的构建结果判断。
   dependency-audit:
     runs-on: ubuntu-latest

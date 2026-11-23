@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { authSecretFrom } from "@/lib/auth-secret.mjs";
 
 /**
  * 邮件订阅的纯函数：邮箱校验、发信配置校验、确认/退订链接签名、邮件内容。
@@ -75,9 +76,9 @@ export function readMailConfig(raw: unknown): MailConfig {
 type TokenPurpose = "confirm" | "unsubscribe";
 
 function tokenKey() {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") throw new Error("生产环境必须设置 AUTH_SECRET");
-  return secret || "dev-secret-change-me-in-production";
+  const secret = authSecretFrom();
+  if (!secret) throw new Error("生产环境必须设置随机的 AUTH_SECRET");
+  return secret;
 }
 
 function mac(id: number, purpose: TokenPurpose) {

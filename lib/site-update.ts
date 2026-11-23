@@ -24,7 +24,10 @@ export function updateRoot(): string {
   return path.resolve(process.env.SITE_UPDATE_ROOT || process.cwd());
 }
 
+const DOCKER_MESSAGE = "Docker 部署不用一键更新：在服务器上执行 git pull && docker compose up -d --build 即可。";
+
 function environmentRestriction(): string | null {
+  if (process.env.DEPLOY_MODE === "docker") return DOCKER_MESSAGE;
   if (process.env.NODE_ENV !== "production" || process.platform !== "linux") {
     return "一键更新需要 Linux 服务器上的 PM2 生产部署；本地开发环境仅检测更新。";
   }
@@ -106,6 +109,10 @@ async function checkRepository(): Promise<SiteUpdateStatus> {
 }
 
 export async function getSiteUpdateStatus(): Promise<SiteUpdateStatus> {
+  // Docker 镜像里没有 git 仓库，也不该由容器自己替换自己
+  if (process.env.DEPLOY_MODE === "docker") {
+    return { state: "unavailable", message: DOCKER_MESSAGE, canUpdate: false, currentRevision: null, latestRevision: null, checkedAt: null };
+  }
   let job = await readUpdateJob();
   const currentRevision = runningRevision();
   if (job?.state === "running" && jobIsAlive(job)) {

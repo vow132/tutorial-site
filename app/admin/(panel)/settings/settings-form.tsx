@@ -6,6 +6,7 @@ import type { SiteSettings, FooterColumn } from "@/lib/settings";
 import { SEARCH_ENGINES } from "@/lib/search-verification";
 import { submitKeepingValues } from "@/lib/form-submit";
 import ImageField from "./image-field";
+import AccentField from "./accent-field";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -144,6 +145,20 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
         />
       </Section>
 
+      {/* ---------- 品牌 ---------- */}
+      <Section title="品牌" desc="Logo、网站图标、分享图和主题色都在这里换，不用改仓库里的文件（改了文件会挡住一键更新）">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <ImageField name="brand.logoImage" label="Logo 图片" hint="正方形，留空用 Logo 字符" initial={settings.brand.logoImage} />
+          <ImageField name="brand.favicon" label="网站图标" hint="正方形，至少 192×192" initial={settings.brand.favicon} />
+          <ImageField name="brand.shareImage" label="默认分享图" hint="1200×630，留空自动生成" initial={settings.brand.shareImage} />
+        </div>
+        <AccentField initial={settings.brand.accentColor} logoText={settings.logoText} />
+        <label className="flex items-center gap-2 text-sm text-ink-2">
+          <input type="checkbox" name="brand.mascot" defaultChecked={settings.brand.mascot} className="h-4 w-4 accent-[var(--color-accent)]" />
+          显示小幽灵吉祥物（导航上方、搜索无结果、404 页）
+        </label>
+      </Section>
+
       {/* ---------- 首页 Hero ---------- */}
       <Section title="首页 Hero 文案" desc="首页顶部的大标题区域">
         <Field label="徽标文字" name="heroBadge" defaultValue={settings.heroBadge} placeholder="持续更新的知识库" />
@@ -232,6 +247,7 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
           placeholder="教程网 · 用心写好每一篇教程"
           hint="年份会自动前置"
         />
+        <Field label="页脚状态文字" name="footerStatus" defaultValue={settings.footerStatus} placeholder="持续更新中" hint="留空不显示" />
       </Section>
 
       {/* ---------- 底部栏目 ---------- */}

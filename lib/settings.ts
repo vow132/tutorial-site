@@ -4,12 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
 import { readVerification, type SearchVerification } from "@/lib/search-verification";
 import {
+  defaultBrand,
   defaultStartHere,
   defaultSupport,
   readArticleMotion,
+  readBrand,
   readStartHere,
   readSupport,
   type ArticleMotion,
+  type BrandSettings,
   type StartHere,
   type SupportSettings,
 } from "@/lib/settings-extras";
@@ -48,6 +51,10 @@ export type SiteSettings = {
   articleMotion: ArticleMotion;
   /** 文末的赞助与打赏 */
   support: SupportSettings;
+  /** 品牌素材：Logo 图片、网站图标、默认分享图、主题色、吉祥物 */
+  brand: BrandSettings;
+  /** 页脚右下角的状态文字，空串表示不显示 */
+  footerStatus: string;
 };
 
 export const SETTINGS_KEY = "site";
@@ -89,6 +96,8 @@ export const defaultSettings: SiteSettings = {
   startHere: defaultStartHere,
   articleMotion: "calm",
   support: defaultSupport,
+  brand: defaultBrand,
+  footerStatus: "持续更新中",
 };
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
@@ -116,6 +125,8 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
       startHere: readStartHere(parsed.startHere),
       articleMotion: readArticleMotion(parsed.articleMotion),
       support: readSupport(parsed.support),
+      brand: readBrand(parsed.brand),
+      footerStatus: typeof parsed.footerStatus === "string" ? parsed.footerStatus : defaultSettings.footerStatus,
     };
   } catch {
     return defaultSettings;

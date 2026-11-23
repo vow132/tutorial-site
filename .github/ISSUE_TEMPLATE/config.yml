@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 报告安全漏洞
+    url: https://github.com/vow132/tutorial-site/security/advisories/new
+    about: 请私下报告，不要开公开 Issue
+  - name: 定制指南
+    url: https://github.com/vow132/tutorial-site/blob/master/docs/CUSTOMIZE.md
+    about: 改站名、Logo、主题色、页脚，部署后的上线检查，Fork 后同步更新

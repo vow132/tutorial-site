@@ -35,6 +35,13 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
     },
+    // 会删掉种子数据的测试（结束时重新写入），等其他测试都跑完再执行
+    {
+      name: "cleanup",
+      testMatch: /\.cleanup\.ts$/,
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["chromium"],
+    },
   ],
   webServer: {
     command: `npm run start -- -p ${PORT}`,

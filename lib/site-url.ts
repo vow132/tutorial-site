@@ -25,6 +25,8 @@ if (
   globalForSiteUrl.__siteUrlWarned = true;
   console.warn(
     `[seo] SITE_URL 未设置或指向本机（当前 ${SITE_URL}）：canonical、sitemap、分享卡片都会是错误地址。` +
-      "请在 .env.production 中设置 SITE_URL=\"https://你的域名\" 后重启。",
+      (process.env.DEPLOY_MODE === "docker"
+        ? "请在 .env 中设置 SITE_URL=\"https://你的域名\" 后执行 docker compose up -d --build。"
+        : "请在 .env.production 中设置 SITE_URL=\"https://你的域名\" 后重启。"),
   );
 }

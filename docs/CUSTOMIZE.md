@@ -1,0 +1,92 @@
+# 定制指南：把它变成你自己的教程网
+
+这份源码是一个通用的图文教程站模板：放什么内容、叫什么名字、长什么样都由你决定。大部分定制在后台点几下就能完成，**不用改代码**；确实要改代码时，按本文最后的「改代码」部分操作，以后还能继续合并上游更新。
+
+## 1. 部署好之后先做这几件事
+
+登录后台 `/admin`，仪表盘顶部的 **上线检查清单** 会列出还没做的事，做完自动打勾：
+
+1. **改站名和品牌**：「站点设置 → 基本信息 / 品牌」；
+2. **删除示例数据**：清单里点「一键清除示例数据」，会删除种子数据里的 3 篇示例教程，以及没有被你的教程使用的示例分类和标签（写入安全日志，删除后不能恢复）；
+3. **改默认密码、开两步验证**：「账号安全」；
+4. **设置 `SITE_URL`、`TRUST_PROXY`**：服务器上的环境变量，见 [`.env.example`](../.env.example)；
+5. **定期备份、开安全告警**：见 README「安全加固」。
+
+## 2. 后台就能改的（不用碰代码）
+
+| 想改什么 | 在哪里改 |
+| --- | --- |
+| 站名、浏览器标题、站点描述（搜索结果里那段话）、Logo 文字 | 站点设置 → 基本信息 |
+| Logo 图片、网站图标（favicon，自动生成各种尺寸）、默认分享图、主题色、小幽灵吉祥物开关 | 站点设置 → 品牌 |
+| 首页大标题、副标题、标语 | 站点设置 → 首页 Hero 文案 |
+| 首页「从这里开始」（展示哪几个系列） | 站点设置 → 首页「从这里开始」 |
+| 文章页要不要倾斜、聚光灯等动效 | 站点设置 → 文章页动效 |
+| 打赏收款码、赞助位 | 站点设置 → 赞助与打赏 |
+| 页脚标语、版权、状态文字、底部栏目和链接 | 站点设置 → 页脚 |
+| 百度 / Google / Bing 等站长平台验证 | 站点设置 → 搜索引擎验证 |
+| `/.well-known/security.txt` 的联系方式 | 站点设置 → 安全联系方式 |
+| 「关于本站」页面 | 关于页面（正文留空时 `/about` 不显示） |
+| 顶部导航里的分类、分类颜色和层级 | 分类管理（导航按分类自动生成） |
+| 标签、系列 | 标签管理、教程系列 |
+| 邮件订阅（SMTP 发信） | 邮件订阅 |
+| 安全告警推送（钉钉 / 飞书 / 企业微信 / Telegram / Webhook） | 账号安全 → 安全告警 |
+
+这些设置都存在数据库里，**不会和一键更新冲突**。主题色会同时改按钮、链接、图表和自动生成的分享图，文字颜色会自动调整到足够的对比度。
+
+> 为什么不建议直接替换仓库里的图标、图片文件？一键更新会检查服务器上的代码有没有被改过，改过就会停下（「服务器存在未提交的本地修改」），防止覆盖你的改动。所以能在后台改的，都放在后台。
+
+## 3. 部署方式和更新
+
+| 部署方式 | 怎么更新 |
+| --- | --- |
+| **PM2（`bash deploy.sh`），直接克隆本仓库，没改代码** | 后台右上角圆点变黄时，点击并输入密码即可一键更新 |
+| **Docker（`docker compose up -d --build`）** | `git pull && docker compose up -d --build`（后台不提供一键更新） |
+| **Fork 后改了代码** | 按下面「同步上游更新」合并，再 `bash deploy.sh` 或重新构建 Docker 镜像 |
+
+一键更新只认本仓库（`vow132/tutorial-site`）：服务器上的 `origin` 不是它时会拒绝更新，避免把来源不明的代码部署到你的服务器上。
+
+## 4. 改代码
+
+### 4.1 Fork 和同步上游更新
+
+```bash
+# 在 GitHub 上 Fork 本仓库，然后克隆你自己的仓库
+git clone https://github.com/<你的用户名>/tutorial-site.git
+cd tutorial-site
+git remote add upstream https://github.com/vow132/tutorial-site.git
+
+# 以后同步上游的新版本
+git fetch upstream
+git merge upstream/master        # 有冲突时解决后提交
+npm ci && npx prisma migrate deploy && npm test
+```
+
+建议把自己的改动集中在少数文件里，合并时冲突会少很多。每个版本的变化和升级注意事项见 [CHANGELOG.md](../CHANGELOG.md)。
+
+### 4.2 常见改动在哪里
+
+| 想改什么 | 文件 |
+| --- | --- |
+| 整体配色、圆角、字体等设计变量 | `app/globals.css` 的 `@theme`（主题色优先在后台改） |
+| 文章正文排版（标题、段落、代码块、表格） | `app/globals.css` 里的 `.article-body` |
+| 首页布局 | `app/(site)/page.tsx` |
+| 顶部导航、页脚 | `components/site-header.tsx`、`components/capsule-nav.tsx`、`components/site-footer.tsx` |
+| 小幽灵吉祥物的样子 | `components/mascot.tsx`（只想关掉的话在后台关） |
+| 教程卡片 | `components/tutorial-card.tsx` |
+| 编辑器（工具栏、扩展） | `components/editor/`；新加的标签和属性要同步放宽 `lib/sanitize.ts` 的白名单 |
+| 种子数据（新部署时的示例内容） | `prisma/seed.ts`；改了示例教程的 slug 时同步 `lib/sample-data.ts`，否则「一键清除示例数据」找不到它们 |
+
+### 4.3 新增一个页面
+
+以 `/links`（友情链接）为例：
+
+1. 新建 `app/(site)/links/page.tsx`，页面元数据用 `lib/seo.ts` 的 `pageMetadata({ title, description, path: "/links" })`，不要自己写 `openGraph` / `alternates`（会把根布局的分享图、RSS 链接整个替换掉）；
+2. 站内链接用 `components/intent-link.tsx`，不要直接用 `next/link`；
+3. 需要被搜索引擎收录时，把地址加进 `app/sitemap.ts`；
+4. 在后台「站点设置 → 页脚 → 底部栏目」加一个指向 `/links` 的链接。
+
+更多架构约定（缓存、数据库迁移、安全要求）见 [AGENTS.md](../AGENTS.md) 和 [CONTRIBUTING.md](../CONTRIBUTING.md)。
+
+## 5. 授权
+
+本项目使用 [MIT 许可证](../LICENSE)：可以免费商用、修改、闭源部署，只需要在源码或分发的副本里保留原来的版权和许可声明。网站上放什么内容由你自己负责。

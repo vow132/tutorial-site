@@ -11,6 +11,8 @@
   --color-accent-soft: #eef2ff;
   /* 小号强调文字（链接、选中项）用更深一档的靛蓝，保证可读对比度 */
   --color-accent-ink: #4f46e5;
+  /* Logo 方块底色（上面是白字）；站点设置里换了主题色时由 lib/brand.ts 覆盖 */
+  --color-brand: #6366f1;
   --color-live: #10b981;
   /* 阴影层级：胶囊悬浮件 / 浮层（下拉、卡片抬升） */
   --shadow-capsule: 0 8px 30px -12px rgb(var(--shadow-rgb) / 0.18);
@@ -343,7 +345,7 @@ body:has(.admin-mobile-drawer-toggle:checked) {
   pointer-events: none;
   background: radial-gradient(
     420px circle at var(--mx, 50%) var(--my, 0%),
-    rgba(99, 102, 241, 0.1),
+    color-mix(in srgb, var(--color-accent) 10%, transparent),
     transparent 65%
   );
   opacity: 0;
@@ -357,6 +359,9 @@ body:has(.admin-mobile-drawer-toggle:checked) {
 [data-motion="calm"] .glow-card-tilt,
 [data-motion="calm"] .glow-card-tilt:hover { transform: none; }
 [data-motion="calm"] .glow-card .spotlight { display: none; }
+
+/* 站点设置 → 品牌 → 不显示吉祥物 */
+html[data-mascot="off"] .site-mascot { display: none !important; }
 
 /* 分类色做小号文字：颜色由 lib/color.ts 的 categoryTextStyle() 计算，保证对比度 ≥ 4.5:1 */
 .cat-text { color: var(--cat-ink); }

@@ -9,6 +9,8 @@ import { helpfulSummary, readRate } from "@/lib/feedback";
 import { getSearchStats } from "@/lib/search-stats";
 import { getTopTutorials, getTrafficSources, getViewTrend } from "@/lib/view-stats";
 import GitHubUpdate from "./github-update";
+import LaunchChecklist from "./launch-checklist";
+import { getLaunchChecklist } from "@/lib/launch-checklist";
 import { SearchInsights, TrafficSources } from "./reader-insights";
 import ViewTrend from "./view-trend";
 
@@ -16,8 +18,10 @@ export const metadata: Metadata = { title: "仪表盘" };
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboard() {
-  await requireAdminPage();
+export default async function AdminDashboard({ searchParams }: { searchParams: Promise<{ sampleCleared?: string }> }) {
+  const admin = await requireAdminPage();
+  const { sampleCleared } = await searchParams;
+  const checklist = await getLaunchChecklist(admin.id);
   const [
     tutorialCount,
     publishedCount,
@@ -97,6 +101,13 @@ export default async function AdminDashboard() {
           <GitHubUpdate />
         </div>
       </div>
+
+      {sampleCleared !== undefined && (
+        <p role="status" className="mt-6 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+          已清除 {Number(sampleCleared) || 0} 篇示例教程和没用到的示例分类、标签
+        </p>
+      )}
+      <LaunchChecklist items={checklist} />
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (

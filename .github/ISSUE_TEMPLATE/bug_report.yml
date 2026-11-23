@@ -1,0 +1,62 @@
+name: 问题反馈
+description: 功能不正常、报错、页面显示有问题
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！**安全漏洞请不要在这里提交**，请按 SECURITY.md 私下报告。
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 看到了什么、期望看到什么。有截图更好。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 …
+        2. 点击 …
+        3. 看到 …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 程序版本
+      description: 后台侧栏底部「程序版本」后面的内容，例如 v1.0.0 · a1b2c3d
+    validations:
+      required: true
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: 部署方式
+      options:
+        - PM2（deploy.sh / 一键更新）
+        - Docker
+        - 本地开发（npm run dev）
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 运行环境
+      description: Node 版本（node -v）、操作系统、浏览器
+      placeholder: Node 24.11、Ubuntu 24.04、Chrome 142
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误日志
+      description: 服务器日志（pm2 logs 或 docker compose logs）、浏览器控制台报错。**贴之前去掉密码、密钥、邮箱等敏感信息。**
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我已经搜过现有的 Issue，没有人提过这个问题
+          required: true

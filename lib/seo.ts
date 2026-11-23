@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/settings";
+import { getSettings, type SiteSettings } from "@/lib/settings";
 import { SITE_URL, absoluteUrl } from "@/lib/site-url";
+import { SHARE_IMAGE_SIZE, siteShareCard, siteShareImagePath } from "@/lib/share-image";
+import { uploadedImage } from "@/lib/article";
 
-/** 没有配图时的默认分享图（public/og.png）。 */
-export const DEFAULT_OG_IMAGE = { url: "/og.png", width: 1200, height: 630 } as const;
+/**
+ * 没有配图的页面用的默认分享图：后台「站点设置 → 品牌」上传了就用上传的，
+ * 否则用按站名、首页大标题和主题色自动生成的 /og/site 图（设置一改地址就变）。
+ */
+export async function defaultShareImage(settings: SiteSettings): Promise<SeoImage> {
+  const uploaded = settings.brand.shareImage ? await uploadedImage(settings.brand.shareImage) : null;
+  if (uploaded) return { url: settings.brand.shareImage, width: uploaded.width, height: uploaded.height, alt: settings.siteTitle };
+  return { url: siteShareImagePath(siteShareCard(settings)), ...SHARE_IMAGE_SIZE, alt: settings.siteTitle };
+}
 
 export const RSS_FEED = { "application/rss+xml": absoluteUrl("/feed.xml") };
 
@@ -50,7 +59,7 @@ export async function pageMetadata({
 }): Promise<Metadata> {
   const settings = await getSettings();
   const shareTitle = title ?? settings.siteTitle;
-  const shareImage: SeoImage = image ?? { ...DEFAULT_OG_IMAGE, alt: settings.siteTitle };
+  const shareImage: SeoImage = image ?? (await defaultShareImage(settings));
 
   const common = {
     siteName: settings.siteName,

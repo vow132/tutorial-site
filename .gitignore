@@ -34,6 +34,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -62,3 +63,6 @@ next-env.d.ts
 
 # deploy.sh 的临时数据库快照
 /.deploy-build.db*
+
+# Docker 部署的数据目录（数据库、上传、备份）
+/docker-data/

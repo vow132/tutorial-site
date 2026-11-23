@@ -1,0 +1,26 @@
+# 用法：
+#   cp .env.example .env     # 填好 AUTH_SECRET、SITE_URL、ADMIN_PASSWORD（站点在 Nginx 后面时再设 TRUST_PROXY=true）
+#   docker compose up -d --build
+# 数据都在 ./docker-data 下（数据库、上传图片、备份），升级、重建容器不会丢。
+# 更新：git pull && docker compose up -d --build（改了 SITE_URL 也要重新构建）
+services:
+  app:
+    build:
+      context: .
+      args:
+        # 构建时写进 canonical / sitemap / robots.txt，必须是正式地址
+        SITE_URL: ${SITE_URL:-http://localhost:3000}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
+        APT_MIRROR: ${APT_MIRROR:-}
+    image: tutorial-site:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: file:/app/data/tutorial.db
+    ports:
+      # 只给本机的 Nginx / Caddy 反向代理用；不用反代、直接对外时改成 "3000:3000"
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./docker-data/db:/app/data
+      - ./docker-data/uploads:/app/public/uploads
+      - ./docker-data/backups:/app/backups

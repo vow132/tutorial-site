@@ -12,7 +12,7 @@ import {
   type SearchVerification,
 } from "@/lib/search-verification";
 import { normalizeSecurityContact } from "@/lib/security-txt";
-import { parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
+import { parseBrandInput, parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
 import { uploadedImage } from "@/lib/article";
 
 export type SettingsFormState = { error?: string; success?: string };
@@ -77,6 +77,18 @@ export async function updateSettings(
     if (image && !(await uploadedImage(image))) return { error: "赞助与打赏里的图片文件已不存在，请重新上传" };
   }
 
+  const brand = parseBrandInput({
+    logoImage: text("brand.logoImage"),
+    favicon: text("brand.favicon"),
+    shareImage: text("brand.shareImage"),
+    accentColor: text("brand.accentColor"),
+    mascot: formData.get("brand.mascot") === "on",
+  });
+  if ("error" in brand) return { error: brand.error };
+  for (const image of [brand.data.logoImage, brand.data.favicon, brand.data.shareImage]) {
+    if (image && !(await uploadedImage(image))) return { error: "品牌里的图片文件已不存在，请重新上传" };
+  }
+
   const startHere = parseStartHereInput({
     enabled: formData.get("startHere.enabled") === "on",
     title: text("startHere.title"),
@@ -102,6 +114,8 @@ export async function updateSettings(
     startHere,
     articleMotion: formData.get("articleMotion") === "full" ? "full" : "calm",
     support: support.data,
+    brand: brand.data,
+    footerStatus: text("footerStatus").slice(0, 20),
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };
