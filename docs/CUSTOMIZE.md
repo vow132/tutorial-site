@@ -12,6 +12,13 @@
 4. **设置 `SITE_URL`、`TRUST_PROXY`**：服务器上的环境变量，见 [`.env.example`](../.env.example)；
 5. **定期备份、开安全告警**：见 README「安全加固」。
 
+原来在 Hexo、Hugo、Jekyll、Obsidian、WordPress 等平台写过文章的，到「教程管理 → 批量导入」一次搬过来：
+- 选 Markdown 文件夹或 WordPress 导出文件（WordPress 后台「工具 → 导出 → 文章」），预览后点导入；
+- 发布时间、标签保留；原分类和本站分类同名时自动放进去，其余放进你选的默认分类，所以最好先把分类建好；
+- 文件夹里的图片会上传到本站，外链图片（旧网站、图床）也可以下载下来，原网站关掉后图片不会丢；
+- 默认全部存为草稿，检查排版后再发布；导入的文章不会给邮件订阅者发通知；
+- 导入完成后页面会给出旧地址 → 新地址的 Nginx 301 跳转规则：新站沿用原来的域名时放进 Nginx 配置，旧链接和搜索引擎的收录都不会断。
+
 ## 2. 后台就能改的（不用碰代码）
 
 | 想改什么 | 在哪里改 |
@@ -40,8 +47,8 @@
 | 部署方式 | 怎么更新 |
 | --- | --- |
 | **PM2（`bash deploy.sh`），直接克隆本仓库，没改代码** | 后台右上角圆点变黄时，点击并输入密码即可一键更新 |
-| **Docker（`docker compose up -d --build`）** | `git pull && docker compose up -d --build`（后台不提供一键更新） |
-| **Fork 后改了代码** | 按下面「同步上游更新」合并，再 `bash deploy.sh` 或重新构建 Docker 镜像 |
+| **Docker（`docker compose up -d`，用现成镜像）** | `docker compose pull && docker compose up -d`（后台不提供一键更新） |
+| **Fork 后改了代码** | 按下面「同步上游更新」合并，再 `bash deploy.sh`；Docker 部署用自己仓库 GitHub Actions 构建的镜像，或者在服务器上自己构建（见 README「Docker 部署」） |
 
 一键更新只认本仓库（`vow132/tutorial-site`）：服务器上的 `origin` 不是它时会拒绝更新，避免把来源不明的代码部署到你的服务器上。
 

@@ -1,0 +1,89 @@
+name: Docker 镜像
+
+# 发布到 GitHub 容器镜像仓库（ghcr.io/<仓库所有者>/tutorial-site），amd64 和 arm64 各在原生机器上构建，再合成一个多架构镜像：
+# - master 每次更新：latest、sha-<提交号前 7 位>
+# - 推送 vX.Y.Z 标签：X.Y.Z、X.Y、X
+# PR 只构建两种架构、不推送，提前发现 Dockerfile 的问题。
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - scripts/docker-start.mjs
+      - .github/workflows/docker-publish.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PUSH: ${{ github.event_name != 'pull_request' }}
+
+jobs:
+  build-amd64:
+    runs-on: ubuntu-24.04
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: build
+        name: 构建 amd64
+        run: bash .github/scripts/docker-build-arch.sh linux/amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-arm64:
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: build
+        name: 构建 arm64
+        run: bash .github/scripts/docker-build-arch.sh linux/arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: [build-amd64, build-arm64]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 合成多架构镜像并打标签
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AMD64: ${{ needs.build-amd64.outputs.digest }}
+          ARM64: ${{ needs.build-arm64.outputs.digest }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tags=(-t "$image:sha-${GITHUB_SHA::7}")
+          if [ "$GITHUB_REF" = "refs/heads/master" ]; then
+            tags+=(-t "$image:latest")
+          elif [[ "$GITHUB_REF" =~ ^refs/tags/v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"; patch="${BASH_REMATCH[3]}"
+            tags+=(-t "$image:$major.$minor.$patch" -t "$image:$major.$minor")
+            [ "$major" != "0" ] && tags+=(-t "$image:$major")
+          fi
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools create "${tags[@]}" \
+            --annotation "index:org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "index:org.opencontainers.image.description=图文教程网站（Next.js + SQLite），数据库和上传文件放在挂载卷里" \
+            --annotation "index:org.opencontainers.image.licenses=MIT" \
+            --annotation "index:org.opencontainers.image.revision=$GITHUB_SHA" \
+            "$image@$AMD64" "$image@$ARM64"
+          docker buildx imagetools inspect "$image:sha-${GITHUB_SHA::7}"
+          {
+            echo "### 已发布镜像"
+            for tag in "${tags[@]}"; do [ "$tag" != "-t" ] && echo "- \`$tag\`"; done
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -82,7 +82,7 @@ export async function getLaunchChecklist(adminId: number): Promise<ChecklistItem
       hint: siteUrlOk
         ? SITE_URL
         : `现在是 ${SITE_URL}：${
-            docker ? "在 .env 里设置 SITE_URL=\"https://你的域名\" 后执行 docker compose up -d --build" : "在 .env.production 里设置 SITE_URL=\"https://你的域名\" 后重启"
+            docker ? "在 .env 里设置 SITE_URL=\"https://你的域名\" 后执行 docker compose up -d" : "在 .env.production 里设置 SITE_URL=\"https://你的域名\" 后重启"
           }，否则分享链接、sitemap 都是错的`,
     },
     {

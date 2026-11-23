@@ -1,0 +1,14 @@
+# 自己构建镜像（改过代码，或者拉不到 ghcr.io 的镜像时）：
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# 以后更新：git pull，再执行同一条命令。
+services:
+  app:
+    image: tutorial-site:local
+    pull_policy: build
+    build:
+      context: .
+      args:
+        # 国内默认 npmmirror；海外服务器可在 .env 里设置 NPM_REGISTRY=https://registry.npmjs.org/
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
+        # 拉 Debian 软件包慢时在 .env 里设置 APT_MIRROR=mirrors.aliyun.com
+        APT_MIRROR: ${APT_MIRROR:-}

@@ -94,6 +94,13 @@ export default async function AdminTutorialsPage({
             {filtered ? `筛选出 ${total} 篇（共 ${all} 篇）` : `共 ${total} 篇`}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <Link
+          href="/admin/tutorials/import"
+          className="flex h-10 items-center rounded-full border border-line px-4 text-sm text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+        >
+          批量导入
+        </Link>
         <Link
           href="/admin/tutorials/new"
           className="flex h-10 items-center gap-2 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -103,6 +110,7 @@ export default async function AdminTutorialsPage({
           </svg>
           写教程
         </Link>
+        </div>
       </div>
 
       <form role="search" aria-label="筛选教程" className="mt-6 flex flex-wrap items-center gap-2">

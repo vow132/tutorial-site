@@ -10,6 +10,21 @@
 
 ## [未发布]
 
+### 新增
+
+- **现成的 Docker 镜像**：GitHub Actions 自动构建 `ghcr.io/vow132/tutorial-site`（amd64 / arm64，各在原生机器上构建，推送前先启动容器做冒烟测试）。`docker compose up -d` 直接拉取，不用在服务器上构建；更新用 `docker compose pull && docker compose up -d`。master 每次更新发布 `latest`，打 `vX.Y.Z` 标签发布 `X.Y.Z` / `X.Y` / `X`。自己构建改用 `docker-compose.build.yml`。
+- **批量导入**（教程管理 → 批量导入）：导入 Hexo、Hugo、Jekyll、Obsidian 等 Markdown 文件夹或 WordPress 导出文件。保留发布 / 修改时间和标签，原分类和本站分类同名时自动对应；文件夹里的图片上传到本站，外链图片可下载到本站（只允许公网地址，防止被用来访问服务器内网）；默认存为草稿，不给订阅者发邮件；结束后给出旧地址的 Nginx 301 跳转规则。
+- 安全日志补上系列、订阅者、发信设置、清除示例数据、批量导入等操作的中文名称。
+
+### 改进
+
+- Docker 镜像和站点无关：`SITE_URL` 只在运行时传入（`robots.txt` 改为定时重新生成，容器启动时按真实地址重建），改域名只要 `docker compose up -d`，不用重新构建。
+- 镜像删掉运行用不到的开发依赖，体积从约 1.7GB 降到约 1.4GB；后台侧栏显示镜像的提交号。
+
+### 升级说明
+
+- Docker 部署：`docker-compose.yml` 改为默认拉取现成镜像。如果你改过代码、要继续在服务器上构建，改用 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。`.env` 里的 `SITE_URL` 不再是构建参数，改了以后 `docker compose up -d` 即可。
+
 ## [1.0.0] - 2026-11-23
 
 第一个正式版本：任何人都可以拿这份源码搭自己的教程网，站名、Logo、主题色、分享图、文案都在后台改，不用动代码。
