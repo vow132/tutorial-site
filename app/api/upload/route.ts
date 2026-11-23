@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { getCurrentAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
-import { variantName } from "@/lib/image-variants";
-import { createVariants, detectImageFormat, optimizeImage } from "@/lib/upload-image";
+import { storeUploadedImage } from "@/lib/upload-store";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -30,41 +26,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "图片不能超过 5MB" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = detectImageFormat(buffer);
-  if (!ext) {
-    return NextResponse.json(
-      { error: "仅支持 PNG/JPG/GIF/WebP 图片（出于安全考虑不再接受 SVG）" },
-      { status: 400 }
-    );
-  }
-
-  let optimized: { data: Buffer; ext: string };
-  try {
-    optimized = await optimizeImage(buffer, ext);
-  } catch {
-    return NextResponse.json(
-      { error: "图片已损坏或尺寸过大（最多约 4000 万像素）" },
-      { status: 400 }
-    );
-  }
-
-  const dir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(dir, { recursive: true });
-  const name = `${Date.now()}-${randomBytes(6).toString("hex")}${optimized.ext}`;
-  await writeFile(path.join(dir, name), optimized.data);
-  // 响应式小图失败不影响上传本身，正文会退回只用原图。
-  try {
-    for (const [width, data] of await createVariants(optimized.data)) {
-      await writeFile(path.join(dir, variantName(name, width)), data);
-    }
-  } catch (error) {
-    console.warn("[upload] 生成响应式小图失败：", error);
+  const stored = await storeUploadedImage(Buffer.from(await file.arrayBuffer()));
+  if ("error" in stored) {
+    return NextResponse.json({ error: stored.error }, { status: 400 });
   }
   await audit("upload", {
     actor: admin.username,
-    detail: `${name}（${file.size} → ${optimized.data.length} 字节）`,
+    detail: `${stored.name}（${file.size} → ${stored.bytes} 字节）`,
   });
 
-  return NextResponse.json({ url: `/uploads/${name}` });
+  return NextResponse.json({ url: stored.url });
 }

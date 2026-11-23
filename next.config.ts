@@ -4,7 +4,10 @@ import { execFileSync } from "node:child_process";
 function buildRevision() {
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  } catch { return ""; }
+  } catch {
+    // Docker 镜像里没有 .git：构建镜像时用构建参数 BUILD_REVISION 传入提交号（有 Git 仓库时始终以 Git 为准）
+    return /^[a-f0-9]{40}$/.test(process.env.BUILD_REVISION ?? "") ? process.env.BUILD_REVISION! : "";
+  }
 }
 
 const isDev = process.env.NODE_ENV === "development";

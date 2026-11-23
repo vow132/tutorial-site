@@ -24,7 +24,7 @@ export function updateRoot(): string {
   return path.resolve(process.env.SITE_UPDATE_ROOT || process.cwd());
 }
 
-const DOCKER_MESSAGE = "Docker 部署不用一键更新：在服务器上执行 git pull && docker compose up -d --build 即可。";
+const DOCKER_MESSAGE = "Docker 部署不用一键更新：在服务器上执行 docker compose pull && docker compose up -d 即可（自己构建镜像的按 README 重新构建）。";
 
 function environmentRestriction(): string | null {
   if (process.env.DEPLOY_MODE === "docker") return DOCKER_MESSAGE;

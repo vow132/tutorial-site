@@ -1,18 +1,14 @@
-# 用法：
-#   cp .env.example .env     # 填好 AUTH_SECRET、SITE_URL、ADMIN_PASSWORD（站点在 Nginx 后面时再设 TRUST_PROXY=true）
-#   docker compose up -d --build
-# 数据都在 ./docker-data 下（数据库、上传图片、备份），升级、重建容器不会丢。
-# 更新：git pull && docker compose up -d --build（改了 SITE_URL 也要重新构建）
+# 用法（详见 README「Docker 部署」）：
+#   cp .env.example .env     # 填好 SITE_URL、AUTH_SECRET、ADMIN_PASSWORD（站点在 Nginx 后面时再设 TRUST_PROXY=true）
+#   docker compose up -d
+# 默认拉取 GitHub 自动构建好的镜像（amd64 / arm64），不用在服务器上构建。
+# 更新：docker compose pull && docker compose up -d
+# 改了代码想自己构建：docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# 数据都在 ./docker-data 下（数据库、上传图片、备份），更新、重建容器不会丢。
 services:
   app:
-    build:
-      context: .
-      args:
-        # 构建时写进 canonical / sitemap / robots.txt，必须是正式地址
-        SITE_URL: ${SITE_URL:-http://localhost:3000}
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
-        APT_MIRROR: ${APT_MIRROR:-}
-    image: tutorial-site:latest
+    # 想固定版本时在 .env 里设置 TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.0.0
+    image: ${TUTORIAL_IMAGE:-ghcr.io/vow132/tutorial-site:latest}
     restart: unless-stopped
     env_file: .env
     environment:

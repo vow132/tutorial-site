@@ -54,6 +54,7 @@ npm run test:e2e          # 端到端测试（首次运行先 npx playwright ins
   ```
 
 - 有安装脚本的新依赖（原生模块等）要加到 `package.json` 的 `allowScripts`，新版 npm 默认不执行没列出的安装脚本。
+- 网站运行或运维命令（迁移、seed、`admin:reset`）要用的包放在 `dependencies`：Docker 镜像构建完会删掉 `devDependencies`。
 
 ## 提交 Pull Request
 
@@ -66,7 +67,7 @@ npm run test:e2e          # 端到端测试（首次运行先 npx playwright ins
 
 1. 按[语义化版本](https://semver.org/lang/zh-CN/)确定版本号，修改 `package.json` 和 `package-lock.json` 里的 `version`；
 2. 把 CHANGELOG.md 的「未发布」改成新版本号和日期，需要站长手动处理的写进「升级说明」；
-3. 合并后打标签 `git tag vX.Y.Z && git push origin vX.Y.Z`，并在 GitHub 上创建 Release。
+3. 合并后打标签 `git tag vX.Y.Z && git push origin vX.Y.Z`，并在 GitHub 上创建 Release。推送标签后 GitHub Actions 会自动发布 `X.Y.Z`、`X.Y`、`X` 三个 Docker 镜像标签（master 的每次更新发布 `latest`）。
 
 ## 许可
 

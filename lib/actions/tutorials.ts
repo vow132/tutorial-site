@@ -12,18 +12,11 @@ import { contentChanged, saveRevision } from "@/lib/revisions";
 import { parseTagNames } from "@/lib/tags";
 import { setTutorialTags } from "@/lib/tag-sync";
 import { notifyNewTutorial } from "@/lib/subscription-notify";
+import { normalizeSlug } from "@/lib/tutorial-slug";
 
 export type TutorialFormState = { error?: string };
 
 
-function normalizeSlug(input: string, title: string) {
-  const raw = (input || title).toLowerCase().trim();
-  const slug = raw
-    .replace(/[^a-z0-9一-龥]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  return slug || `tutorial-${Date.now().toString(36)}`;
-}
 
 /** 封面只接受本站上传的图片（/uploads/文件名），防止填入外链或任意路径。 */
 const COVER_URL = /^\/uploads\/[\w-]+\.(?:webp|png|jpe?g|gif)$/i;

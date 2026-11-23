@@ -26,12 +26,13 @@
 - **文章**：服务端 TOC 提取与高亮（highlight.js）、代码块语言标签与一键复制、标题旁 `#` 复制章节链接（锚点按标题文字生成，改动其他段落不会失效）、点击图片放大、打印/另存 PDF 专用排版、显示最后更新日期、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐、顶部阅读进度条与「回到顶部」、文末「这篇有帮助吗」反馈（点「没帮助」可以留一句话给站长）、复制链接 / 微信扫码分享、文末打赏码与赞助位、邮件订阅新教程（双重确认、一键退订）；文章页默认「精简动效」（不倾斜、不跟随），可在后台切换；按 `/` 或 Ctrl/⌘+K 聚焦搜索，404 页提供搜索框和最新教程；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息，并生成 800/1200px 小图供手机按屏幕加载
 - **后台**：Tiptap 3 富文本编辑器（拖拽/粘贴上传图片、表格、代码块选语言、提示/注意/警告提示框；边写边自动保存到本浏览器，误关页面或登录过期可恢复）、教程历史版本（每次保存留旧版，可预览和一键恢复）、草稿预览、定时发布、教程封面图（文章头图 + 分享卡片；列表卡片显示缩略图，没设封面时用正文第一张图）、教程标签（每篇最多 8 个，后台可改名/合并/删除）、教程系列（几篇按顺序组成一组，文章页显示「第 2 / 5 篇」目录和本系列上下篇，每个系列有自己的页面 `/series/…`）、仪表盘近 30 天阅读趋势与热门教程（含读完率和读者反馈好评率）、阅读来源（百度 / 微信 / 直接访问…）、读者搜了什么和「没搜到结果」的词（选题清单）、读者留言收件箱、Markdown 导入导出、首页「从这里开始」入门路线（展示选定的系列）、邮件订阅管理（发信设置加密保存、测试邮件、订阅者列表）、教程列表按标题搜索和按状态/分类筛选、可编辑的「关于本站」页面、分类树管理（最多三级、防循环依赖）、站点设置可视化编辑、账号安全
 - **SEO 与健壮性**：动态 sitemap / robots、canonical、逐页 OpenGraph/Twitter 分享卡片（没有封面的文章自动生成「标题 + 分类」分享图，字体随项目打包，生成时不访问外网）、标签页（`/tags`，相关教程优先按共同标签推荐；只有一篇教程的标签页不收录）、系列页（`/series`，带 CreativeWorkSeries 结构化数据，只有一篇的系列不收录）、搜索结果显示关键词所在的那段正文、关于页（`/about`）、Article/面包屑/WebSite 结构化数据、后台填写 Google/Bing/百度/360/搜狗/神马/Yandex 站长验证码、真实 404 状态码、越界分页自动收敛、空/加载/错误状态齐全
+- **搬家导入**：后台「教程管理 → 批量导入」一次导入 Hexo、Hugo、Jekyll、Obsidian 等 Markdown 文件夹，或 WordPress 导出文件：保留发布时间、标签和分类，文件夹里的图片和外链图片一起搬到本站，默认存为草稿，导入后生成旧地址的 301 跳转规则，搜索引擎收录不断
 - **站点定制**：站名、Logo 图片、网站图标、默认分享图、主题色（按钮 / 链接 / 图表 / 分享图一起换色，自动保证对比度）、吉祥物开关、首页文案、页脚都在后台改，不用动代码，也不会挡住一键更新；仪表盘的「上线检查清单」提示还没做的上线准备，示例数据一键清除
 - **安全**：可吊销的服务端会话 + 两步验证（TOTP，含一次性恢复码）+ 通行密钥、敏感字段与备份加密、`security.txt`、受信任设备感知的登录限流、正文 HTML 白名单过滤、按文件头校验上传（不接受 SVG）、CSP/HSTS 等安全响应头、后台安全日志、Server Actions 与后台页面逐一鉴权，详见「安全加固」
 
 ## 做成你自己的教程网
 
-这是一个通用的教程站模板，放什么内容由你决定。部署后登录后台，按仪表盘顶部的「上线检查清单」改站名和品牌、清除示例数据、改密码；更多定制方法（后台能改什么、改代码时动哪些文件、Fork 后怎么同步更新）见 [定制指南](docs/CUSTOMIZE.md)。
+这是一个通用的教程站模板，放什么内容由你决定。部署后登录后台，按仪表盘顶部的「上线检查清单」改站名和品牌、清除示例数据、改密码；原来在别的平台写过文章的，用「教程管理 → 批量导入」搬过来；更多定制方法（后台能改什么、改代码时动哪些文件、Fork 后怎么同步更新）见 [定制指南](docs/CUSTOMIZE.md)。
 
 当前版本见 [CHANGELOG.md](CHANGELOG.md)，后台侧栏底部也会显示正在运行的版本。参与开发请看 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
 
@@ -110,28 +111,39 @@ SITE_URL="http://localhost:3000"
 
 ### Docker 部署
 
-需要 Docker 和 Docker Compose（`docker compose version` 能输出版本即可）：
+需要 Docker 和 Docker Compose（`docker compose version` 能输出版本即可）。默认直接拉取 GitHub 自动构建好的镜像 `ghcr.io/vow132/tutorial-site`（amd64 和 arm64 都有，树莓派、ARM 云服务器也能用），服务器上不用装 Node、不用构建：
 
 ```bash
 git clone https://github.com/vow132/tutorial-site.git && cd tutorial-site
 cp .env.example .env
 # 编辑 .env：SITE_URL 改成正式地址，AUTH_SECRET 换成 openssl rand -base64 48 的输出，ADMIN_PASSWORD 设成强密码
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f app     # 看到 Ready 就启动好了
 ```
 
-- 第一次启动会自动建库、创建管理员和示例数据；之后的启动只执行数据库迁移，不会再写入示例数据。
-- 数据都在 `./docker-data/` 下（`db` 数据库、`uploads` 上传图片、`backups` 备份），重建容器、升级镜像都不会丢。
-- 端口只绑定在 `127.0.0.1:3000`，请在前面用 Nginx / Caddy 配置 HTTPS 反向代理（见「安全加固」），并在 `.env` 里设置 `TRUST_PROXY=true`。用示例 Nginx 配置时，把 `/uploads/` 的 `alias` 改成 `/path/to/tutorial-site/docker-data/uploads/`。
-- `SITE_URL` 会在构建时写进页面，修改后要重新执行 `docker compose up -d --build`。
-- 国内服务器：npm 默认走 npmmirror；拉 Debian 软件包慢时在 `.env` 里设置 `APT_MIRROR=mirrors.aliyun.com`；拉不到 `node:24-bookworm-slim` 基础镜像时请给 Docker 配置镜像加速器。
+只需要仓库里的 `docker-compose.yml` 和 `.env.example` 两个文件，不想克隆整个仓库的话下载这两个文件放在同一个目录里即可。
 
-升级到新版本（Docker 部署不使用后台的一键更新）：
+- 第一次启动会自动建库、创建管理员和示例数据；之后的启动只执行数据库迁移，不会再写入示例数据。
+- 数据都在 `./docker-data/` 下（`db` 数据库、`uploads` 上传图片、`backups` 备份），更新镜像、重建容器都不会丢。
+- 端口只绑定在 `127.0.0.1:3000`，请在前面用 Nginx / Caddy 配置 HTTPS 反向代理（见「安全加固」），并在 `.env` 里设置 `TRUST_PROXY=true`。用示例 Nginx 配置时，把 `/uploads/` 的 `alias` 改成 `/path/to/tutorial-site/docker-data/uploads/`。
+- 改了 `.env`（比如换域名）后执行 `docker compose up -d`，容器会按新设置重建。
+- 想固定在某个版本：在 `.env` 里设置 `TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.0.0`（`latest` 跟随 master 最新代码，和一键更新一致）。
+
+更新到新版本（Docker 部署不使用后台的一键更新）：
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+**自己构建镜像**（改过代码，或者服务器拉不到 ghcr.io）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# 以后更新：git pull，再执行同一条命令
+```
+
+自己构建时 npm 默认走 npmmirror；拉 Debian 软件包慢时在 `.env` 里设置 `APT_MIRROR=mirrors.aliyun.com`；拉不到 `node:24-bookworm-slim` 基础镜像时请给 Docker 配置镜像加速器。Fork 之后在自己仓库的 Actions 页面启用工作流，以后每次推送到 master，GitHub 会自动把你的代码构建成 `ghcr.io/<你的用户名>/tutorial-site`，在 `.env` 里用 `TUTORIAL_IMAGE` 指过去就行（第一次构建后要在 GitHub 的 Packages 页面把镜像设为 Public，或者在服务器上 `docker login ghcr.io`）。
 
 运维命令要以 `node` 用户在容器里执行（用 root 执行会让数据库文件变成 root 所有，网站随后就写不进去了）：
 
