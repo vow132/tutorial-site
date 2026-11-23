@@ -1,4 +1,5 @@
 import IntentLink from "./intent-link";
+import SiteLogo from "./site-logo";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategories } from "@/lib/public-data";
 import { getSubscriptionEnabled } from "@/lib/mail";
@@ -28,9 +29,7 @@ export default async function SiteFooter() {
         <div className="flex flex-col gap-10 md:flex-row md:justify-between">
           <div className="max-w-xs">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
-                {settings.logoText}
-              </span>
+              <SiteLogo settings={settings} className="h-7 w-7 text-sm" />
               <span className="font-bold">{settings.siteName}</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-ink-2">
@@ -76,10 +75,12 @@ export default async function SiteFooter() {
           <span>
             © {new Date().getFullYear()} {settings.copyright}
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-live" />
-            持续更新中
-          </span>
+          {settings.footerStatus && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-live" />
+              {settings.footerStatus}
+            </span>
+          )}
         </div>
       </div>
     </footer>

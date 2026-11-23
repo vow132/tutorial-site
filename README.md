@@ -26,7 +26,14 @@
 - **文章**：服务端 TOC 提取与高亮（highlight.js）、代码块语言标签与一键复制、标题旁 `#` 复制章节链接（锚点按标题文字生成，改动其他段落不会失效）、点击图片放大、打印/另存 PDF 专用排版、显示最后更新日期、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐、顶部阅读进度条与「回到顶部」、文末「这篇有帮助吗」反馈（点「没帮助」可以留一句话给站长）、复制链接 / 微信扫码分享、文末打赏码与赞助位、邮件订阅新教程（双重确认、一键退订）；文章页默认「精简动效」（不倾斜、不跟随），可在后台切换；按 `/` 或 Ctrl/⌘+K 聚焦搜索，404 页提供搜索框和最新教程；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息，并生成 800/1200px 小图供手机按屏幕加载
 - **后台**：Tiptap 3 富文本编辑器（拖拽/粘贴上传图片、表格、代码块选语言、提示/注意/警告提示框；边写边自动保存到本浏览器，误关页面或登录过期可恢复）、教程历史版本（每次保存留旧版，可预览和一键恢复）、草稿预览、定时发布、教程封面图（文章头图 + 分享卡片；列表卡片显示缩略图，没设封面时用正文第一张图）、教程标签（每篇最多 8 个，后台可改名/合并/删除）、教程系列（几篇按顺序组成一组，文章页显示「第 2 / 5 篇」目录和本系列上下篇，每个系列有自己的页面 `/series/…`）、仪表盘近 30 天阅读趋势与热门教程（含读完率和读者反馈好评率）、阅读来源（百度 / 微信 / 直接访问…）、读者搜了什么和「没搜到结果」的词（选题清单）、读者留言收件箱、Markdown 导入导出、首页「从这里开始」入门路线（展示选定的系列）、邮件订阅管理（发信设置加密保存、测试邮件、订阅者列表）、教程列表按标题搜索和按状态/分类筛选、可编辑的「关于本站」页面、分类树管理（最多三级、防循环依赖）、站点设置可视化编辑、账号安全
 - **SEO 与健壮性**：动态 sitemap / robots、canonical、逐页 OpenGraph/Twitter 分享卡片（没有封面的文章自动生成「标题 + 分类」分享图，字体随项目打包，生成时不访问外网）、标签页（`/tags`，相关教程优先按共同标签推荐；只有一篇教程的标签页不收录）、系列页（`/series`，带 CreativeWorkSeries 结构化数据，只有一篇的系列不收录）、搜索结果显示关键词所在的那段正文、关于页（`/about`）、Article/面包屑/WebSite 结构化数据、后台填写 Google/Bing/百度/360/搜狗/神马/Yandex 站长验证码、真实 404 状态码、越界分页自动收敛、空/加载/错误状态齐全
+- **站点定制**：站名、Logo 图片、网站图标、默认分享图、主题色（按钮 / 链接 / 图表 / 分享图一起换色，自动保证对比度）、吉祥物开关、首页文案、页脚都在后台改，不用动代码，也不会挡住一键更新；仪表盘的「上线检查清单」提示还没做的上线准备，示例数据一键清除
 - **安全**：可吊销的服务端会话 + 两步验证（TOTP，含一次性恢复码）+ 通行密钥、敏感字段与备份加密、`security.txt`、受信任设备感知的登录限流、正文 HTML 白名单过滤、按文件头校验上传（不接受 SVG）、CSP/HSTS 等安全响应头、后台安全日志、Server Actions 与后台页面逐一鉴权，详见「安全加固」
+
+## 做成你自己的教程网
+
+这是一个通用的教程站模板，放什么内容由你决定。部署后登录后台，按仪表盘顶部的「上线检查清单」改站名和品牌、清除示例数据、改密码；更多定制方法（后台能改什么、改代码时动哪些文件、Fork 后怎么同步更新）见 [定制指南](docs/CUSTOMIZE.md)。
+
+当前版本见 [CHANGELOG.md](CHANGELOG.md)，后台侧栏底部也会显示正在运行的版本。参与开发请看 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
 
 ## 本地运行
 
@@ -50,6 +57,8 @@ bash deploy.sh
 
 脚本会按“安装依赖 → Prisma generate → migrate → seed → build → PM2 平滑重载”的顺序执行。迁移和种子数据必须在 `npm run build` 之前完成，否则静态主页可能把空数据库内容生成到 `.next` 中。
 
+不想装 Node 和 PM2 的话，也可以用 Docker 部署，见下文「Docker 部署」。
+
 ### 升级 Node.js
 
 先用 `node -v` 查看版本，低于 22.12 时按下面升级（以 nvm 为例，也可以用系统包管理器安装 Node 24）：
@@ -68,7 +77,7 @@ pm2 info 教程网 | grep "node.js version"   # 确认已是 24.x，再打开网
 
 ### 环境变量
 
-在服务器设置 `.env.production`：
+在服务器设置 `.env.production`（完整模板和说明见 [`.env.example`](.env.example)，`cp .env.example .env.production` 后修改）：
 
 ```dotenv
 DATABASE_URL="file:./prisma/dev.db"
@@ -76,7 +85,7 @@ ADMIN_USERNAME="admin"
 # 首次部署时的管理员密码；不设置时生产环境会随机生成并在部署输出中显示一次
 ADMIN_PASSWORD="请修改为强密码"
 # 会话签名密钥：必须替换为随机长字符串（openssl rand -base64 48），
-# 使用已知占位值时生产环境会拒绝启动
+# 没设置或还是这里的占位值时，生产环境的后台会拒绝登录（Docker 部署直接拒绝启动）
 AUTH_SECRET="请替换为随机长字符串"
 # 登录 Cookie 的 Secure 标记：不设置时自动判断（经 HTTPS 访问即开启）；
 # 也可显式设为 true / false 覆盖
@@ -99,11 +108,45 @@ SITE_URL="http://localhost:3000"
 
 `DATABASE_URL` 的相对路径以项目根目录为基准。PM2 配置已经固定 `cwd`，运行时和 Prisma CLI 会使用同一个数据库文件。
 
+### Docker 部署
+
+需要 Docker 和 Docker Compose（`docker compose version` 能输出版本即可）：
+
+```bash
+git clone https://github.com/vow132/tutorial-site.git && cd tutorial-site
+cp .env.example .env
+# 编辑 .env：SITE_URL 改成正式地址，AUTH_SECRET 换成 openssl rand -base64 48 的输出，ADMIN_PASSWORD 设成强密码
+docker compose up -d --build
+docker compose logs -f app     # 看到 Ready 就启动好了
+```
+
+- 第一次启动会自动建库、创建管理员和示例数据；之后的启动只执行数据库迁移，不会再写入示例数据。
+- 数据都在 `./docker-data/` 下（`db` 数据库、`uploads` 上传图片、`backups` 备份），重建容器、升级镜像都不会丢。
+- 端口只绑定在 `127.0.0.1:3000`，请在前面用 Nginx / Caddy 配置 HTTPS 反向代理（见「安全加固」），并在 `.env` 里设置 `TRUST_PROXY=true`。用示例 Nginx 配置时，把 `/uploads/` 的 `alias` 改成 `/path/to/tutorial-site/docker-data/uploads/`。
+- `SITE_URL` 会在构建时写进页面，修改后要重新执行 `docker compose up -d --build`。
+- 国内服务器：npm 默认走 npmmirror；拉 Debian 软件包慢时在 `.env` 里设置 `APT_MIRROR=mirrors.aliyun.com`；拉不到 `node:24-bookworm-slim` 基础镜像时请给 Docker 配置镜像加速器。
+
+升级到新版本（Docker 部署不使用后台的一键更新）：
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+运维命令要以 `node` 用户在容器里执行（用 root 执行会让数据库文件变成 root 所有，网站随后就写不进去了）：
+
+```bash
+docker compose exec -u node app npm run backup          # 备份到 docker-data/backups
+docker compose exec -u node app npm run admin:reset     # 忘记密码时重置管理员
+```
+
+定时备份可以在宿主机的 crontab 里加 `17 3 * * * cd /path/to/tutorial-site && docker compose exec -T -u node app npm run backup`，再把整个 `docker-data` 目录同步到异地。
+
 ### 后台 GitHub 入口与一键更新
 
 仪表盘右上角「写教程」旁的 GitHub 图标会打开 `vow132/tutorial-site`。右上角圆点每 5 分钟检测一次仓库的 `master` 分支：绿色表示无需更新，黄色表示有新版本，点击黄色圆点并**再次输入管理员密码**后提交更新任务（部署会在服务器上执行新代码，即使会话有效也要二次确认，并记入安全日志）；灰色表示正在检测或无法自动更新，红色表示失败，点击可查看原因。更新中的黄色圆点会显示当前步骤，成功后页面自动刷新。
 
-一键更新适用于 **Linux + 单个 PM2 fork 模式进程** 的 Git 部署，默认进程名称为 `教程网`，需要 Git、npm、目录写入权限以及 GitHub / npm 网络访问。本地开发、Windows 或无 Git 的部署只检测版本。服务器存在未提交修改、运行版本与 Git 目录不一致、仓库历史分叉时，会停止自动更新。
+一键更新适用于 **Linux + 单个 PM2 fork 模式进程** 的 Git 部署，默认进程名称为 `教程网`，需要 Git、npm、目录写入权限以及 GitHub / npm 网络访问，并且服务器上的 `origin` 必须是本仓库（Fork 后改过代码的站点请按[定制指南](docs/CUSTOMIZE.md)手动合并更新）。本地开发、Windows、Docker 或无 Git 的部署只检测版本或不提供一键更新。服务器存在未提交修改、运行版本与 Git 目录不一致、仓库历史分叉时，会停止自动更新。
 
 可选服务器环境变量（`.env.production`）：
 

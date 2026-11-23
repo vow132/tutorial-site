@@ -18,13 +18,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
   if (!tutorial) return new Response("Not Found", { status: 404 });
 
-  const { siteName, logoText } = await getSettings();
+  const { siteName, logoText, brand } = await getSettings();
   const card: ShareCard = {
     title: tutorial.title,
     categoryName: tutorial.category.name,
     categoryColor: tutorial.category.color,
     siteName,
     logoText,
+    accent: brand.accentColor || undefined,
   };
   const version = shareImageVersion(card);
   try {

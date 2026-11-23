@@ -118,3 +118,50 @@ export function pickStartHereSeries<T extends { slug: string }>(all: T[], slugs:
   const bySlug = new Map(all.map((item) => [item.slug, item]));
   return slugs.map((slug) => bySlug.get(slug)).filter((item): item is T => Boolean(item));
 }
+
+/** 品牌素材：都在后台上传 / 选择，站长不用改仓库里的文件（改了文件会挡住一键更新）。 */
+export type BrandSettings = {
+  /** Logo 图片（/uploads/…，正方形最好）；为空时用「Logo 字符」 */
+  logoImage: string;
+  /** 网站图标（浏览器标签、收藏、手机桌面），为空时用默认的 /favicon.ico */
+  favicon: string;
+  /** 默认分享图（首页、列表等没有配图的页面），为空时按站名自动生成 */
+  shareImage: string;
+  /** 主题色 #rrggbb，为空时用默认的靛蓝 */
+  accentColor: string;
+  /** 是否显示小幽灵吉祥物 */
+  mascot: boolean;
+};
+
+export const DEFAULT_ACCENT = "#6366f1";
+
+export const defaultBrand: BrandSettings = { logoImage: "", favicon: "", shareImage: "", accentColor: "", mascot: true };
+
+export function readBrand(raw: unknown): BrandSettings {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof BrandSettings, unknown>>;
+  return {
+    logoImage: str(value.logoImage),
+    favicon: str(value.favicon),
+    shareImage: str(value.shareImage),
+    accentColor: typeof value.accentColor === "string" && /^#[0-9a-f]{6}$/i.test(value.accentColor) ? value.accentColor.toLowerCase() : "",
+    mascot: typeof value.mascot === "boolean" ? value.mascot : true,
+  };
+}
+
+export function parseBrandInput(input: { logoImage: string; favicon: string; shareImage: string; accentColor: string; mascot: boolean }):
+  | { data: BrandSettings }
+  | { error: string } {
+  const data: BrandSettings = {
+    logoImage: input.logoImage.trim(),
+    favicon: input.favicon.trim(),
+    shareImage: input.shareImage.trim(),
+    accentColor: input.accentColor.trim().toLowerCase(),
+    mascot: input.mascot,
+  };
+  for (const key of ["logoImage", "favicon", "shareImage"] as const) {
+    if (data[key] && !UPLOAD_IMAGE_PATH.test(data[key])) return { error: "品牌图片请用上传按钮上传" };
+  }
+  if (data.accentColor === DEFAULT_ACCENT) data.accentColor = "";
+  if (data.accentColor && !/^#[0-9a-f]{6}$/.test(data.accentColor)) return { error: "主题色请填写 #RRGGBB 格式，例如 #0ea5e9" };
+  return { data };
+}

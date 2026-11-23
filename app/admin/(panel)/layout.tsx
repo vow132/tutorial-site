@@ -1,4 +1,5 @@
 import { requireAdminPage } from "@/lib/admin-auth";
+import { versionLabel } from "@/lib/version";
 import AdminSidebar from "./sidebar";
 
 export default async function AdminPanelLayout({
@@ -11,7 +12,7 @@ export default async function AdminPanelLayout({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:flex-row md:gap-6 md:px-6 md:pt-6">
-      <AdminSidebar />
+      <AdminSidebar version={versionLabel()} />
       <div className="min-w-0 flex-1 pb-20">{children}</div>
     </div>
   );

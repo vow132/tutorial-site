@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 export const SHARE_IMAGE_SIZE = { width: 1200, height: 630 } as const;
 
 /** 模板改版时加一，让所有旧图地址失效。 */
-const TEMPLATE_VERSION = "1";
+const TEMPLATE_VERSION = "2";
 
 export type ShareCard = {
   title: string;
@@ -15,17 +15,62 @@ export type ShareCard = {
   categoryColor: string;
   siteName: string;
   logoText: string;
+  /** 站点主题色（Logo 方块、光晕、右下角文字），默认靛蓝 */
+  accent?: string;
+  /** 右下角的引导文字，默认「阅读教程 →」 */
+  cta?: string;
 };
 
 export function shareImageVersion(card: ShareCard) {
   return createHash("sha256")
-    .update(JSON.stringify([TEMPLATE_VERSION, card.title, card.categoryName, card.categoryColor, card.siteName, card.logoText]))
+    .update(
+      JSON.stringify([
+        TEMPLATE_VERSION,
+        card.title,
+        card.categoryName,
+        card.categoryColor,
+        card.siteName,
+        card.logoText,
+        card.accent ?? "",
+        card.cta ?? "",
+      ]),
+    )
     .digest("base64url")
     .slice(0, 12);
 }
 
 export function shareImagePath(tutorialId: number, card: ShareCard) {
   return `/og/tutorials/${tutorialId}?v=${shareImageVersion(card)}`;
+}
+
+type SiteCardSource = {
+  siteName: string;
+  logoText: string;
+  siteTitle: string;
+  heroBadge: string;
+  heroTitleA: string;
+  heroTitleB: string;
+  heroAccent: string;
+  brand: { accentColor: string };
+};
+
+/** 首页、列表页等没有配图时的分享图内容：首页大标题 + 徽标文字，按站点主题色绘制。 */
+export function siteShareCard(settings: SiteCardSource): ShareCard {
+  const accent = settings.brand.accentColor || "#6366f1";
+  const hero = `${settings.heroTitleA}${settings.heroTitleB}${settings.heroAccent}`.trim();
+  return {
+    title: hero || settings.siteTitle,
+    categoryName: settings.heroBadge || settings.siteName,
+    categoryColor: accent,
+    siteName: settings.siteName,
+    logoText: settings.logoText,
+    accent,
+    cta: "访问网站 →",
+  };
+}
+
+export function siteShareImagePath(card: ShareCard) {
+  return `/og/site?v=${shareImageVersion(card)}`;
 }
 
 /** 只留字体里有的字符（emoji、生僻字略去），并合并多余空白。 */

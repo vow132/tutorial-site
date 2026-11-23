@@ -67,7 +67,7 @@ async function coverImage(tutorial: PublishedTutorial) {
 async function shareImage(tutorial: PublishedTutorial) {
   const cover = await coverImage(tutorial);
   if (cover) return { url: cover.url, width: cover.width, height: cover.height, alt: tutorial.title };
-  const { siteName, logoText } = await getSettings();
+  const { siteName, logoText, brand } = await getSettings();
   return {
     url: shareImagePath(tutorial.id, {
       title: tutorial.title,
@@ -75,6 +75,7 @@ async function shareImage(tutorial: PublishedTutorial) {
       categoryColor: tutorial.category.color,
       siteName,
       logoText,
+      accent: brand.accentColor || undefined,
     }),
     ...SHARE_IMAGE_SIZE,
     alt: tutorial.title,

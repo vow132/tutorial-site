@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { authSecretFrom } from "@/lib/auth-secret.mjs";
 
 export const SESSION_COOKIE = "admin_session";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
@@ -16,18 +17,11 @@ type SessionPayload = {
 
 type DevicePayload = { u: string; d: string; exp: number };
 
-const DEV_FALLBACK_SECRET = "dev-secret-change-me-in-production";
-
 function secret() {
-  const value = process.env.AUTH_SECRET;
-  if (!value || value === DEV_FALLBACK_SECRET) {
-    // 已知密钥等于没有密钥：攻击者可自行签发有效会话，必须直接拒绝启动。
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "生产环境必须在 .env 中设置一个随机的 AUTH_SECRET（可用 openssl rand -base64 48 生成）"
-      );
-    }
-    return DEV_FALLBACK_SECRET;
+  // 没设置或是文档里的占位值（已知密钥等于没有密钥：攻击者可自行签发有效会话）时，生产环境直接拒绝。
+  const value = authSecretFrom();
+  if (!value) {
+    throw new Error("生产环境必须设置一个随机的 AUTH_SECRET（可用 openssl rand -base64 48 生成），不能用模板里的占位值");
   }
   return value;
 }

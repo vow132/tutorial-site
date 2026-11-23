@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { authSecretFrom, isPlaceholderSecret } from "./auth-secret.mjs";
 import { SecretBoxError, isSealed, needsReseal, openSecret, sealSecret, secretKeys } from "./secret-box.mjs";
 
 const prod = { NODE_ENV: "production", AUTH_SECRET: "a".repeat(48) };
@@ -43,4 +44,23 @@ test("a changed AUTH_SECRET cannot decrypt; DATA_ENCRYPTION_KEY takes over and k
 test("production without any key refuses to encrypt", () => {
   assert.throws(() => sealSecret("x", "totp", { NODE_ENV: "production" }), /AUTH_SECRET/);
   assert.equal(secretKeys({ NODE_ENV: "development" }).length, 1);
+});
+
+test("the AUTH_SECRET placeholder from .env.example counts as unset in production", () => {
+  for (const placeholder of ["请替换为随机长字符串", " 请替换为随机长字符串 ", "dev-secret-change-me-in-production"]) {
+    assert.equal(isPlaceholderSecret(placeholder), true);
+    assert.equal(authSecretFrom({ NODE_ENV: "production", AUTH_SECRET: placeholder }), null);
+    assert.throws(() => sealSecret("x", "totp", { NODE_ENV: "production", AUTH_SECRET: placeholder }), /AUTH_SECRET/);
+  }
+  assert.equal(authSecretFrom({ NODE_ENV: "production" }), null);
+  assert.equal(authSecretFrom({ NODE_ENV: "development", AUTH_SECRET: "请替换为随机长字符串" }), "dev-secret-change-me-in-production");
+  assert.equal(authSecretFrom(prod), prod.AUTH_SECRET);
+});
+
+test("data sealed under a placeholder secret stays readable after switching to a real one, and gets re-encrypted", () => {
+  const legacy = sealSecret("totp-secret", "totp", { NODE_ENV: "development", AUTH_SECRET: "请替换为随机长字符串" });
+  assert.equal(openSecret(legacy, "totp", prod), "totp-secret");
+  assert.equal(needsReseal(legacy, prod), true);
+  const resealed = sealSecret(openSecret(legacy, "totp", prod), "totp", prod);
+  assert.equal(needsReseal(resealed, prod), false);
 });
