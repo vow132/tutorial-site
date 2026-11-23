@@ -3,6 +3,16 @@ import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
 import { readVerification, type SearchVerification } from "@/lib/search-verification";
+import {
+  defaultStartHere,
+  defaultSupport,
+  readArticleMotion,
+  readStartHere,
+  readSupport,
+  type ArticleMotion,
+  type StartHere,
+  type SupportSettings,
+} from "@/lib/settings-extras";
 
 export type FooterLink = { label: string; href: string };
 export type FooterColumn = {
@@ -32,6 +42,12 @@ export type SiteSettings = {
   verification: SearchVerification;
   /** 安全问题联系方式（mailto: 或 https:），用于 /.well-known/security.txt；空串表示不提供 */
   securityContact: string;
+  /** 首页「从这里开始」（lib/settings-extras.ts） */
+  startHere: StartHere;
+  /** 文章页动效：calm 时不倾斜、不跟随 */
+  articleMotion: ArticleMotion;
+  /** 文末的赞助与打赏 */
+  support: SupportSettings;
 };
 
 export const SETTINGS_KEY = "site";
@@ -70,6 +86,9 @@ export const defaultSettings: SiteSettings = {
   ],
   verification: {},
   securityContact: "",
+  startHere: defaultStartHere,
+  articleMotion: "calm",
+  support: defaultSupport,
 };
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
@@ -94,6 +113,9 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
         : defaultSettings.footerColumns,
       verification: readVerification(parsed.verification),
       securityContact: typeof parsed.securityContact === "string" ? parsed.securityContact : "",
+      startHere: readStartHere(parsed.startHere),
+      articleMotion: readArticleMotion(parsed.articleMotion),
+      support: readSupport(parsed.support),
     };
   } catch {
     return defaultSettings;

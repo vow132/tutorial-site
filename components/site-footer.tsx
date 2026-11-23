@@ -1,6 +1,7 @@
 import IntentLink from "./intent-link";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategories } from "@/lib/public-data";
+import { getSubscriptionEnabled } from "@/lib/mail";
 import {
   buildCategoryTree,
   categoryLinkTarget,
@@ -9,9 +10,10 @@ import {
 } from "@/lib/categories";
 
 export default async function SiteFooter() {
-  const [categories, settings] = await Promise.all([
+  const [categories, settings, subscribeEnabled] = await Promise.all([
     getPublicCategories(),
     getSettings(),
+    getSubscriptionEnabled(),
   ]);
   const categoryLinks = flattenCategoryTree(buildCategoryTree(categories)).map(
     ({ node, depth }) => ({
@@ -34,6 +36,11 @@ export default async function SiteFooter() {
             <p className="mt-3 text-sm leading-relaxed text-ink-2">
               {settings.footerTagline}
             </p>
+            {subscribeEnabled && (
+              <IntentLink href="/subscribe" className="mt-3 inline-block text-sm font-medium text-accent-ink hover:underline">
+                邮件订阅新教程 →
+              </IntentLink>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-12 sm:grid-cols-3">

@@ -147,6 +147,8 @@ export function alertForAudit(
       return { title: "两步验证恢复码已重新生成", lines: [...who, "旧的恢复码已全部作废。", NOT_ME] };
     case "passkey.remove":
       return { title: "删除了通行密钥", lines: [...who, `名称：${context.detail ?? "—"}`] };
+    case "mail.settings":
+      return { title: "邮件订阅的发信设置被修改", lines: [...who, `内容：${context.detail ?? "—"}`, NOT_ME] };
     default:
       return null;
   }

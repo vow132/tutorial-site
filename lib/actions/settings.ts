@@ -12,6 +12,8 @@ import {
   type SearchVerification,
 } from "@/lib/search-verification";
 import { normalizeSecurityContact } from "@/lib/security-txt";
+import { parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
+import { uploadedImage } from "@/lib/article";
 
 export type SettingsFormState = { error?: string; success?: string };
 
@@ -62,6 +64,26 @@ export async function updateSettings(
     return { error: "安全联系方式请填写邮箱，或 https:// 开头的网址" };
   }
 
+  const support = parseSupportInput({
+    donationText: text("support.donationText"),
+    wechatQr: text("support.wechatQr"),
+    alipayQr: text("support.alipayQr"),
+    sponsorText: text("support.sponsorText"),
+    sponsorUrl: text("support.sponsorUrl"),
+    sponsorImage: text("support.sponsorImage"),
+  });
+  if ("error" in support) return { error: support.error };
+  for (const image of [support.data.wechatQr, support.data.alipayQr, support.data.sponsorImage]) {
+    if (image && !(await uploadedImage(image))) return { error: "赞助与打赏里的图片文件已不存在，请重新上传" };
+  }
+
+  const startHere = parseStartHereInput({
+    enabled: formData.get("startHere.enabled") === "on",
+    title: text("startHere.title"),
+    intro: text("startHere.intro"),
+    seriesSlugs: formData.getAll("startHere.series").map(String),
+  });
+
   const settings: SiteSettings = {
     siteName: text("siteName") || "教程网",
     logoText: text("logoText") || "教",
@@ -77,6 +99,9 @@ export async function updateSettings(
     footerColumns,
     verification,
     securityContact,
+    startHere,
+    articleMotion: formData.get("articleMotion") === "full" ? "full" : "calm",
+    support: support.data,
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };
