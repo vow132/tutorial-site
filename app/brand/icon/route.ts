@@ -1,43 +1,24 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import sharp from "sharp";
-import { BRAND_ICON_SIZES, brandIconVersion } from "@/lib/brand-icon";
-import { getSettings } from "@/lib/settings";
-
-/** 生成好的 PNG 按「图片 + 尺寸」缓存，图标被反复请求时不重复缩放。 */
-const cache = new Map<string, Uint8Array>();
+import { BRAND_ICON_SIZES } from "@/lib/brand-icon";
+import { siteIconPng } from "@/lib/site-icon";
 
 /**
- * 网站图标：把后台上传的图片（站点设置 → 品牌 → 网站图标）缩放成正方形 PNG。
- * /brand/icon?s=32|180|192|512&v=<版本>；没上传时 404（页面此时链接的是默认的 /favicon.ico）。
+ * 网站图标：/brand/icon?s=32|180|192|512&v=<版本>。后台上传了网站图标就用它，否则按 Logo 文字和主题色生成（lib/site-icon.ts）。
+ * 地址里的版本和当前一致时长期缓存；旧版本只短期缓存。
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const size = Number(url.searchParams.get("s"));
   if (!(BRAND_ICON_SIZES as readonly number[]).includes(size)) return new Response("Not Found", { status: 404 });
-  const { brand } = await getSettings();
-  const version = brandIconVersion(brand.favicon);
-  if (!version) return new Response("Not Found", { status: 404 });
-
-  const key = `${brand.favicon}:${size}`;
-  let png = cache.get(key);
-  if (!png) {
-    try {
-      const source = await readFile(path.join(process.cwd(), "public", brand.favicon));
-      png = new Uint8Array(
-        await sharp(source).resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-      );
-    } catch {
-      return new Response("Not Found", { status: 404 });
-    }
-    cache.set(key, png);
-    if (cache.size > 16) cache.delete(cache.keys().next().value!);
+  try {
+    const { png, version } = await siteIconPng(size);
+    return new Response(png as BodyInit, {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": url.searchParams.get("v") === version ? "public, max-age=31536000, immutable" : "public, max-age=300",
+      },
+    });
+  } catch (error) {
+    console.error("[brand-icon] 生成网站图标失败：", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
-  const current = url.searchParams.get("v") === version;
-  return new Response(png as BodyInit, {
-    headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": current ? "public, max-age=31536000, immutable" : "public, max-age=300",
-    },
-  });
 }

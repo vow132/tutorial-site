@@ -27,8 +27,57 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const dateFormat = new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" });
 const formatDate = (iso: string | null) => (iso ? dateFormat.format(new Date(iso)) : "—");
-const fileInputClass =
-  "block w-full text-xs text-ink-2 file:mr-3 file:rounded-full file:border-0 file:bg-paper file:px-4 file:py-2 file:text-sm file:text-ink-2 hover:file:text-ink";
+/** 选了什么：文件夹显示「文件夹名（N 个文件）」，一个文件显示文件名，多个显示个数。 */
+function describeFiles(files: FileList | null) {
+  if (!files?.length) return "";
+  const folder = files[0].webkitRelativePath?.split("/")[0];
+  if (folder) return `${folder}（${files.length} 个文件）`;
+  return files.length === 1 ? files[0].name : `${files.length} 个文件`;
+}
+
+/**
+ * 文件选择：原生文件框的按钮文字和样式随浏览器语言变（有的显示英文），换成和后台一致的按钮；
+ * 真正的 <input type="file"> 只是视觉上隐藏，仍然可以用 Tab 聚焦、回车打开。
+ */
+function FilePicker({
+  id,
+  button,
+  disabled,
+  onFiles,
+  ...input
+}: {
+  id: string;
+  button: string;
+  disabled: boolean;
+  onFiles: (files: FileList | null) => Promise<void>;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "type" | "onChange" | "disabled">) {
+  const [chosen, setChosen] = useState("");
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <input
+        {...input}
+        id={id}
+        type="file"
+        disabled={disabled}
+        className="peer sr-only"
+        onChange={(event) => {
+          const element = event.currentTarget;
+          const files = element.files;
+          setChosen(describeFiles(files));
+          // 清空以便再次选择同一个文件夹 / 文件时还能触发
+          void onFiles(files).finally(() => (element.value = ""));
+        }}
+      />
+      <label
+        htmlFor={id}
+        className="inline-flex h-9 cursor-pointer items-center rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:cursor-not-allowed peer-disabled:opacity-50"
+      >
+        {button}
+      </label>
+      <span className="min-w-0 truncate text-xs text-ink-3">{chosen || "还没有选择"}</span>
+    </div>
+  );
+}
 
 async function uploadFile(file: File): Promise<{ url: string } | { error: string }> {
   if (file.size > MAX_IMAGE_BYTES) return { error: "超过 5MB" };
@@ -289,17 +338,13 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
               <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">
                 Hexo 选 <code>source</code>，Hugo 选 <code>content</code>（连同 <code>static</code> 一起选上一级更好），Jekyll 选 <code>_posts</code> 所在目录，Obsidian 选整个库。文件夹里的图片会一起上传。
               </p>
-              <input
+              <FilePicker
                 id={ids.folder}
-                type="file"
+                button="选择文件夹"
                 multiple
                 disabled={parsing}
                 {...{ webkitdirectory: "", directory: "" }}
-                onChange={(event) => {
-                  const files = event.currentTarget.files;
-                  void loadMarkdown(files, "Markdown 文件夹").then(() => (event.target.value = ""));
-                }}
-                className={fileInputClass}
+                onFiles={(files) => loadMarkdown(files, "Markdown 文件夹")}
               />
             </div>
             <div className="rounded-2xl border border-line bg-paper/60 p-4">
@@ -307,17 +352,13 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
                 几个 Markdown 文件
               </label>
               <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">可以多选。本地图片找不到（只选了文件没选文件夹），外链图片照常下载。</p>
-              <input
+              <FilePicker
                 id={ids.files}
-                type="file"
+                button="选择文件"
                 multiple
                 accept=".md,.markdown,text/markdown"
                 disabled={parsing}
-                onChange={(event) => {
-                  const files = event.currentTarget.files;
-                  void loadMarkdown(files, "Markdown 文件").then(() => (event.target.value = ""));
-                }}
-                className={fileInputClass}
+                onFiles={(files) => loadMarkdown(files, "Markdown 文件")}
               />
             </div>
             <div className="rounded-2xl border border-line bg-paper/60 p-4">
@@ -327,16 +368,12 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
               <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">
                 在 WordPress 后台「工具 → 导出」选「文章」，下载得到的 .xml 文件。图片会从原网站下载到本站。
               </p>
-              <input
+              <FilePicker
                 id={ids.wxr}
-                type="file"
+                button="选择 .xml 文件"
                 accept=".xml,application/xml,text/xml"
                 disabled={parsing}
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0];
-                  void loadWordPress(file).then(() => (event.target.value = ""));
-                }}
-                className={fileInputClass}
+                onFiles={(files) => loadWordPress(files?.[0])}
               />
             </div>
           </div>

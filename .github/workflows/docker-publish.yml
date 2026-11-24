@@ -3,6 +3,7 @@ name: Docker 镜像
 # 发布到 GitHub 容器镜像仓库（ghcr.io/<仓库所有者>/tutorial-site），amd64 和 arm64 各在原生机器上构建，再合成一个多架构镜像：
 # - master 每次更新：latest、sha-<提交号前 7 位>
 # - 推送 vX.Y.Z 标签：X.Y.Z、X.Y、X
+# - master 上 package.json 的版本是新的（还没有 vX.Y.Z 标签）：自动打标签、建 GitHub Release，镜像加上版本标签（.github/scripts/release.sh）
 # PR 只构建两种架构、不推送，提前发现 Dockerfile 的问题。
 on:
   push:
@@ -15,6 +16,7 @@ on:
       - package.json
       - package-lock.json
       - scripts/docker-start.mjs
+      - .github/scripts/**
       - .github/workflows/docker-publish.yml
   workflow_dispatch:
 
@@ -58,7 +60,12 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [build-amd64, build-arm64]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # 自动发版时创建标签和 Release
+      packages: write
     steps:
+      - uses: actions/checkout@v7
+
       - name: 合成多架构镜像并打标签
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,3 +94,9 @@ jobs:
             echo "### 已发布镜像"
             for tag in "${tags[@]}"; do [ "$tag" != "-t" ] && echo "- \`$tag\`"; done
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 新版本自动发版
+        if: github.ref == 'refs/heads/master'
+        run: bash .github/scripts/release.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

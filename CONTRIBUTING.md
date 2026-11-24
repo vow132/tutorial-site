@@ -66,8 +66,10 @@ npm run test:e2e          # 端到端测试（首次运行先 npx playwright ins
 ## 发布新版本（维护者）
 
 1. 按[语义化版本](https://semver.org/lang/zh-CN/)确定版本号，修改 `package.json` 和 `package-lock.json` 里的 `version`；
-2. 把 CHANGELOG.md 的「未发布」改成新版本号和日期，需要站长手动处理的写进「升级说明」；
-3. 合并后打标签 `git tag vX.Y.Z && git push origin vX.Y.Z`，并在 GitHub 上创建 Release。推送标签后 GitHub Actions 会自动发布 `X.Y.Z`、`X.Y`、`X` 三个 Docker 镜像标签（master 的每次更新发布 `latest`）。
+2. 把 CHANGELOG.md 的「未发布」改成「## [X.Y.Z] - 日期」，上面留一个空的「未发布」，需要站长手动处理的写进「升级说明」，文末加上这个版本的链接；
+3. 合并就行：master 的「Docker 镜像」工作流发现新版本号还没有标签时，会自动打 `vX.Y.Z` 标签、创建 GitHub Release（说明取自 CHANGELOG 里这一节），并给镜像加上 `X.Y.Z`、`X.Y`、`X` 标签（脚本在 `.github/scripts/release.sh`，可以 `DRY_RUN=1 GITHUB_REPOSITORY=vow132/tutorial-site bash .github/scripts/release.sh` 先看看会发出什么）。
+
+master 的每次更新都会发布 `latest` 镜像；手动推送 `vX.Y.Z` 标签也会构建对应版本的镜像。
 
 ## 许可
 

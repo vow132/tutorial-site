@@ -123,7 +123,7 @@ export function pickStartHereSeries<T extends { slug: string }>(all: T[], slugs:
 export type BrandSettings = {
   /** Logo 图片（/uploads/…，正方形最好）；为空时用「Logo 字符」 */
   logoImage: string;
-  /** 网站图标（浏览器标签、收藏、手机桌面），为空时用默认的 /favicon.ico */
+  /** 网站图标（浏览器标签、收藏、手机桌面），为空时按 Logo 文字和主题色生成（lib/site-icon.ts） */
   favicon: string;
   /** 默认分享图（首页、列表等没有配图的页面），为空时按站名自动生成 */
   shareImage: string;

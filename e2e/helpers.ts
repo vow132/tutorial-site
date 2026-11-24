@@ -39,6 +39,19 @@ export function queryDatabase<T>(sql: string, ...params: unknown[]): T | undefin
   }
 }
 
+/** 在测试服务器用的 SQLite 上执行一条写语句（只用于清理测试数据），返回改动的行数。 */
+export function writeDatabase(sql: string, ...params: unknown[]): number {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- 测试里按需加载原生模块
+  const Database = require("better-sqlite3");
+  const url = (process.env.DATABASE_URL ?? "file:./prisma/dev.db").replace(/^file:/, "").split("?")[0];
+  const db = new Database(url, { fileMustExist: true, timeout: 5000 });
+  try {
+    return db.prepare(sql).run(...params).changes as number;
+  } finally {
+    db.close();
+  }
+}
+
 /** 通过后台表单新建一篇教程（正文一次性插入，比逐字输入快）。 */
 export async function createTutorialViaForm(
   page: Page,

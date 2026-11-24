@@ -149,7 +149,7 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
       <Section title="品牌" desc="Logo、网站图标、分享图和主题色都在这里换，不用改仓库里的文件（改了文件会挡住一键更新）">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <ImageField name="brand.logoImage" label="Logo 图片" hint="正方形，留空用 Logo 字符" initial={settings.brand.logoImage} />
-          <ImageField name="brand.favicon" label="网站图标" hint="正方形，至少 192×192" initial={settings.brand.favicon} />
+          <ImageField name="brand.favicon" label="网站图标" hint="正方形，至少 512×512；留空按 Logo 字符和主题色生成" initial={settings.brand.favicon} />
           <ImageField name="brand.shareImage" label="默认分享图" hint="1200×630，留空自动生成" initial={settings.brand.shareImage} />
         </div>
         <AccentField initial={settings.brand.accentColor} logoText={settings.logoText} />

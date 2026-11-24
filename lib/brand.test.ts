@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { accentVariables, brandCss } from "./brand";
-import { brandIconVersion } from "./brand-icon";
+import { brandIconPath, brandIconVersion, letterIconVersion, siteIconVersion } from "./brand-icon";
 import { contrastRatio } from "./color";
 import { parseBrandInput, readBrand } from "./settings-extras";
 import { shareImageVersion, siteShareCard, siteShareImagePath } from "./share-image";
@@ -91,4 +91,15 @@ test("the site share image uses the hero text and changes with the accent colour
   assert.equal(siteShareCard({ ...settings, heroTitleA: "", heroTitleB: "", heroAccent: "" }).title, settings.siteTitle);
   assert.match(siteShareImagePath(card), /^\/og\/site\?v=[\w-]{12}$/);
   assert.notEqual(shareImageVersion(siteShareCard({ ...settings, brand: { accentColor: "#0ea5e9" } })), shareImageVersion(card));
+});
+
+test("without an uploaded icon the letter icon's URL changes with the logo text and accent colour", () => {
+  const base = letterIconVersion("教", "");
+  assert.match(base, /^l-[\w-]{10}$/);
+  assert.equal(letterIconVersion("教", "#6366f1"), base, "the default colour and an empty one are the same icon");
+  assert.notEqual(letterIconVersion("学", ""), base);
+  assert.notEqual(letterIconVersion("教", "#0ea5e9"), base);
+  assert.equal(siteIconVersion({ logoText: "教", brand: { favicon: "", accentColor: "" } }), base);
+  assert.equal(siteIconVersion({ logoText: "教", brand: { favicon: "/uploads/abc-1.png", accentColor: "" } }), "abc-1");
+  assert.equal(brandIconPath(192, "abc-1"), "/brand/icon?s=192&v=abc-1");
 });
