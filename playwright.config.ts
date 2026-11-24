@@ -1,5 +1,4 @@
 import { defineConfig, devices } from "@playwright/test";
-import { admin } from "./e2e/helpers";
 
 /**
  * 端到端测试：针对生产构建运行（先 `npm run build`，再 `npm run test:e2e`）。
@@ -10,6 +9,9 @@ import { admin } from "./e2e/helpers";
  * 不和普通测试同时跑：两个服务器共用 .next 里的页面缓存，演示横幅会混进普通页面。
  */
 const DEMO = process.env.E2E_DEMO === "1";
+// 和 e2e/helpers.ts 的 admin 一致（这里不能 import e2e/ 下的文件：Docker 构建时没有这个目录，类型检查会失败）
+const ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? process.env.ADMIN_USERNAME ?? "admin";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? "admin123456";
 const PORT = Number(process.env.E2E_PORT ?? (DEMO ? 3101 : 3100));
 
 /**
@@ -24,7 +26,7 @@ const serverEnv = Object.fromEntries(
     ...process.env,
     SITE_URL,
     // 演示模式：登录页公开的演示账号就是测试用的管理员
-    ...(DEMO ? { DEMO_MODE: "true", ADMIN_USERNAME: admin.username, ADMIN_PASSWORD: admin.password } : {}),
+    ...(DEMO ? { DEMO_MODE: "true", ADMIN_USERNAME, ADMIN_PASSWORD } : {}),
   }).filter((entry): entry is [string, string] => entry[1] !== undefined),
 );
 

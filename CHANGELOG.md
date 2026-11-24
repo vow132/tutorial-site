@@ -10,6 +10,8 @@
 
 ## [未发布]
 
+## [1.2.0] - 2026-11-25
+
 ### 新增
 
 - **顶部导航自定义链接**（站点设置 → 顶部导航链接）：在分类之外加关于、友链、交流群这类链接，最多 6 个，可以放在分类前面或后面，外部网址在新标签页打开。
@@ -24,6 +26,10 @@
 ### 修复
 
 - 深色模式下打开不存在的文章、标签、系列、分类（或者没写内容的关于页）时，404 页面显示成浅色，主题按钮点了也没反应。
+
+### 升级说明
+
+- Docker 部署：`docker compose pull && docker compose up -d` 即可。镜像里不再有 Prisma 命令行和 tsx：如果你在容器里直接执行过 `npx prisma …`，迁移改用 `docker compose exec -u node app npm run migrate`；`backup`、`backup:restore`、`uploads:clean`、`admin:reset`、`images:variants` 这些 `npm run` 命令不变。PM2 部署不受影响。
 
 ## [1.1.0] - 2026-11-24
 
@@ -88,5 +94,6 @@
 - `public/og.png` 已删除：默认分享图改为后台上传，或按站名自动生成（`/og/site`）。如果你替换过这个文件，请到「站点设置 → 品牌 → 默认分享图」重新上传。
 - `app/favicon.ico` 移到了 `public/favicon.ico`。如果你替换过网站图标，请改为在「站点设置 → 品牌 → 网站图标」上传；直接改仓库里的文件会让一键更新提示「服务器存在未提交的本地修改」。
 
+[1.2.0]: https://github.com/vow132/tutorial-site/releases/tag/v1.2.0
 [1.1.0]: https://github.com/vow132/tutorial-site/releases/tag/v1.1.0
 [1.0.0]: https://github.com/vow132/tutorial-site/tree/64dd2039d2d3ca92f20c8778049bdcfdebab7f33
