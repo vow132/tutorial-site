@@ -127,3 +127,44 @@ export async function renderShareImage(key: string, card: ShareCard): Promise<Ui
   if (cache.size > MAX_CACHED) cache.delete(cache.keys().next().value!);
   return png;
 }
+
+/**
+ * 字母图标（没上传网站图标时的默认图标）：主题色圆角方块 + 白色 Logo 文字，和页面左上角的 Logo 一样。
+ * 只画字体里有的字；一个字都画不了时只画色块。
+ */
+export async function renderLetterIcon(text: string, background: string, size: number): Promise<Uint8Array> {
+  const key = `icon:${text}:${background}:${size}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const font = await loadFont();
+  const letters = Array.from(keepDrawable(text, font.covered).replace(/\s/g, "")).slice(0, 3);
+  const fontSize = Math.round(size * (letters.length <= 1 ? 0.56 : letters.length === 2 ? 0.4 : 0.3));
+  const response = new ImageResponse(
+    (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: background,
+          // 180 是 iOS 桌面图标：系统自己切圆角，这里铺满
+          borderRadius: size === 180 ? 0 : Math.round(size * 0.22),
+          color: "#ffffff",
+          fontFamily: FONT_NAME,
+          fontSize,
+          fontWeight: 700,
+          lineHeight: 1,
+        }}
+      >
+        {letters.join("")}
+      </div>
+    ),
+    { width: size, height: size, fonts: [{ name: FONT_NAME, data: font.data, weight: 700, style: "normal" }] },
+  );
+  const png = new Uint8Array(await response.arrayBuffer());
+  cache.set(key, png);
+  if (cache.size > MAX_CACHED) cache.delete(cache.keys().next().value!);
+  return png;
+}

@@ -10,20 +10,30 @@
 
 ## [未发布]
 
+## [1.1.0] - 2026-11-24
+
 ### 新增
 
 - **现成的 Docker 镜像**：GitHub Actions 自动构建 `ghcr.io/vow132/tutorial-site`（amd64 / arm64，各在原生机器上构建，推送前先启动容器做冒烟测试）。`docker compose up -d` 直接拉取，不用在服务器上构建；更新用 `docker compose pull && docker compose up -d`。master 每次更新发布 `latest`，打 `vX.Y.Z` 标签发布 `X.Y.Z` / `X.Y` / `X`。自己构建改用 `docker-compose.build.yml`。
 - **批量导入**（教程管理 → 批量导入）：导入 Hexo、Hugo、Jekyll、Obsidian 等 Markdown 文件夹或 WordPress 导出文件。保留发布 / 修改时间和标签，原分类和本站分类同名时自动对应；文件夹里的图片上传到本站，外链图片可下载到本站（只允许公网地址，防止被用来访问服务器内网）；默认存为草稿，不给订阅者发邮件；结束后给出旧地址的 Nginx 301 跳转规则。
+- **自动发版**：在 PR 里改 `package.json` 的版本号和本文件，合并后自动打 `vX.Y.Z` 标签、创建 GitHub Release（说明取自这里），镜像加上 `X.Y.Z` / `X.Y` / `X` 标签。
+- **网站清单**（`/manifest.webmanifest`）：手机「添加到主屏幕」时显示站名、图标和主题色。
 - 安全日志补上系列、订阅者、发信设置、清除示例数据、批量导入等操作的中文名称。
 
 ### 改进
 
 - Docker 镜像和站点无关：`SITE_URL` 只在运行时传入（`robots.txt` 改为定时重新生成，容器启动时按真实地址重建），改域名只要 `docker compose up -d`，不用重新构建。
 - 镜像删掉运行用不到的开发依赖，体积从约 1.7GB 降到约 1.4GB；后台侧栏显示镜像的提交号。
+- **跟随系统深色模式**：读者没手动切换过时，按系统的深色 / 浅色显示，系统切换时页面跟着变；手动切到和系统一致的那一档会恢复「跟随系统」。
+- **默认网站图标跟着品牌走**：没上传网站图标时，按 Logo 文字和主题色自动生成图标（浏览器标签、收藏、手机桌面、`/favicon.ico` 都一致），改了站点设置图标随之更新。
+- 批量导入的文件选择改成和后台一致的按钮，并显示选了哪个文件夹、多少个文件（原生文件框在有些浏览器里显示英文）。
+- 本地跑端到端测试不再在开发数据库里留下测试用的搜索词统计。
+- README 换上新界面的截图。
 
 ### 升级说明
 
 - Docker 部署：`docker-compose.yml` 改为默认拉取现成镜像。如果你改过代码、要继续在服务器上构建，改用 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。`.env` 里的 `SITE_URL` 不再是构建参数，改了以后 `docker compose up -d` 即可。
+- `public/favicon.ico` 已删除，`/favicon.ico` 改为和网站图标一致的动态图标。想用自己的图标请在「站点设置 → 品牌 → 网站图标」上传。
 
 ## [1.0.0] - 2026-11-23
 
@@ -63,4 +73,5 @@
 - `public/og.png` 已删除：默认分享图改为后台上传，或按站名自动生成（`/og/site`）。如果你替换过这个文件，请到「站点设置 → 品牌 → 默认分享图」重新上传。
 - `app/favicon.ico` 移到了 `public/favicon.ico`。如果你替换过网站图标，请改为在「站点设置 → 品牌 → 网站图标」上传；直接改仓库里的文件会让一键更新提示「服务器存在未提交的本地修改」。
 
-[1.0.0]: https://github.com/vow132/tutorial-site/releases/tag/v1.0.0
+[1.1.0]: https://github.com/vow132/tutorial-site/releases/tag/v1.1.0
+[1.0.0]: https://github.com/vow132/tutorial-site/tree/64dd2039d2d3ca92f20c8778049bdcfdebab7f33

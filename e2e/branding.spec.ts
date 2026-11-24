@@ -7,7 +7,7 @@ import { ADMIN_STATE, collectErrors, uniqueSuffix } from "./helpers";
 
 test.use({ storageState: ADMIN_STATE });
 
-test("by default the site uses a generated share image and the bundled favicon", async ({ page, request }) => {
+test("by default the site uses a generated share image, a letter icon and a web manifest", async ({ page, request }) => {
   await page.goto("/");
   const content = (await page.locator('meta[property="og:image"]').getAttribute("content"))!;
   expect(content).toMatch(/\/og\/site\?v=[\w-]{12}$/);
@@ -22,10 +22,27 @@ test("by default the site uses a generated share image and the bundled favicon",
   expect([meta.width, meta.height]).toEqual([1200, 630]);
   expect((await request.get("/og/site?v=old")).headers()["cache-control"]).toBe("public, max-age=300");
 
-  await expect(page.locator('link[rel="icon"]').first()).toHaveAttribute("href", /^\/favicon\.ico/);
-  expect((await request.get("/favicon.ico")).status()).toBe(200);
-  // 没上传网站图标时不生成
-  expect((await request.get("/brand/icon?s=32")).status()).toBe(404);
+  // 没上传网站图标：按 Logo 文字和主题色生成字母图标，/favicon.ico 和它一致
+  const icon = (await page.locator('link[rel="icon"]').first().getAttribute("href"))!;
+  expect(icon).toMatch(/^\/brand\/icon\?s=32&v=l-[\w-]+$/);
+  const png = await request.get(icon);
+  expect(png.headers()["content-type"]).toBe("image/png");
+  expect(png.headers()["cache-control"]).toContain("immutable");
+  const iconMeta = await sharp(await png.body()).metadata();
+  expect([iconMeta.width, iconMeta.height]).toEqual([32, 32]);
+  const favicon = await request.get("/favicon.ico");
+  expect(favicon.status()).toBe(200);
+  expect(favicon.headers()["content-type"]).toBe("image/png");
+  const large = await sharp(await (await request.get("/brand/icon?s=512")).body()).metadata();
+  expect([large.width, large.height]).toEqual([512, 512]);
+
+  // 网站清单：站名和 192 / 512 图标
+  const manifestHref = (await page.locator('link[rel="manifest"]').getAttribute("href"))!;
+  const manifest = (await (await request.get(manifestHref)).json()) as { name: string; start_url: string; icons: Array<{ src: string; sizes: string }> };
+  expect(manifest.name).toBeTruthy();
+  expect(manifest.start_url).toBe("/");
+  expect(manifest.icons.map((item) => item.sizes)).toEqual(["192x192", "512x512"]);
+  expect(manifest.icons[0].src).toMatch(/^\/brand\/icon\?s=192&v=l-/);
   // 默认主题色不注入覆盖样式，吉祥物照常显示
   expect((await page.locator("head style").allTextContents()).some((css) => css.includes("--color-accent"))).toBe(false);
   await expect(page.locator("html")).not.toHaveAttribute("data-mascot", "off");
@@ -68,7 +85,8 @@ test("logo, favicon, share image, accent colour, mascot and footer status come f
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`${shareUrl}$`));
 
     const icon = (await page.locator('link[rel="icon"]').first().getAttribute("href"))!;
-    expect(icon).toMatch(/^\/brand\/icon\?s=32&v=[\w-]+$/);
+    // 上传的图标：版本号是文件名，不再是字母图标
+    expect(icon).toMatch(/^\/brand\/icon\?s=32&v=(?!l-)[\w-]+$/);
     const png = await request.get(icon);
     expect(png.headers()["content-type"]).toBe("image/png");
     expect(png.headers()["cache-control"]).toContain("immutable");
