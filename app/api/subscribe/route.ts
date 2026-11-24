@@ -1,4 +1,5 @@
 import { getClientIp } from "@/lib/client-ip";
+import { isDemoMode } from "@/lib/demo";
 import { getMailConfig, sendOne } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
 import { sharedLimiter } from "@/lib/rate-limit";
@@ -37,7 +38,8 @@ export async function POST(request: Request) {
   if (typeof body.website === "string" && body.website.trim()) return ok();
 
   const config = await getMailConfig();
-  if (!config.enabled || !mailConfigComplete(config)) return Response.json({ error: "邮件订阅暂未开启" }, { status: 404 });
+  // 演示站不发邮件：否则谁都能用它给任意邮箱发确认信
+  if (isDemoMode() || !config.enabled || !mailConfigComplete(config)) return Response.json({ error: "邮件订阅暂未开启" }, { status: 404 });
 
   const ip = await getClientIp();
   const perVisitor = sharedLimiter("subscribe-visitor", 5, HOUR_MS, 20_000);

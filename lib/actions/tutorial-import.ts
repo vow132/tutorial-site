@@ -2,6 +2,7 @@
 
 import { Prisma } from "@/generated/prisma/client";
 import { requireAuth } from "@/lib/admin-auth";
+import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 import { firstUploadedImage, thumbnailFor } from "@/lib/article";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
@@ -41,6 +42,7 @@ async function availableSlug(base: string) {
 }
 
 export async function importTutorial(input: ImportTutorialInput): Promise<ImportTutorialResult> {
+  if (isDemoMode()) return { ok: false, error: DEMO_READ_ONLY_MESSAGE };
   await requireAuth();
   if (!input || typeof input !== "object") return { ok: false, error: "数据无效" };
   const title = String(input.title ?? "").trim().slice(0, 200);
@@ -86,6 +88,7 @@ export async function importTutorial(input: ImportTutorialInput): Promise<Import
 
 /** 把外链图片下载到本站（防 SSRF，见 lib/remote-image.ts），返回本站地址。 */
 export async function importRemoteImage(url: string): Promise<{ url: string } | { error: string }> {
+  if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
   await requireAuth();
   if (typeof url !== "string" || url.length > 2048) return { error: "图片地址无效" };
   try {

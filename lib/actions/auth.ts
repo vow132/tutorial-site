@@ -16,6 +16,7 @@ import { getClientIp } from "@/lib/client-ip";
 import { passwordProblem } from "@/lib/password-policy";
 import { sharedLimiter, type RateLimiter } from "@/lib/rate-limit";
 import { LOCKED_TOTP_MESSAGE, verifySecondFactor } from "@/lib/second-factor";
+import { isDemoMode } from "@/lib/demo";
 
 export type LoginState = { error?: string; needsTotp?: boolean };
 
@@ -125,7 +126,8 @@ export async function login(
   }
 
   // 仍在使用默认/弱密码时，直接带去改密码页面。
-  redirect(passwordProblem(password, admin.username) ? "/admin/account?weak=1" : from);
+  // 演示站的密码本来就是公开的（lib/demo.ts），不用提示改密码
+  redirect(!isDemoMode() && passwordProblem(password, admin.username) ? "/admin/account?weak=1" : from);
 }
 
 export async function logout() {

@@ -26,6 +26,7 @@ npx tsc --noEmit
 npm test                  # 单元测试
 npm run build
 npm run test:e2e          # 端到端测试（首次运行先 npx playwright install chromium）
+E2E_DEMO=1 npx playwright test   # 演示模式的端到端测试（Windows PowerShell：$env:E2E_DEMO=1; npx playwright test）
 ```
 
 端到端测试会新建并删除 `e2e-` 开头的数据，**只对开发 / 测试数据库运行**。CI 会在 Node 22 和 24 上跑同样的检查，并单独做依赖安全审计。
@@ -54,7 +55,8 @@ npm run test:e2e          # 端到端测试（首次运行先 npx playwright ins
   ```
 
 - 有安装脚本的新依赖（原生模块等）要加到 `package.json` 的 `allowScripts`，新版 npm 默认不执行没列出的安装脚本。
-- 网站运行或运维命令（迁移、seed、`admin:reset`）要用的包放在 `dependencies`：Docker 镜像构建完会删掉 `devDependencies`。
+- Docker 镜像只带 Next 的 standalone 输出（网站代码用到的包已经打包进去）：`scripts/*.mjs` 运维脚本只能用 Node 内置模块、better-sqlite3 和 dotenv；用 TypeScript 写的运维脚本要加进 `scripts/docker-runtime.mjs` 的 `BUNDLES`，构建镜像时打包成 `.mjs`。改了这些记得跑一次 Docker 冒烟测试（`.github/scripts/docker-smoke.sh`，CI 会跑）。
+- 新增写数据的接口时，要么经过 `requireAuth()` / `requireSession()`，要么自己判断 `isDemoMode()`（`lib/demo.ts`），否则演示站会被改乱。
 
 ## 提交 Pull Request
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
+import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 import { storeUploadedImage } from "@/lib/upload-store";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
@@ -10,6 +11,7 @@ export async function POST(request: Request) {
   if (!admin) {
     return NextResponse.json({ error: "未登录或会话已过期" }, { status: 401 });
   }
+  if (isDemoMode()) return NextResponse.json({ error: DEMO_READ_ONLY_MESSAGE }, { status: 403 });
 
   // 先看声明的长度，避免把超大请求体整个读进内存。
   const declared = Number(request.headers.get("content-length") ?? 0);

@@ -1,10 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
+import { admin } from "./e2e/helpers";
 
 /**
  * 端到端测试：针对生产构建运行（先 `npm run build`，再 `npm run test:e2e`）。
  * 测试会在数据库里新建并删除带 e2e- 前缀的教程/分类，请勿指向生产数据库。
  */
-const PORT = Number(process.env.E2E_PORT ?? 3100);
+/**
+ * E2E_DEMO=1：只跑演示模式的测试（e2e/demo.spec.ts），服务器以 DEMO_MODE=true 启动在另一个端口。
+ * 不和普通测试同时跑：两个服务器共用 .next 里的页面缓存，演示横幅会混进普通页面。
+ */
+const DEMO = process.env.E2E_DEMO === "1";
+const PORT = Number(process.env.E2E_PORT ?? (DEMO ? 3101 : 3100));
 
 /**
  * 测试服务器的 SITE_URL：通行密钥（WebAuthn）要求域名，不接受 IP，所以用 localhost；
@@ -13,7 +19,13 @@ const PORT = Number(process.env.E2E_PORT ?? 3100);
 const SITE_URL = process.env.SITE_URL ?? `http://localhost:${PORT}`;
 const serverEnv = Object.fromEntries(
   // 定时发布每 2 秒检查一次（默认 60 秒），测试不用等一分钟
-  Object.entries({ SCHEDULE_CHECK_SECONDS: "2", ...process.env, SITE_URL }).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  Object.entries({
+    SCHEDULE_CHECK_SECONDS: "2",
+    ...process.env,
+    SITE_URL,
+    // 演示模式：登录页公开的演示账号就是测试用的管理员
+    ...(DEMO ? { DEMO_MODE: "true", ADMIN_USERNAME: admin.username, ADMIN_PASSWORD: admin.password } : {}),
+  }).filter((entry): entry is [string, string] => entry[1] !== undefined),
 );
 
 export default defineConfig({
@@ -28,21 +40,24 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "off",
   },
-  projects: [
-    { name: "setup", testMatch: /auth\.setup\.ts/ },
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-      dependencies: ["setup"],
-    },
-    // 会删掉种子数据的测试（结束时重新写入），等其他测试都跑完再执行
-    {
-      name: "cleanup",
-      testMatch: /\.cleanup\.ts$/,
-      use: { ...devices["Desktop Chrome"] },
-      dependencies: ["chromium"],
-    },
-  ],
+  projects: DEMO
+    ? [{ name: "demo", testMatch: /demo\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } }]
+    : [
+        { name: "setup", testMatch: /auth\.setup\.ts/ },
+        {
+          name: "chromium",
+          testIgnore: /demo\.spec\.ts$/,
+          use: { ...devices["Desktop Chrome"] },
+          dependencies: ["setup"],
+        },
+        // 会删掉种子数据的测试（结束时重新写入），等其他测试都跑完再执行
+        {
+          name: "cleanup",
+          testMatch: /\.cleanup\.ts$/,
+          use: { ...devices["Desktop Chrome"] },
+          dependencies: ["chromium"],
+        },
+      ],
   webServer: {
     command: `npm run start -- -p ${PORT}`,
     url: `http://127.0.0.1:${PORT}/robots.txt`,

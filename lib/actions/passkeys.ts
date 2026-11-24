@@ -33,6 +33,7 @@ import {
 } from "@/lib/passkeys";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { getSettings } from "@/lib/settings";
+import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 
 type Result = { error?: string; success?: string };
 
@@ -41,6 +42,7 @@ export async function beginPasskeyRegistration(
   rawName: string,
   currentPassword: string,
 ): Promise<Result & { options?: PublicKeyCredentialCreationOptionsJSON }> {
+  if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
   const { admin } = await requireSession();
   const rp = relyingParty();
   if ("error" in rp) return { error: rp.error };
@@ -113,6 +115,7 @@ export async function finishPasskeyRegistration(response: RegistrationResponseJS
 }
 
 export async function removePasskey(id: string): Promise<Result> {
+  if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
   const { admin } = await requireSession();
   const passkey = await prisma.adminPasskey.findFirst({ where: { id: String(id), adminId: admin.id } });
   if (!passkey) return { error: "通行密钥不存在" };

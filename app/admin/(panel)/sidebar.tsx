@@ -157,7 +157,8 @@ function SidebarLinks({
           </svg>
           查看网站
         </Link>
-        <form action={logout}>
+        {/* 演示模式下也能退出登录（components/demo-guard.tsx 放行带 data-demo-allow 的表单） */}
+        <form action={logout} data-demo-allow="">
           <button
             type="submit"
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"

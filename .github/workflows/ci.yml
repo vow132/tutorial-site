@@ -60,6 +60,13 @@ jobs:
         if: matrix.node-version == 24
         run: npm run test:e2e
 
+      # 演示模式（DEMO_MODE=true）：另起一个服务器，确认后台只读、访客写的文字不入库
+      - name: 端到端测试（演示模式）
+        if: matrix.node-version == 24
+        run: npm run test:e2e
+        env:
+          E2E_DEMO: "1"
+
       - name: 上传端到端测试失败现场
         if: failure() && matrix.node-version == 24
         uses: actions/upload-artifact@v7

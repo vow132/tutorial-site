@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { sharedLimiter } from "@/lib/rate-limit";
+import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 import {
   credentialFingerprint,
   DEVICE_COOKIE,
@@ -107,9 +108,14 @@ export async function getCurrentAdmin() {
   return (await getCurrentSession())?.admin ?? null;
 }
 
+/**
+ * 写操作（每个 Server Action）用：没登录就拒绝。
+ * 演示模式（lib/demo.ts）下一律拒绝：后台只读，演示数据不会被改。读页面用 requireAdminPage()。
+ */
 export async function requireAuth() {
   const admin = await getCurrentAdmin();
   if (!admin) throw new Error("未登录或会话已过期");
+  if (isDemoMode()) throw new Error(DEMO_READ_ONLY_MESSAGE);
   return admin;
 }
 
@@ -123,9 +129,11 @@ export async function requireAdminPage() {
   return admin;
 }
 
+/** 同 requireAuth()，还要当前会话 ID 的写操作（改密码、两步验证、通行密钥、退出其他设备）用。 */
 export async function requireSession() {
   const current = await getCurrentSession();
   if (!current) throw new Error("未登录或会话已过期");
+  if (isDemoMode()) throw new Error(DEMO_READ_ONLY_MESSAGE);
   return current;
 }
 

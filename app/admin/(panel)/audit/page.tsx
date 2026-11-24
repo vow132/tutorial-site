@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { displayIp, isDemoMode } from "@/lib/demo";
 
 export const metadata: Metadata = { title: "安全日志" };
 export const dynamic = "force-dynamic";
@@ -77,10 +78,15 @@ function countRecentFailedLogins() {
 
 export default async function AuditLogPage() {
   await requireAdminPage();
-  const [entries, failedLogins] = await Promise.all([
+  const [entries, failedLogins, admins] = await Promise.all([
     prisma.auditLog.findMany({ orderBy: { id: "desc" }, take: 200 }),
     countRecentFailedLogins(),
+    prisma.admin.findMany({ select: { username: true } }),
   ]);
+  // 演示站：登录失败时访客随手填的用户名不显示（只显示真实存在的管理员名），IP 打码
+  const demo = isDemoMode();
+  const adminNames = new Set(admins.map((admin) => admin.username));
+  const actorOf = (actor: string | null) => (actor && demo && !adminNames.has(actor) ? "（访客填写，已隐藏）" : actor);
 
   return (
     <div>
@@ -114,8 +120,8 @@ export default async function AuditLogPage() {
                 >
                   {LABELS[entry.action] ?? entry.action}
                 </td>
-                <td className="px-5 py-3 text-ink-2">{entry.actor ?? "—"}</td>
-                <td className="whitespace-nowrap px-5 py-3 text-ink-3">{entry.ip ?? "—"}</td>
+                <td className="px-5 py-3 text-ink-2">{actorOf(entry.actor) ?? "—"}</td>
+                <td className="whitespace-nowrap px-5 py-3 text-ink-3">{displayIp(entry.ip) ?? "—"}</td>
                 <td className="px-5 py-3 text-ink-2">{entry.detail ?? ""}</td>
               </tr>
             ))}

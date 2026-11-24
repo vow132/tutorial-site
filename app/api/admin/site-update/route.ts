@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { confirmCurrentPassword, getCurrentAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
+import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 import { getSiteUpdateStatus, startSiteUpdate } from "@/lib/site-update";
 
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   if (!admin) {
     return NextResponse.json({ error: "登录已过期，请重新登录后台。" }, { status: 401, headers });
   }
+  if (isDemoMode()) return NextResponse.json({ error: DEMO_READ_ONLY_MESSAGE }, { status: 403, headers });
   // The browser sends JSON only from our own origin. Reject cross-site posts
   // even when a signed administrator cookie accompanies the request.
   const origin = request.headers.get("origin");

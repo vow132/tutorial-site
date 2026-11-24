@@ -6,6 +6,7 @@ import Pagination from "@/components/pagination";
 import { mailConfigComplete } from "@/lib/subscription";
 import { MailSettingsForm, TestMailForm } from "./mail-forms";
 import DeleteSubscriberButton from "./delete-subscriber-button";
+import { displayEmail } from "@/lib/demo";
 
 export const metadata: Metadata = { title: "邮件订阅" };
 export const dynamic = "force-dynamic";
@@ -96,7 +97,7 @@ export default async function AdminSubscribersPage({ searchParams }: { searchPar
               <tbody className="divide-y divide-line">
                 {subscribers.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-4 py-3 text-ink">{item.email}</td>
+                    <td className="px-4 py-3 text-ink">{displayEmail(item.email)}</td>
                     <td className="px-4 py-3">
                       {item.confirmedAt ? (
                         <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">已确认</span>
@@ -106,7 +107,7 @@ export default async function AdminSubscribersPage({ searchParams }: { searchPar
                     </td>
                     <td className="px-4 py-3 text-ink-2">{formatDate(item.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      <DeleteSubscriberButton id={item.id} email={item.email} />
+                      <DeleteSubscriberButton id={item.id} email={displayEmail(item.email)} />
                     </td>
                   </tr>
                 ))}

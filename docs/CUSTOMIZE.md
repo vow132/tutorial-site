@@ -34,6 +34,7 @@
 | `/.well-known/security.txt` 的联系方式 | 站点设置 → 安全联系方式 |
 | 「关于本站」页面 | 关于页面（正文留空时 `/about` 不显示） |
 | 顶部导航里的分类、分类颜色和层级 | 分类管理（导航按分类自动生成） |
+| 顶部导航里分类之外的链接（关于、友链、交流群等，放在分类前面或后面） | 站点设置 → 顶部导航链接 |
 | 标签、系列 | 标签管理、教程系列 |
 | 邮件订阅（SMTP 发信） | 邮件订阅 |
 | 安全告警推送（钉钉 / 飞书 / 企业微信 / Telegram / Webhook） | 账号安全 → 安全告警 |
@@ -90,7 +91,7 @@ npm ci && npx prisma migrate deploy && npm test
 1. 新建 `app/(site)/links/page.tsx`，页面元数据用 `lib/seo.ts` 的 `pageMetadata({ title, description, path: "/links" })`，不要自己写 `openGraph` / `alternates`（会把根布局的分享图、RSS 链接整个替换掉）；
 2. 站内链接用 `components/intent-link.tsx`，不要直接用 `next/link`；
 3. 需要被搜索引擎收录时，把地址加进 `app/sitemap.ts`；
-4. 在后台「站点设置 → 页脚 → 底部栏目」加一个指向 `/links` 的链接。
+4. 在后台「站点设置 → 顶部导航链接」或「页脚 → 底部栏目」加一个指向 `/links` 的链接。
 
 更多架构约定（缓存、数据库迁移、安全要求）见 [AGENTS.md](../AGENTS.md) 和 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
