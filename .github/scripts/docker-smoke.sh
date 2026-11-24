@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 启动镜像做一次冒烟测试：第一次启动建库并写入示例数据、页面用的是运行时的 SITE_URL 和真实数据、重启不会重复写入示例数据。
+# 启动镜像做一次冒烟测试：第一次启动建库并写入示例数据、页面用的是运行时的 SITE_URL 和真实数据、
+# 分享图和图标能生成、运维命令（备份、还原、清理、重置管理员、迁移）都能用、重启不会重复写入示例数据。
 # 用法：docker-smoke.sh <镜像>
 set -euo pipefail
 image="$1"
@@ -39,6 +40,19 @@ curl -sf http://127.0.0.1:3000/robots.txt | grep -q "Sitemap: $site/sitemap.xml"
 urls=$(curl -sf http://127.0.0.1:3000/sitemap.xml | grep -o "<loc>$site/[^<]*" | wc -l)
 [ "$urls" -gt 2 ] || { echo "sitemap 只有 $urls 条运行时地址（还是构建时用空库生成的版本？）" >&2; exit 1; }
 curl -sf http://127.0.0.1:3000/ | grep -q "<link rel=\"canonical\" href=\"$site/\"\|<link rel=\"canonical\" href=\"$site\"" || { echo "canonical 没用运行时的 SITE_URL" >&2; exit 1; }
+
+curl -sf -o /dev/null http://127.0.0.1:3000/og/site || { echo "分享图生成失败（字体文件没打进镜像？）" >&2; exit 1; }
+curl -sf -o /dev/null "http://127.0.0.1:3000/brand/icon?s=192" || { echo "网站图标生成失败" >&2; exit 1; }
+
+# 镜像里只有 standalone 输出和整理进去的脚本（scripts/docker-runtime.mjs），逐个确认运维命令能用
+in_app() { docker exec -u node "$name" "$@" >/dev/null || { echo "容器里执行失败：$*" >&2; exit 1; }; }
+in_app npm run -s backup
+in_app npm run -s uploads:clean
+in_app npm run -s images:variants
+in_app npm run -s migrate
+latest=$(docker exec -u node "$name" sh -c 'ls -t /app/backups/*.db.gz | head -1')
+in_app npm run -s backup:restore -- "$latest"
+in_app npm run -s admin:reset -- --password "ci-reset-Passw0rd-123"
 
 docker restart "$name" >/dev/null
 wait_healthy

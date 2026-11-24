@@ -1,7 +1,7 @@
 /**
  * 为已上传的正文图片补生成响应式小图（新上传的图片会自动生成）。
  *   npm run images:variants
- * 已存在的小图会跳过，可重复执行；完成后重启站点（pm2 restart 教程网），
+ * 已存在的小图会跳过，可重复执行；完成后重启站点（pm2 restart 教程网，Docker 是 docker compose restart app），
  * 让文章渲染缓存重新探测小图。
  */
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
@@ -38,7 +38,10 @@ async function main() {
     }
   }
   console.log(`✅ 检查了 ${names.length} 张图片，新生成 ${created} 张小图${failed ? `，${failed} 张失败` : ""}。`);
-  if (created > 0) console.log("请重启站点（如 pm2 restart 教程网）让文章重新使用小图。");
+  if (created > 0) {
+    const restart = process.env.DEPLOY_MODE === "docker" ? "docker compose restart app" : "pm2 restart 教程网";
+    console.log(`请重启站点（${restart}）让文章重新使用小图。`);
+  }
 }
 
 main();

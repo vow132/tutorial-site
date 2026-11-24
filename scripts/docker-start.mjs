@@ -2,8 +2,9 @@
 /**
  * Docker 容器的启动脚本（Dockerfile 的 CMD）：
  * 1. 以 root 修正挂载目录（数据库、上传、备份）的属主，之后的命令都以 node 用户运行；
- * 2. 执行数据库迁移；数据库是新建的（第一次启动）才写入种子数据（管理员、示例分类和教程）；
- * 3. 启动 next start，转发停止信号；
+ * 2. 执行数据库迁移（scripts/migrate.mjs，和 prisma migrate deploy 等价，镜像里没有 Prisma 命令行）；
+ *    数据库是新建的（第一次启动）才写入种子数据（管理员、示例分类和教程）；
+ * 3. 启动 Next 的 standalone 服务（server.js），转发停止信号；
  * 4. 服务起来后在后台请求一遍主要页面，第一个访客不用等页面生成。
  *
  * 镜像里的页面是构建时用空库预渲染的（构建时拿不到真实数据库）。如果直接用，sitemap 这类缓存 1 小时的页面
@@ -91,14 +92,16 @@ if (asRoot) for (const dir of writable) chownTree(dir);
 dropBuildTimePages();
 
 const firstRun = !existsSync(dbFile);
-run(["npx", "prisma", "migrate", "deploy"]);
+run(["node", "scripts/migrate.mjs"]);
 if (firstRun) {
   console.log("ℹ️ 第一次启动：写入种子数据（管理员账号、示例分类和教程）");
-  run(["npx", "prisma", "db", "seed"]);
+  // prisma/seed.ts 构建镜像时打包成了 scripts/seed.mjs（scripts/docker-runtime.mjs）
+  run(["node", "scripts/seed.mjs"]);
 }
 
-const [cmd, rest] = command(["node", "node_modules/next/dist/bin/next", "start", "-p", port]);
-const server = spawn(cmd, rest, { cwd: root, stdio: "inherit", env: process.env });
+// HOSTNAME：Docker 默认把它设成容器 ID，server.js 会只监听容器网卡，健康检查连 127.0.0.1 就连不上
+const [cmd, rest] = command(["node", "server.js"]);
+const server = spawn(cmd, rest, { cwd: root, stdio: "inherit", env: { ...process.env, PORT: port, HOSTNAME: "0.0.0.0" } });
 for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => server.kill(signal));
 server.on("exit", (code, signal) => process.exit(code ?? (signal ? 0 : 1)));
 

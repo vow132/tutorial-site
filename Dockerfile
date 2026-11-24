@@ -3,12 +3,13 @@
 # 改了代码想自己构建：docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 #
 # 镜像和站点无关：站点地址（SITE_URL）、密钥等都在运行时由 .env 传入，数据库、上传图片、备份都在挂载卷里。
+# 镜像里只有网站运行用到的文件（Next 的 standalone 输出，由 scripts/docker-runtime.mjs 整理），没有开发依赖和 Prisma 命令行。
 
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 
-# python3 / make / g++：better-sqlite3 下载不到预编译包时现场编译；
-# openssl：Prisma 按系统里的 libssl 版本选择迁移引擎，构建和运行两个阶段都要装，选中的引擎才一致。
+# python3 / make / g++：better-sqlite3 下载不到预编译包时现场编译；openssl：Prisma 命令行（prisma generate）检测平台用。
+# 这些只在构建阶段用，最终镜像里没有。
 # APT_MIRROR 可选：国内服务器拉 Debian 软件包慢时填 mirrors.aliyun.com、mirrors.tuna.tsinghua.edu.cn 等
 ARG APT_MIRROR=
 RUN if [ -n "$APT_MIRROR" ]; then sed -i "s|deb.debian.org|$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; fi \
@@ -27,31 +28,22 @@ RUN npx prisma generate
 # 页面渲染要查库：用一个临时空库构建，构建完连同数据缓存一起删掉。构建时生成的页面不带真实数据和站点地址，
 # 容器启动时会被 scripts/docker-start.mjs 删掉、按运行时的 SITE_URL 和数据库重新生成。
 # BUILD_REVISION：提交号，显示在后台侧栏（镜像里没有 .git，CI 构建时传入）。
+# 迁移用 scripts/migrate.mjs（和 prisma migrate deploy 等价，容器启动时也用它），顺便在构建时验证一遍。
 ARG BUILD_REVISION=
-RUN DATABASE_URL=file:/tmp/build.db npx prisma migrate deploy \
- && DATABASE_URL=file:/tmp/build.db BUILD_REVISION="$BUILD_REVISION" AUTH_SECRET=build-time-only-not-used-at-runtime-0123456789 npm run build \
- && rm -rf /tmp/build.db* .next/cache
-
-# 运行用不到的开发依赖（ESLint、Playwright、TypeScript、Tailwind 编译器）和 musl 版原生包（镜像是 glibc）删掉，
-# 运维命令要用的 prisma、tsx、dotenv 在 dependencies 里，会保留。
-RUN npm prune --omit=dev --no-audit --no-fund \
- && rm -rf node_modules/@next/swc-*-musl node_modules/@img/*linuxmusl* \
- && npm cache clean --force
+RUN DATABASE_URL=file:/tmp/build.db node scripts/migrate.mjs \
+ && DATABASE_URL=file:/tmp/build.db BUILD_REVISION="$BUILD_REVISION" BUILD_STANDALONE=1 AUTH_SECRET=build-time-only-not-used-at-runtime-0123456789 npm run build \
+ && rm -rf /tmp/build.db* .next/cache \
+ && node scripts/docker-runtime.mjs /runtime
 
 FROM node:24-bookworm-slim
 WORKDIR /app
-ARG APT_MIRROR=
-RUN if [ -n "$APT_MIRROR" ]; then sed -i "s|deb.debian.org|$APT_MIRROR|g" /etc/apt/sources.list.d/debian.sources; fi \
- && apt-get update \
- && apt-get install -y --no-install-recommends openssl \
- && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
     DEPLOY_MODE=docker \
     PORT=3000 \
     DATABASE_URL=file:/app/data/tutorial.db \
     BACKUP_DIR=/app/backups \
     NEXT_TELEMETRY_DISABLED=1
-COPY --from=build --chown=node:node /app /app
+COPY --from=build --chown=node:node /runtime /app
 RUN mkdir -p /app/data /app/backups /app/public/uploads && chown node:node /app/data /app/backups /app/public/uploads
 VOLUME ["/app/data", "/app/public/uploads", "/app/backups"]
 EXPOSE 3000
