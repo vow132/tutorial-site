@@ -1,5 +1,5 @@
 /**
- * 站点设置里后加的几组：首页「从这里开始」、文章页动效、赞助与打赏。
+ * 站点设置里后加的几组：首页「从这里开始」、文章页动效、赞助与打赏、品牌、顶部导航链接。
  * 纯函数（类型、默认值、读取、校验），lib/settings.ts、设置 Server Action 和单元测试共用。
  */
 
@@ -164,4 +164,64 @@ export function parseBrandInput(input: { logoImage: string; favicon: string; sha
   if (data.accentColor === DEFAULT_ACCENT) data.accentColor = "";
   if (data.accentColor && !/^#[0-9a-f]{6}$/.test(data.accentColor)) return { error: "主题色请填写 #RRGGBB 格式，例如 #0ea5e9" };
   return { data };
+}
+
+/** 顶部导航里分类之外的链接（关于、友链、外部社区等）。 */
+export type NavLink = { label: string; href: string };
+export type NavLinks = {
+  /** before：放在「全部教程」后面、分类前面；after：放在所有分类后面 */
+  position: "before" | "after";
+  links: NavLink[];
+};
+
+export const MAX_NAV_LINKS = 6;
+/** 导航胶囊里一项的文字上限（按字计，中文 6 个字已经很宽） */
+export const MAX_NAV_LABEL = 8;
+
+export const defaultNavLinks: NavLinks = { position: "after", links: [] };
+
+/** 站内路径（/about，不能是 //开头的协议相对地址）或 http(s) 网址；其余（javascript: 等）一律不收。 */
+export function navHrefProblem(href: string): string | null {
+  if (href.length > 500) return "太长";
+  if (href.startsWith("/")) return href.startsWith("//") || /\s/.test(href) ? "格式不对" : null;
+  try {
+    const url = new URL(href);
+    return url.protocol === "https:" || url.protocol === "http:" ? null : "只能是 / 开头的站内地址或 http(s):// 网址";
+  } catch {
+    return "只能是 / 开头的站内地址或 http(s):// 网址";
+  }
+}
+
+export function readNavLinks(raw: unknown): NavLinks {
+  const value = (raw && typeof raw === "object" ? raw : {}) as { position?: unknown; links?: unknown };
+  const links = Array.isArray(value.links)
+    ? value.links
+        .filter(
+          (link): link is NavLink =>
+            Boolean(link) && typeof link.label === "string" && typeof link.href === "string" && !!link.label && !navHrefProblem(link.href),
+        )
+        .slice(0, MAX_NAV_LINKS)
+        .map(({ label, href }) => ({ label, href }))
+    : [];
+  return { position: value.position === "before" ? "before" : "after", links };
+}
+
+/** 后台表单的输入：整行留空的忽略，其余每行文字和地址都要填对。 */
+export function parseNavLinksInput(input: { position: string; links: unknown }): { data: NavLinks } | { error: string } {
+  if (!Array.isArray(input.links)) return { error: "导航链接数据格式有误" };
+  const links: NavLink[] = [];
+  for (const [index, row] of input.links.entries()) {
+    const label = typeof row?.label === "string" ? row.label.trim() : "";
+    const href = typeof row?.href === "string" ? row.href.trim() : "";
+    if (!label && !href) continue;
+    const name = `第 ${index + 1} 个导航链接`;
+    if (!label) return { error: `${name}没有填文字` };
+    if (Array.from(label).length > MAX_NAV_LABEL) return { error: `${name}的文字最多 ${MAX_NAV_LABEL} 个字` };
+    if (!href) return { error: `${name}没有填地址` };
+    const problem = navHrefProblem(href);
+    if (problem) return { error: `${name}的地址${problem}` };
+    links.push({ label, href });
+  }
+  if (links.length > MAX_NAV_LINKS) return { error: `导航链接最多 ${MAX_NAV_LINKS} 个` };
+  return { data: { position: input.position === "before" ? "before" : "after", links } };
 }

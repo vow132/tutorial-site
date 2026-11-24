@@ -12,7 +12,7 @@ import {
   type SearchVerification,
 } from "@/lib/search-verification";
 import { normalizeSecurityContact } from "@/lib/security-txt";
-import { parseBrandInput, parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
+import { parseBrandInput, parseNavLinksInput, parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
 import { uploadedImage } from "@/lib/article";
 
 export type SettingsFormState = { error?: string; success?: string };
@@ -89,6 +89,15 @@ export async function updateSettings(
     if (image && !(await uploadedImage(image))) return { error: "品牌里的图片文件已不存在，请重新上传" };
   }
 
+  let navLinksRaw: unknown;
+  try {
+    navLinksRaw = JSON.parse(text("navLinks.links") || "[]");
+  } catch {
+    return { error: "导航链接数据格式有误" };
+  }
+  const navLinks = parseNavLinksInput({ position: text("navLinks.position"), links: navLinksRaw });
+  if ("error" in navLinks) return { error: navLinks.error };
+
   const startHere = parseStartHereInput({
     enabled: formData.get("startHere.enabled") === "on",
     title: text("startHere.title"),
@@ -116,6 +125,7 @@ export async function updateSettings(
     support: support.data,
     brand: brand.data,
     footerStatus: text("footerStatus").slice(0, 20),
+    navLinks: navLinks.data,
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };
