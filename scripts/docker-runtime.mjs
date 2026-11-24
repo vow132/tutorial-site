@@ -49,12 +49,14 @@ const SCRIPTS = {
 const notTest = (source) => !/\.test\.m?[jt]s$/.test(source);
 const copy = (from, to = from, filter = notTest) =>
   cpSync(path.join(root, from), path.join(target, to), { recursive: true, force: true, filter });
+/** 不一定存在的目录（例如 public：仓库里目前没有要跟踪的文件，干净的检出里就没有它；上传目录由 Dockerfile 建）。 */
+const copyIfExists = (from) => existsSync(path.join(root, from)) && copy(from);
 
 rmSync(target, { recursive: true, force: true });
 cpSync(standalone, target, { recursive: true, verbatimSymlinks: true });
 cpSync(path.join(root, ".next", "static"), path.join(target, ".next", "static"), { recursive: true });
-copy("public");
-copy("assets");
+copyIfExists("public");
+copyIfExists("assets");
 copy("prisma/migrations");
 for (const dir of ["scripts", "lib"]) {
   mkdirSync(path.join(target, dir), { recursive: true });
