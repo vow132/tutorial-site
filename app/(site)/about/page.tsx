@@ -8,6 +8,7 @@ import { htmlToDescription, processArticle } from "@/lib/article";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
+import { rewriteAssetHtml } from "@/lib/asset-url";
 
 /** 静态缓存页：后台保存时立即失效（lib/actions/about.ts），另有每小时一次的兜底刷新。 */
 export const revalidate = 3600;
@@ -52,7 +53,7 @@ export default async function AboutPage() {
         <h1 className="text-3xl font-extrabold leading-tight text-ink md:text-4xl">{about.title}</h1>
       </Reveal>
       <Reveal delay={0.08} fade={false}>
-        <article className="article-body mt-8" dangerouslySetInnerHTML={{ __html: html }} />
+        <article className="article-body mt-8" dangerouslySetInnerHTML={{ __html: rewriteAssetHtml(html, settings.assetHost) }} />
       </Reveal>
     </div>
   );

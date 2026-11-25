@@ -3,6 +3,7 @@ import { getSettings, type SiteSettings } from "@/lib/settings";
 import { SITE_URL, absoluteUrl } from "@/lib/site-url";
 import { SHARE_IMAGE_SIZE, siteShareCard, siteShareImagePath } from "@/lib/share-image";
 import { uploadedImage } from "@/lib/article";
+import { assetUrl } from "@/lib/asset-url";
 
 /**
  * 没有配图的页面用的默认分享图：后台「站点设置 → 品牌」上传了就用上传的，
@@ -10,7 +11,9 @@ import { uploadedImage } from "@/lib/article";
  */
 export async function defaultShareImage(settings: SiteSettings): Promise<SeoImage> {
   const uploaded = settings.brand.shareImage ? await uploadedImage(settings.brand.shareImage) : null;
-  if (uploaded) return { url: settings.brand.shareImage, width: uploaded.width, height: uploaded.height, alt: settings.siteTitle };
+  if (uploaded) {
+    return { url: assetUrl(settings.brand.shareImage, settings.assetHost), width: uploaded.width, height: uploaded.height, alt: settings.siteTitle };
+  }
   return { url: siteShareImagePath(siteShareCard(settings)), ...SHARE_IMAGE_SIZE, alt: settings.siteTitle };
 }
 
@@ -59,7 +62,8 @@ export async function pageMetadata({
 }): Promise<Metadata> {
   const settings = await getSettings();
   const shareTitle = title ?? settings.siteTitle;
-  const shareImage: SeoImage = image ?? (await defaultShareImage(settings));
+  // 本站上传的图片（封面）走图片加速地址（lib/asset-url.ts）
+  const shareImage: SeoImage = image ? { ...image, url: assetUrl(image.url, settings.assetHost) } : await defaultShareImage(settings);
 
   const common = {
     siteName: settings.siteName,

@@ -17,6 +17,7 @@ import JsonLd from "@/components/json-ld";
 import { categoryTextStyle } from "@/lib/color";
 import { pageMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site-url";
+import { assetUrl } from "@/lib/asset-url";
 
 // 首页是静态页：内容变更时由后台立即刷新；阅读量等统计每 10 分钟刷新一次。
 // 后台改动会立即让首页失效；但如果有一次重新生成恰好在改动之前开始、之后才结束，
@@ -314,7 +315,7 @@ export default async function HomePage() {
                 {latest[0].thumbnail && (
                   // eslint-disable-next-line @next/next/no-img-element -- 上传目录里的 WebP 小图
                   <img
-                    src={latest[0].thumbnail}
+                    src={assetUrl(latest[0].thumbnail, settings.assetHost)}
                     alt=""
                     width={224}
                     height={126}

@@ -8,6 +8,7 @@ import { submitKeepingValues } from "@/lib/form-submit";
 import ImageField from "./image-field";
 import AccentField from "./accent-field";
 import NavLinksField from "./nav-links-field";
+import AssetHostField from "./asset-host-field";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -166,6 +167,23 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
         desc="导航默认是「首页」「全部教程」和各个分类；可以再加关于、友链、交流群这类链接（最多 6 个，外部网址在新标签页打开）"
       >
         <NavLinksField initial={settings.navLinks} />
+      </Section>
+
+      {/* ---------- 图片加速 ---------- */}
+      <Section
+        title="图片加速（CDN / 对象存储）"
+        desc="填一个 CDN 或对象存储的加速域名后，前台页面里的图片改从它加载，服务器省带宽、读者加载更快。图片文件仍存在本站，加速服务第一次被访问时自动回本站取图"
+      >
+        <AssetHostField initial={settings.assetHost} />
+        <details className="text-xs leading-relaxed text-ink-3">
+          <summary className="cursor-pointer text-ink-2">怎么配置？</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>CDN（阿里云 CDN、腾讯云 CDN、Cloudflare 等）：加一个加速域名（如 img.example.com），源站填本站域名；</li>
+            <li>阿里云 OSS：建一个公共读的 Bucket，开启「镜像回源」并把回源地址设为本站域名，最好再绑定自己的域名；</li>
+            <li>腾讯云 COS：建一个公共读的存储桶，开启「回源设置」指向本站域名；</li>
+            <li>配好后在上面填加速域名、点「测试」，通过后保存。随时可以清空恢复成本站直接提供图片。</li>
+          </ul>
+        </details>
       </Section>
 
       {/* ---------- 首页 Hero ---------- */}

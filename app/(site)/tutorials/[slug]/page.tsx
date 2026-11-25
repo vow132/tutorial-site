@@ -29,6 +29,7 @@ import SupportBox from "@/components/support-box";
 import SubscribeForm from "@/components/subscribe-form";
 import { getSubscriptionEnabled } from "@/lib/mail";
 import { bylineOf } from "@/lib/roles";
+import { assetSrcSet, assetUrl, rewriteAssetHtml } from "@/lib/asset-url";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -173,7 +174,7 @@ export default async function TutorialDetailPage({
         description: describe(tutorial, html),
         url: articleUrl,
         mainEntityOfPage: articleUrl,
-        image: [toAbsolute(image.url)],
+        image: [toAbsolute(assetUrl(image.url, settings.assetHost))],
         datePublished: tutorial.createdAt.toISOString(),
         dateModified: tutorial.updatedAt.toISOString(),
         articleSection: tutorial.category.name,
@@ -281,8 +282,8 @@ export default async function TutorialDetailPage({
           {cover && (
             // eslint-disable-next-line @next/next/no-img-element -- 上传目录的静态文件，自带响应式小图
             <img
-              src={cover.url}
-              srcSet={cover.srcSet}
+              src={assetUrl(cover.url, settings.assetHost)}
+              srcSet={assetSrcSet(cover.srcSet, settings.assetHost)}
               sizes="(min-width: 1280px) 820px, (min-width: 1024px) calc(100vw - 302px), calc(100vw - 32px)"
               width={cover.width}
               height={cover.height}
@@ -304,13 +305,13 @@ export default async function TutorialDetailPage({
           <Reveal delay={0.1} fade={false}>
             <article
               className="article-body mt-8"
-              dangerouslySetInnerHTML={{ __html: html }}
+              dangerouslySetInnerHTML={{ __html: rewriteAssetHtml(html, settings.assetHost) }}
             />
           </Reveal>
 
           <HelpfulFeedback id={tutorial.id} />
           <ShareButtons url={articleUrl} title={tutorial.title} />
-          <SupportBox support={settings.support} />
+          <SupportBox support={settings.support} assetHost={settings.assetHost} />
           {subscribeEnabled && (
             <section aria-labelledby="subscribe-heading" className="subscribe-box print-hide mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
               <h2 id="subscribe-heading" className="text-base font-semibold text-ink">订阅新教程</h2>
