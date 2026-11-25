@@ -9,10 +9,17 @@ import { defineConfig, devices } from "@playwright/test";
  * 不和普通测试同时跑：两个服务器共用 .next 里的页面缓存，演示横幅会混进普通页面。
  */
 const DEMO = process.env.E2E_DEMO === "1";
+/**
+ * E2E_SETUP=1：只跑首次安装的测试（e2e/setup.spec.ts）。服务器用一个全新的、没有后台账号的数据库
+ * （启动前由 e2e/fresh-setup-db.mjs 建好），测试进程查询的也是这个库。
+ */
+const SETUP = process.env.E2E_SETUP === "1";
+const SETUP_DB = "prisma/e2e-setup.db";
+if (SETUP) process.env.DATABASE_URL = `file:./${SETUP_DB}`;
 // 和 e2e/helpers.ts 的 admin 一致（这里不能 import e2e/ 下的文件：Docker 构建时没有这个目录，类型检查会失败）
 const ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? process.env.ADMIN_USERNAME ?? "admin";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? "admin123456";
-const PORT = Number(process.env.E2E_PORT ?? (DEMO ? 3101 : 3100));
+const PORT = Number(process.env.E2E_PORT ?? (DEMO ? 3101 : SETUP ? 3102 : 3100));
 
 /**
  * 测试服务器的 SITE_URL：通行密钥（WebAuthn）要求域名，不接受 IP，所以用 localhost；
@@ -44,11 +51,13 @@ export default defineConfig({
   },
   projects: DEMO
     ? [{ name: "demo", testMatch: /demo\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } }]
+    : SETUP
+    ? [{ name: "setup-wizard", testMatch: /setup\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } }]
     : [
         { name: "setup", testMatch: /auth\.setup\.ts/ },
         {
           name: "chromium",
-          testIgnore: /demo\.spec\.ts$/,
+          testIgnore: /(demo|setup)\.spec\.ts$/,
           use: { ...devices["Desktop Chrome"] },
           dependencies: ["setup"],
         },
@@ -61,7 +70,7 @@ export default defineConfig({
         },
       ],
   webServer: {
-    command: `npm run start -- -p ${PORT}`,
+    command: SETUP ? `node e2e/fresh-setup-db.mjs ${SETUP_DB} && npm run start -- -p ${PORT}` : `npm run start -- -p ${PORT}`,
     url: `http://127.0.0.1:${PORT}/robots.txt`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

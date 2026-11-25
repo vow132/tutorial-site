@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "批量导入" };
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
-  await requireAdminPage();
+  await requireAdminPage("import");
   const rows = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
     select: { id: true, name: true, slug: true, parentId: true, order: true },

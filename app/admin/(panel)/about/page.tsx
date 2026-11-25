@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "关于页面" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminAboutPage() {
-  await requireAdminPage();
+  await requireAdminPage("about");
   const [about, settings] = await Promise.all([readAboutForAdmin(), getSettings()]);
   const linked = settings.footerColumns.some((column) => column.links.some((link) => link.href === "/about"));
 

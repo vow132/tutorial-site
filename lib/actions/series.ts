@@ -45,7 +45,7 @@ async function orderedIds(seriesId: number) {
 }
 
 export async function createSeries(_prev: SeriesFormState, formData: FormData): Promise<SeriesFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const parsed = parseSeriesInput({
     title: formData.get("title"),
     slug: formData.get("slug"),
@@ -60,7 +60,7 @@ export async function createSeries(_prev: SeriesFormState, formData: FormData): 
 }
 
 export async function updateSeries(id: number, _prev: SeriesFormState, formData: FormData): Promise<SeriesFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const parsed = parseSeriesInput({
     title: formData.get("title"),
     slug: formData.get("slug"),
@@ -80,7 +80,7 @@ export async function updateSeries(id: number, _prev: SeriesFormState, formData:
 
 /** 删除系列：教程本身保留，只是不再属于任何系列。 */
 export async function deleteSeries(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const id = Number(formData.get("id"));
   const series = id ? await prisma.series.findUnique({ where: { id } }) : null;
   if (!series) return;
@@ -96,7 +96,7 @@ export async function deleteSeries(formData: FormData) {
 
 /** 把教程加入系列（排在末尾）；原来在别的系列里的会移过来。 */
 export async function addToSeries(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const seriesId = Number(formData.get("seriesId"));
   const tutorialId = Number(formData.get("tutorialId"));
   const [series, tutorial] = await Promise.all([
@@ -119,7 +119,7 @@ export async function addToSeries(formData: FormData) {
 
 /** 从系列里移出一篇（教程本身不受影响），其余重新编号。 */
 export async function removeFromSeries(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const tutorialId = Number(formData.get("tutorialId"));
   const tutorial = tutorialId
     ? await prisma.tutorial.findUnique({ where: { id: tutorialId }, select: { slug: true, title: true, seriesId: true, series: true } })
@@ -136,7 +136,7 @@ export async function removeFromSeries(formData: FormData) {
 
 /** 在系列里上移/下移一位。 */
 export async function moveInSeries(formData: FormData) {
-  await requireAuth();
+  await requireAuth("taxonomy");
   const tutorialId = Number(formData.get("tutorialId"));
   const direction = formData.get("direction") === "up" ? -1 : 1;
   const tutorial = tutorialId

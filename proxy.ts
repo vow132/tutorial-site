@@ -26,7 +26,8 @@ function isLocalHealthCheck(request: NextRequest) {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+  // 登录页和首次安装页（还没有任何账号时用，页面自己校验安装码）不需要登录
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login" && pathname !== "/admin/setup") {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     if (!verifySession(token)) {
       const url = new URL("/admin/login", request.url);

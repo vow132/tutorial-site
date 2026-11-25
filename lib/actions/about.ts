@@ -11,7 +11,7 @@ import { sanitizeArticleHtml } from "@/lib/sanitize";
 export type AboutFormState = { error?: string; success?: string };
 
 export async function updateAbout(_prev: AboutFormState, formData: FormData): Promise<AboutFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("about");
   const title = String(formData.get("title") ?? "").trim() || DEFAULT_ABOUT_TITLE;
   if (title.length > 60) return { error: "标题不能超过 60 个字符" };
   // Server Action 可以绕过编辑器直接调用，入库前按正文白名单过滤。

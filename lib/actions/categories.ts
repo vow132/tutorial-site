@@ -162,7 +162,7 @@ export async function createCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
 
   const common = readCommonFields(formData);
   if (common.error || !common.data) return { error: common.error };
@@ -206,7 +206,7 @@ export async function updateCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { error: "分类参数不正确" };
@@ -262,7 +262,7 @@ export async function deleteCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { error: "参数错误" };

@@ -28,6 +28,7 @@ import ShareButtons from "@/components/share-buttons";
 import SupportBox from "@/components/support-box";
 import SubscribeForm from "@/components/subscribe-form";
 import { getSubscriptionEnabled } from "@/lib/mail";
+import { bylineOf } from "@/lib/roles";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -162,6 +163,7 @@ export default async function TutorialDetailPage({
   const { html, toc } = processed;
   const articleUrl = absoluteUrl(tutorialPath(tutorial.slug));
   const site = { "@type": "Organization", name: settings.siteName, url: absoluteUrl("/") };
+  const byline = bylineOf(tutorial.author);
   const jsonLd = {
     "@graph": [
       {
@@ -183,7 +185,8 @@ export default async function TutorialDetailPage({
           : {}),
         ...(tutorial.tags.length ? { keywords: tutorial.tags.map(({ tag }) => tag.name).join(",") } : {}),
         inLanguage: "zh-CN",
-        author: site,
+        // 有署名时作者是这个人，否则还是站点本身
+        author: byline ? { "@type": "Person", name: byline } : site,
         publisher: site,
       },
       breadcrumbJsonLd([
@@ -247,6 +250,11 @@ export default async function TutorialDetailPage({
               </h1>
               <div className="border-b border-line pb-6">
                 <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-ink-3">
+                  {byline && (
+                    <span>
+                      作者 <span className="font-medium text-ink-2">{byline}</span>
+                    </span>
+                  )}
                   <span>
                     发布于{" "}
                     <time dateTime={tutorial.createdAt.toISOString()}>{formatDate(tutorial.createdAt)}</time>

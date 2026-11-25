@@ -27,6 +27,8 @@ export default async function AdminLoginPage({
   if (await getCurrentAdmin()) {
     redirect(safeFrom ?? "/admin");
   }
+  // 新站还没有任何账号：先去安装页设置站长账号
+  if ((await prisma.admin.count()) === 0) redirect("/admin/setup");
 
   // 登记过通行密钥、且站点地址满足 WebAuthn 要求（HTTPS + 域名）时才显示通行密钥登录。
   const passkeyLogin = !("error" in relyingParty()) && (await prisma.adminPasskey.count()) > 0;

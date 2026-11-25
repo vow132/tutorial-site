@@ -29,7 +29,7 @@ function revalidateTagPages(tutorialSlugs: string[], ...tagSlugs: string[]) {
  * 教程改挂到那个标签上，原标签删除。
  */
 export async function renameTag(_prev: TagFormState, formData: FormData): Promise<TagFormState> {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const id = Number(formData.get("id"));
   const name = normalizeTagName(String(formData.get("name") ?? ""));
   if (!name) return { error: "请输入标签名" };
@@ -72,7 +72,7 @@ export async function renameTag(_prev: TagFormState, formData: FormData): Promis
 
 /** 删除标签：只解除和教程的关联，教程本身不受影响。 */
 export async function deleteTag(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("taxonomy");
   const id = Number(formData.get("id"));
   const tag = id ? await prisma.tag.findUnique({ where: { id } }) : null;
   if (!tag) return;

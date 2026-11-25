@@ -11,6 +11,8 @@ import { describeAgent } from "@/lib/user-agent";
 import { getAlertConfig, getAlertStatus } from "@/lib/alerts";
 import AccountForm from "./account-form";
 import AlertsForm from "./alerts-form";
+import DisplayNameForm from "./display-name-form";
+import { can, readRole, ROLES } from "@/lib/roles";
 import Passkeys from "./passkeys";
 import { relyingParty } from "@/lib/passkeys";
 import { DisableTwoFactorForm, EnableTwoFactorForm, RegenerateRecoveryCodesForm } from "./two-factor-form";
@@ -39,9 +41,11 @@ export default async function AdminAccountPage({
     orderBy: { createdAt: "desc" },
   });
 
+  // 安全告警是全站的设置，只有站长能看和改
+  const isOwner = can(admin.role, "site");
   const [alertConfig, alertStatus, passkeys, recoveryCodes] = await Promise.all([
-    getAlertConfig(),
-    getAlertStatus(),
+    isOwner ? getAlertConfig() : null,
+    isOwner ? getAlertStatus() : null,
     prisma.adminPasskey.findMany({
       where: { adminId: admin.id },
       orderBy: { createdAt: "asc" },
@@ -66,7 +70,7 @@ export default async function AdminAccountPage({
       <div>
         <h1 className="text-2xl font-bold text-ink">账号安全</h1>
         <p className="mt-1 text-sm text-ink-3">
-          修改管理员用户名或密码，保存后当前浏览器保持登录，其他设备需要重新登录。
+          你的角色是「{ROLES[readRole(admin.role)].label}」。修改用户名或密码后当前浏览器保持登录，其他设备需要重新登录。
         </p>
       </div>
 
@@ -75,6 +79,12 @@ export default async function AdminAccountPage({
           当前密码是默认密码或过于简单，很容易被撞库猜中，请立即修改为至少 10 位、不常见的密码，并建议开启两步验证。
         </p>
       )}
+
+      <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
+        <h2 className="text-lg font-bold text-ink">署名</h2>
+        <p className="mb-4 mt-1 text-sm text-ink-3">显示在你写的教程页上（作者）。留空就不显示，登录用户名不会出现在前台。</p>
+        <DisplayNameForm initial={admin.displayName ?? ""} />
+      </section>
 
       <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <AccountForm username={admin.username} />
@@ -157,6 +167,7 @@ export default async function AdminAccountPage({
         />
       </section>
 
+      {isOwner && alertConfig && alertStatus && (
       <section id="alerts" className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <div className="mb-2 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-ink">安全告警</h2>
@@ -202,6 +213,7 @@ export default async function AdminAccountPage({
           }}
         />
       </section>
+      )}
 
       <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <h2 className="text-lg font-bold text-ink">登录设备</h2>

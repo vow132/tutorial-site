@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
+import { can, type Permission } from "@/lib/roles";
 import {
   credentialFingerprint,
   DEVICE_COOKIE,
@@ -108,13 +109,18 @@ export async function getCurrentAdmin() {
   return (await getCurrentSession())?.admin ?? null;
 }
 
+export const FORBIDDEN_MESSAGE = "你的账号没有这个权限";
+
 /**
- * 写操作（每个 Server Action）用：没登录就拒绝。
+ * 写操作（每个 Server Action）用：没登录、没有权限就拒绝。
+ * permission 不传时**只允许站长**（lib/roles.ts），开放给编辑、作者的操作要显式写上权限；
+ * 改单篇教程的还要再用 canEditTutorial() 检查是不是自己的。
  * 演示模式（lib/demo.ts）下一律拒绝：后台只读，演示数据不会被改。读页面用 requireAdminPage()。
  */
-export async function requireAuth() {
+export async function requireAuth(permission: Permission = "site") {
   const admin = await getCurrentAdmin();
   if (!admin) throw new Error("未登录或会话已过期");
+  if (!can(admin.role, permission)) throw new Error(FORBIDDEN_MESSAGE);
   if (isDemoMode()) throw new Error(DEMO_READ_ONLY_MESSAGE);
   return admin;
 }
@@ -122,17 +128,20 @@ export async function requireAuth() {
 /**
  * 后台页面用：layout 在客户端导航时不一定重新执行，所以每个读取后台数据的
  * 页面都自己校验一次（同一次渲染内由 React cache 去重，不会多查库）。
+ * permission 不传时只允许站长；没有权限的账号带回仪表盘并提示。
  */
-export async function requireAdminPage() {
+export async function requireAdminPage(permission: Permission = "site") {
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/admin/login");
+  if (!can(admin.role, permission)) redirect("/admin?forbidden=1");
   return admin;
 }
 
-/** 同 requireAuth()，还要当前会话 ID 的写操作（改密码、两步验证、通行密钥、退出其他设备）用。 */
-export async function requireSession() {
+/** 同 requireAuth()，还要当前会话 ID 的写操作用（改自己的密码、两步验证、通行密钥传 "account"）。 */
+export async function requireSession(permission: Permission = "site") {
   const current = await getCurrentSession();
   if (!current) throw new Error("未登录或会话已过期");
+  if (!can(current.admin.role, permission)) throw new Error(FORBIDDEN_MESSAGE);
   if (isDemoMode()) throw new Error(DEMO_READ_ONLY_MESSAGE);
   return current;
 }

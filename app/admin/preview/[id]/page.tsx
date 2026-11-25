@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ArticleEnhancer from "@/components/article-enhancer";
 import { requireAdminPage } from "@/lib/admin-auth";
 import { processArticle, uploadedImage } from "@/lib/article";
 import { prisma } from "@/lib/prisma";
+import { canEditTutorial } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "预览" };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ const formatDate = (date: Date) =>
  * 只有登录的管理员能访问（/admin 路径由 proxy 和 requireAdminPage 双重把关），不会被收录。
  */
 export default async function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminPage();
+  const admin = await requireAdminPage("tutorials");
   const { id } = await params;
   const tutorial = await prisma.tutorial.findUnique({
     where: { id: Number(id) || 0 },
@@ -27,6 +28,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ id: st
     },
   });
   if (!tutorial) notFound();
+  if (!canEditTutorial(admin, tutorial)) redirect("/admin/tutorials?forbidden=1");
   const [{ html }, cover] = await Promise.all([
     processArticle(tutorial.content),
     tutorial.cover ? uploadedImage(tutorial.cover) : null,

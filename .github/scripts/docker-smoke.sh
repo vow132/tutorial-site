@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 启动镜像做一次冒烟测试：第一次启动建库并写入示例数据、页面用的是运行时的 SITE_URL 和真实数据、
-# 分享图和图标能生成、运维命令（备份、还原、清理、重置管理员、迁移）都能用、重启不会重复写入示例数据。
+# 分享图和图标能生成、运维命令（备份、还原、清理、重置管理员、迁移）都能用、重启不会重复写入示例数据；
+# 不设 ADMIN_PASSWORD 时走首次安装页。
 # 用法：docker-smoke.sh <镜像>
 set -euo pipefail
 image="$1"
@@ -58,4 +59,17 @@ docker restart "$name" >/dev/null
 wait_healthy
 seeds=$(docker logs "$name" 2>&1 | grep -c "第一次启动" || true)
 [ "$seeds" -eq 1 ] || { echo "重启后又写入了一次示例数据" >&2; exit 1; }
+docker rm -f "$name" >/dev/null
+
+# 不设 ADMIN_PASSWORD：不建账号，日志里给出安装地址和安装码，后台地址都带到安装页
+docker run -d --name "$name" -p 3000:3000 \
+  -e AUTH_SECRET=ci-smoke-test-only-never-use-in-production \
+  -e SITE_URL="$site" \
+  "$image" >/dev/null
+wait_healthy
+docker logs "$name" 2>&1 | grep -q "安装码" || { echo "没有 ADMIN_PASSWORD 时日志里没有安装码" >&2; exit 1; }
+location=$(curl -s -o /dev/null -w "%{redirect_url}" http://127.0.0.1:3000/admin/login)
+[[ "$location" == */admin/setup ]] || { echo "没有账号时登录页没有带到安装页（$location）" >&2; exit 1; }
+curl -sf http://127.0.0.1:3000/admin/setup | grep -q "先完成安装" || { echo "安装页打不开" >&2; exit 1; }
+docker exec -u node "$name" npm run -s setup:code | grep -q "安装码" || { echo "npm run setup:code 没有输出安装码" >&2; exit 1; }
 echo "✅ 冒烟测试通过：$image"

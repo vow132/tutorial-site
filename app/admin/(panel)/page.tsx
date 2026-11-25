@@ -13,15 +13,22 @@ import LaunchChecklist from "./launch-checklist";
 import { getLaunchChecklist } from "@/lib/launch-checklist";
 import { SearchInsights, TrafficSources } from "./reader-insights";
 import ViewTrend from "./view-trend";
+import { can, readRole, ROLES } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "仪表盘" };
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboard({ searchParams }: { searchParams: Promise<{ sampleCleared?: string }> }) {
-  const admin = await requireAdminPage();
-  const { sampleCleared } = await searchParams;
-  const checklist = await getLaunchChecklist(admin.id);
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ sampleCleared?: string; forbidden?: string; welcome?: string }>;
+}) {
+  const admin = await requireAdminPage("dashboard");
+  const { sampleCleared, forbidden, welcome } = await searchParams;
+  // 上线检查清单、备份、告警、一键更新是站长的事；编辑、作者只看内容和阅读数据
+  const isOwner = can(admin.role, "site");
+  const checklist = isOwner ? await getLaunchChecklist(admin.id) : [];
   const [
     tutorialCount,
     publishedCount,
@@ -98,16 +105,27 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
             </svg>
             写教程
           </Link>
-          <GitHubUpdate />
+          {isOwner && <GitHubUpdate />}
         </div>
       </div>
+
+      {welcome !== undefined && isOwner && (
+        <p role="status" className="mt-6 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+          安装完成，欢迎！下面的「上线检查清单」列出了上线前还要做的几件事（换 Logo 和主题色、开两步验证、配置备份等），做完会自动打勾。
+        </p>
+      )}
+      {forbidden !== undefined && (
+        <p role="alert" className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          你的账号（{ROLES[readRole(admin.role)].label}）没有打开那个页面的权限，需要的话请找站长调整。
+        </p>
+      )}
 
       {sampleCleared !== undefined && (
         <p role="status" className="mt-6 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
           已清除 {Number(sampleCleared) || 0} 篇示例教程和没用到的示例分类、标签
         </p>
       )}
-      <LaunchChecklist items={checklist} />
+      {isOwner && <LaunchChecklist items={checklist} />}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
@@ -124,7 +142,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         ))}
       </div>
 
-      {/* 运维状态：备份停掉、告警没开都是长期运行里最容易被忽略的事故 */}
+      {/* 运维状态：备份停掉、告警没开都是长期运行里最容易被忽略的事故（只给站长看） */}
+      {isOwner && (
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div
           className={`rounded-3xl border p-5 ${
@@ -155,8 +174,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           </Link>
         </div>
       </div>
+      )}
 
-      {unreadMessages > 0 && (
+      {unreadMessages > 0 && can(admin.role, "feedback") && (
         <Link
           href="/admin/feedback"
           className="mt-4 flex items-center justify-between gap-3 rounded-3xl border border-accent/40 bg-accent-soft/60 px-5 py-4 text-sm transition-colors hover:bg-accent-soft"

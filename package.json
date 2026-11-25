@@ -12,6 +12,7 @@
     "backup:restore": "node scripts/backup-restore.mjs",
     "uploads:clean": "node scripts/uploads-clean.mjs",
     "admin:reset": "tsx scripts/reset-admin.ts",
+    "setup:code": "node scripts/setup-code.mjs",
     "test:e2e": "playwright test",
     "images:variants": "tsx scripts/image-variants.ts"
   },

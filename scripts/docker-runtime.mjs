@@ -42,6 +42,7 @@ const SCRIPTS = {
   "backup:restore": "node scripts/backup-restore.mjs",
   "uploads:clean": "node scripts/uploads-clean.mjs",
   "admin:reset": "node scripts/reset-admin.mjs",
+  "setup:code": "node scripts/setup-code.mjs",
   "images:variants": "node scripts/image-variants.mjs",
   migrate: "node scripts/migrate.mjs",
 };

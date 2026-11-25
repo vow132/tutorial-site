@@ -15,6 +15,8 @@ export const getPublishedTutorial = cache(async (slug: string) =>
       views: true,
       categoryId: true,
       seriesId: true,
+      // 文章页署名：只取后台填的署名，不取登录用户名
+      author: { select: { displayName: true } },
       createdAt: true,
       updatedAt: true,
       category: true,

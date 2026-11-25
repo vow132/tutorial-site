@@ -3,6 +3,7 @@ import { getCurrentAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 import { storeUploadedImage } from "@/lib/upload-store";
+import { can } from "@/lib/roles";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   if (!admin) {
     return NextResponse.json({ error: "未登录或会话已过期" }, { status: 401 });
   }
+  // 所有角色都要上传图片（写教程、关于页、站点设置）；作者也有 tutorials 权限
+  if (!can(admin.role, "tutorials")) return NextResponse.json({ error: "你的账号没有这个权限" }, { status: 403 });
   if (isDemoMode()) return NextResponse.json({ error: DEMO_READ_ONLY_MESSAGE }, { status: 403 });
 
   // 先看声明的长度，避免把超大请求体整个读进内存。

@@ -8,52 +8,63 @@ import { logout } from "@/lib/actions/auth";
 import ThemeToggle from "@/components/theme-toggle";
 import LabelButton from "@/components/label-button";
 import { SITE_REPOSITORY_URL } from "@/lib/site-update-types";
+import { can, type Permission } from "@/lib/roles";
 
 type AdminItem = {
   href: string;
   label: string;
   icon: ReactNode;
+  /** 看得到这一项需要的权限（和页面里 requireAdminPage 的权限一致） */
+  permission: Permission;
 };
 
 const items: AdminItem[] = [
   {
     href: "/admin",
     label: "仪表盘",
+    permission: "dashboard",
     icon: <path d="M3 3h7v7H3zM11 3h7v4h-7zM11 10h7v7h-7zM3 13h7v4H3z" />,
   },
   {
     href: "/admin/tutorials",
     label: "教程管理",
+    permission: "tutorials",
     icon: <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15.5H6.5A2.5 2.5 0 0 0 4 20zM4 17.5V4.5M20 17.5V20H6.5" />,
   },
   {
     href: "/admin/categories",
     label: "分类管理",
+    permission: "taxonomy",
     icon: <path d="M3.5 3.5h6v6h-6zM11.5 3.5h6v6h-6zM3.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z" />,
   },
   {
     href: "/admin/tags",
     label: "标签管理",
+    permission: "taxonomy",
     icon: <path d="M3 3h7.5l8 8-7.5 7.5-8-8zM7 7h.01" />,
   },
   {
     href: "/admin/series",
     label: "教程系列",
+    permission: "taxonomy",
     icon: <path d="M4 4h11v3H4zM4 9.5h11v3H4zM4 15h11v3H4zM17.5 5.5v11" />,
   },
   {
     href: "/admin/feedback",
     label: "读者留言",
+    permission: "feedback",
     icon: <path d="M3.5 4.5h15v10h-9l-4 3.5v-3.5h-2zM7 8.5h8M7 11.5h5" />,
   },
   {
     href: "/admin/subscribers",
     label: "邮件订阅",
+    permission: "site",
     icon: <path d="M3 5h16v12H3zM3 5l8 6.5L19 5" />,
   },
   {
     href: "/admin/about",
     label: "关于页面",
+    permission: "about",
     icon: (
       <>
         <circle cx="11" cy="11" r="8" />
@@ -64,6 +75,7 @@ const items: AdminItem[] = [
   {
     href: "/admin/settings",
     label: "站点设置",
+    permission: "site",
     icon: (
       <>
         <circle cx="11" cy="11" r="3" />
@@ -72,8 +84,20 @@ const items: AdminItem[] = [
     ),
   },
   {
+    href: "/admin/users",
+    label: "账号管理",
+    permission: "site",
+    icon: (
+      <>
+        <circle cx="8" cy="7.5" r="3" />
+        <path d="M2.5 18c.9-3 3-4.5 5.5-4.5s4.6 1.5 5.5 4.5M14 4.6a3 3 0 0 1 0 5.8M16 13.8c1.6.6 2.8 2 3.5 4.2" />
+      </>
+    ),
+  },
+  {
     href: "/admin/account",
     label: "账号安全",
+    permission: "account",
     icon: (
       <>
         <rect x="4" y="3" width="14" height="16" rx="2" />
@@ -85,6 +109,7 @@ const items: AdminItem[] = [
   {
     href: "/admin/audit",
     label: "安全日志",
+    permission: "site",
     icon: <path d="M11 2.5 4 5v5.5c0 4.2 3 7.4 7 9 4-1.6 7-4.8 7-9V5zM8 11l2 2 4-4" />,
   },
 ];
@@ -96,16 +121,18 @@ function isActivePath(pathname: string, href: string) {
 function SidebarLinks({
   pathname,
   version,
+  role,
   onNavigate,
 }: {
   pathname: string;
   version: string;
+  role: string;
   onNavigate?: () => void;
 }) {
   return (
     <>
       <nav className="space-y-1" aria-label="后台导航">
-        {items.map((item) => (
+        {items.filter((item) => can(role, item.permission)).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -192,7 +219,7 @@ function SidebarLinks({
   );
 }
 
-export default function AdminSidebar({ version }: { version: string }) {
+export default function AdminSidebar({ version, role }: { version: string; role: string }) {
   const pathname = usePathname();
   const toggleId = useId();
   const drawerId = useId();
@@ -361,6 +388,7 @@ export default function AdminSidebar({ version }: { version: string }) {
             <div className="flex-1 overflow-y-auto p-3">
               <SidebarLinks
                 pathname={pathname}
+                role={role}
                 version={version}
                 onNavigate={() => closeMobileMenu()}
               />
@@ -374,7 +402,7 @@ export default function AdminSidebar({ version }: { version: string }) {
           <span className="text-sm font-semibold text-ink">后台管理</span>
           <ThemeToggle />
         </div>
-        <SidebarLinks pathname={pathname} version={version} />
+        <SidebarLinks pathname={pathname} version={version} role={role} />
       </aside>
     </>
   );

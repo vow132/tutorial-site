@@ -51,6 +51,13 @@ const LABELS: Record<string, string> = {
   upload: "上传图片",
   "site-update.start": "启动网站更新",
   "site-update.denied": "网站更新被拒绝",
+  "account.display_name": "修改署名",
+  "user.create": "新建账号",
+  "user.update": "修改账号角色或署名",
+  "user.reset": "重置他人密码",
+  "user.delete": "删除账号",
+  "setup.complete": "完成安装",
+  "setup.failed": "安装码错误",
 };
 
 const WARNING = new Set([
@@ -62,6 +69,9 @@ const WARNING = new Set([
   "account.reset_cli",
   "totp.disable",
   "login.recovery_code",
+  "user.reset",
+  "user.delete",
+  "setup.failed",
 ]);
 
 const dateFormat = new Intl.DateTimeFormat("zh-CN", {

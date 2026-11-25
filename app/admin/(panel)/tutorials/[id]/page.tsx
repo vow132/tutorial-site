@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { updateTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import { tagSuggestions, tutorialTagNames } from "@/lib/tag-sync";
 import TutorialForm from "../tutorial-form";
+import { canEditTutorial } from "@/lib/roles";
+import { authorOptions } from "@/lib/authors";
 
 export const metadata: Metadata = { title: "编辑教程" };
 
@@ -17,14 +19,16 @@ export default async function EditTutorialPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdminPage();
+  const admin = await requireAdminPage("tutorials");
   const { id } = await params;
   const tutorial = await prisma.tutorial.findUnique({
     where: { id: Number(id) },
   });
   if (!tutorial) notFound();
+  // 作者只能编辑自己的教程
+  if (!canEditTutorial(admin, tutorial)) redirect("/admin/tutorials?forbidden=1");
 
-  const [categoryRows, suggestions, tags, revisionCount, series] = await Promise.all([
+  const [categoryRows, suggestions, tags, revisionCount, series, authors] = await Promise.all([
     prisma.category.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],
       select: { id: true, name: true, parentId: true, order: true },
@@ -33,6 +37,7 @@ export default async function EditTutorialPage({
     tutorialTagNames(tutorial.id),
     prisma.tutorialRevision.count({ where: { tutorialId: tutorial.id } }),
     prisma.series.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, title: true } }),
+    authorOptions(admin),
   ]);
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
@@ -80,6 +85,8 @@ export default async function EditTutorialPage({
           serverUpdatedAt={tutorial.updatedAt.toISOString()}
           categories={categories}
           series={series}
+          authors={authors}
+          authorId={tutorial.authorId}
           tagSuggestions={suggestions}
           action={boundAction}
           initial={{

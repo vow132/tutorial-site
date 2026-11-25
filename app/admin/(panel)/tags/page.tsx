@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "标签管理" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminTagsPage({ searchParams }: { searchParams: Promise<{ merged?: string }> }) {
-  await requireAdminPage();
+  await requireAdminPage("taxonomy");
   const { merged } = await searchParams;
   const [tags, published] = await Promise.all([
     prisma.tag.findMany({
