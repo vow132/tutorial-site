@@ -4,6 +4,7 @@ import nodemailer from "nodemailer";
 import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
 import { getMailConfig } from "@/lib/mail-store";
 import { mailConfigComplete, type MailConfig } from "@/lib/subscription";
+import { isDemoMode } from "@/lib/demo";
 
 /**
  * 发信：读者能否看到订阅框由 getSubscriptionEnabled() 决定（不含密钥，可缓存）；
@@ -21,8 +22,8 @@ const cachedEnabled = unstable_cache(
   { tags: [CACHE_TAGS.settings], revalidate: SLOW_REVALIDATE_SECONDS },
 );
 
-/** 前台是否显示订阅框。 */
-export const getSubscriptionEnabled = cache(() => cachedEnabled());
+/** 前台是否显示订阅框（演示站不开订阅，见 lib/demo.ts）。 */
+export const getSubscriptionEnabled = cache(async () => !isDemoMode() && (await cachedEnabled()));
 
 export type OutgoingMail = { to: string; subject: string; text: string; html: string; headers?: Record<string, string> };
 

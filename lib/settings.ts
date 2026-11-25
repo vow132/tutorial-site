@@ -5,14 +5,17 @@ import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
 import { readVerification, type SearchVerification } from "@/lib/search-verification";
 import {
   defaultBrand,
+  defaultNavLinks,
   defaultStartHere,
   defaultSupport,
   readArticleMotion,
   readBrand,
+  readNavLinks,
   readStartHere,
   readSupport,
   type ArticleMotion,
   type BrandSettings,
+  type NavLinks,
   type StartHere,
   type SupportSettings,
 } from "@/lib/settings-extras";
@@ -55,6 +58,8 @@ export type SiteSettings = {
   brand: BrandSettings;
   /** 页脚右下角的状态文字，空串表示不显示 */
   footerStatus: string;
+  /** 顶部导航里分类之外的链接 */
+  navLinks: NavLinks;
 };
 
 export const SETTINGS_KEY = "site";
@@ -98,6 +103,7 @@ export const defaultSettings: SiteSettings = {
   support: defaultSupport,
   brand: defaultBrand,
   footerStatus: "持续更新中",
+  navLinks: defaultNavLinks,
 };
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
@@ -127,6 +133,7 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
       support: readSupport(parsed.support),
       brand: readBrand(parsed.brand),
       footerStatus: typeof parsed.footerStatus === "string" ? parsed.footerStatus : defaultSettings.footerStatus,
+      navLinks: readNavLinks(parsed.navLinks),
     };
   } catch {
     return defaultSettings;

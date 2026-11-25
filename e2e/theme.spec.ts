@@ -31,6 +31,25 @@ test.describe("the theme follows the system until the reader picks one", () => {
     await expect(html).toHaveAttribute("data-theme", "dark");
     await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#0d1117");
   });
+
+  test("404 pages of missing tutorials and tags follow the theme too, and the toggle works there", async ({ page }) => {
+    // 这类 404 由页面里的 notFound() 触发，Next 只输出空壳、整页在浏览器里渲染（components/theme-boot.tsx 补执行主题脚本）
+    const html = page.locator("html");
+    const response = await page.goto(`/tutorials/e2e-missing-${Date.now()}`);
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { name: "404" })).toBeVisible();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    await page.locator("[data-theme-toggle]:visible").first().click();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    expect(await page.evaluate((key) => localStorage.getItem(key), KEY)).toBe("light");
+    // 点一次只切换一次（脚本没有被执行两遍、重复绑定点击）
+    await page.locator("[data-theme-toggle]:visible").first().click();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+
+    expect((await page.goto(`/tags/e2e-missing-${Date.now()}`))?.status()).toBe(404);
+    await expect(page.getByRole("heading", { name: "404" })).toBeVisible();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+  });
 });
 
 test("a light system keeps the site light by default", async ({ page }) => {

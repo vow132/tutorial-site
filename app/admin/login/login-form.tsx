@@ -6,14 +6,15 @@ import { login, type LoginState } from "@/lib/actions/auth";
 const inputClass =
   "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
 
-export default function LoginForm({ from }: { from?: string }) {
+export default function LoginForm({ from, initial }: { from?: string; initial?: { username: string; password: string } }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(
     login,
     {}
   );
   // 受控输入：服务器要求两步验证码时，表单重置不会清空已填的账号密码。
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  // initial：演示站预先填好公开的演示账号（lib/demo.ts）
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [password, setPassword] = useState(initial?.password ?? "");
 
   return (
     <form
@@ -29,10 +30,11 @@ export default function LoginForm({ from }: { from?: string }) {
     >
       {from && <input type="hidden" name="from" value={from} />}
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-ink-2">
+        <label htmlFor="login-username" className="mb-1.5 block text-sm font-medium text-ink-2">
           用户名
         </label>
         <input
+          id="login-username"
           name="username"
           required
           autoComplete="username"
@@ -43,10 +45,11 @@ export default function LoginForm({ from }: { from?: string }) {
         />
       </div>
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-ink-2">
+        <label htmlFor="login-password" className="mb-1.5 block text-sm font-medium text-ink-2">
           密码
         </label>
         <input
+          id="login-password"
           name="password"
           type="password"
           required

@@ -10,6 +10,27 @@
 
 ## [未发布]
 
+## [1.2.0] - 2026-11-25
+
+### 新增
+
+- **顶部导航自定义链接**（站点设置 → 顶部导航链接）：在分类之外加关于、友链、交流群这类链接，最多 6 个，可以放在分类前面或后面，外部网址在新标签页打开。
+- **演示模式**（`DEMO_MODE=true`）：用来公开展示这套程序。登录页和前台顶部公开演示账号；后台什么都能看，但保存、上传、删除、改密码、一键更新都不生效，演示数据不会被改乱；读者留言、搜索词不入库，邮件订阅关闭，其他访客的 IP 打码。搭法见 README「演示站」。
+
+### 改进
+
+- **Docker 镜像小了很多**：改用 Next 的 standalone 输出，镜像里只有网站运行用到的文件，下载从约 282MB 降到约 103MB（解压后从约 1.4GB 降到约 430MB）。数据库迁移改用和 `prisma migrate deploy` 等价的内置脚本，不再带 Prisma 命令行；`docker compose exec -u node app npm run …` 的运维命令不变。
+- 在容器里还原备份、补生成小图时，提示给出 `docker compose` 命令（以前写的是 pm2）。
+- 后台登录页显示站点自己的 Logo 和站名（以前固定显示「教」），用户名、密码输入框和标签正确关联（读屏软件能读出）。
+
+### 修复
+
+- 深色模式下打开不存在的文章、标签、系列、分类（或者没写内容的关于页）时，404 页面显示成浅色，主题按钮点了也没反应。
+
+### 升级说明
+
+- Docker 部署：`docker compose pull && docker compose up -d` 即可。镜像里不再有 Prisma 命令行和 tsx：如果你在容器里直接执行过 `npx prisma …`，迁移改用 `docker compose exec -u node app npm run migrate`；`backup`、`backup:restore`、`uploads:clean`、`admin:reset`、`images:variants` 这些 `npm run` 命令不变。PM2 部署不受影响。
+
 ## [1.1.0] - 2026-11-24
 
 ### 新增
@@ -73,5 +94,6 @@
 - `public/og.png` 已删除：默认分享图改为后台上传，或按站名自动生成（`/og/site`）。如果你替换过这个文件，请到「站点设置 → 品牌 → 默认分享图」重新上传。
 - `app/favicon.ico` 移到了 `public/favicon.ico`。如果你替换过网站图标，请改为在「站点设置 → 品牌 → 网站图标」上传；直接改仓库里的文件会让一键更新提示「服务器存在未提交的本地修改」。
 
+[1.2.0]: https://github.com/vow132/tutorial-site/releases/tag/v1.2.0
 [1.1.0]: https://github.com/vow132/tutorial-site/releases/tag/v1.1.0
 [1.0.0]: https://github.com/vow132/tutorial-site/tree/64dd2039d2d3ca92f20c8778049bdcfdebab7f33

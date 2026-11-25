@@ -7,6 +7,7 @@ import { SEARCH_ENGINES } from "@/lib/search-verification";
 import { submitKeepingValues } from "@/lib/form-submit";
 import ImageField from "./image-field";
 import AccentField from "./accent-field";
+import NavLinksField from "./nav-links-field";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -157,6 +158,14 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
           <input type="checkbox" name="brand.mascot" defaultChecked={settings.brand.mascot} className="h-4 w-4 accent-[var(--color-accent)]" />
           显示小幽灵吉祥物（导航上方、搜索无结果、404 页）
         </label>
+      </Section>
+
+      {/* ---------- 顶部导航 ---------- */}
+      <Section
+        title="顶部导航链接"
+        desc="导航默认是「首页」「全部教程」和各个分类；可以再加关于、友链、交流群这类链接（最多 6 个，外部网址在新标签页打开）"
+      >
+        <NavLinksField initial={settings.navLinks} />
       </Section>
 
       {/* ---------- 首页 Hero ---------- */}

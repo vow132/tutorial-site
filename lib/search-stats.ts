@@ -3,6 +3,7 @@ import { RateLimiter } from "@/lib/rate-limit";
 import { recentDays, siteDay } from "@/lib/site-day";
 import { NON_HUMAN_AGENT } from "@/lib/view-counter";
 import { normalizeSearchQuery } from "@/lib/search-query";
+import { isDemoMode } from "@/lib/demo";
 
 /**
  * 搜索词统计：读者搜了什么、哪些词没搜到结果（= 现成的选题清单）。
@@ -50,6 +51,8 @@ async function flush() {
 
 /** 记一次搜索（只记真人：爬虫、脚本的 UA 不算）。results 是这次搜到的篇数。 */
 export function recordSearch(rawQuery: string, results: number, visitor: { ip: string | null; userAgent: string | null }) {
+  // 演示站不记：后台对所有访客开放，搜索词会原样显示给别人看
+  if (isDemoMode()) return;
   if (!visitor.userAgent || NON_HUMAN_AGENT.test(visitor.userAgent)) return;
   const query = normalizeSearchQuery(rawQuery);
   if (!query) return;

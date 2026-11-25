@@ -2,6 +2,7 @@ import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { referrerSource } from "@/lib/referrer";
 import { SITE_URL } from "@/lib/site-url";
 import { countTutorialRead, countTutorialView } from "@/lib/view-counter";
+import { isDemoMode } from "@/lib/demo";
 
 const SITE_HOST = (() => {
   try {
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
 
   const visitor = { ip: await getClientIp(), userAgent: await getUserAgent() };
   if (body.read === true) countTutorialRead(id, visitor);
-  else countTutorialView(id, visitor, referrerSource(body.ref, SITE_HOST));
+  // 演示站不记来源网站（ref 是浏览器自己报的，可以随便填，后台会显示给所有访客）
+  else countTutorialView(id, visitor, referrerSource(isDemoMode() ? undefined : body.ref, SITE_HOST));
   return new Response(null, { status: 204 });
 }

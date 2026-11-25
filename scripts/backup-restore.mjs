@@ -83,11 +83,22 @@ async function main() {
     const live = databaseFile(process.env.DATABASE_URL, root);
     console.log(`✅ 已还原到 ${output}（完整性检查通过${tutorials === null ? "" : `，共 ${tutorials} 篇教程`}）`);
     console.log("\n如需用它替换线上数据库（会丢失备份时间点之后的改动）：");
-    console.log("  1. npm run backup                         # 先给当前数据库留一份备份");
-    console.log("  2. pm2 stop 教程网                          # 停站（进程名以 pm2 list 为准）");
-    console.log(`  3. rm -f "${live}-wal" "${live}-shm"`);
-    console.log(`  4. cp "${output}" "${live}"`);
-    console.log("  5. pm2 start 教程网");
+    if (process.env.DEPLOY_MODE === "docker") {
+      // 容器里的路径对应宿主机 docker-compose.yml 所在目录下的 docker-data/（见 docker-compose.yml 的 volumes）
+      const onHost = (file) => file.replace(/^\/app\/data\//, "docker-data/db/").replace(/^\/app\/backups\//, "docker-data/backups/");
+      console.log("  （在宿主机上 docker-compose.yml 所在的目录执行）");
+      console.log("  1. docker compose exec -u node app npm run backup   # 先给当前数据库留一份备份");
+      console.log("  2. docker compose stop app                          # 停站");
+      console.log(`  3. rm -f "${onHost(live)}-wal" "${onHost(live)}-shm"`);
+      console.log(`  4. cp "${onHost(output)}" "${onHost(live)}"`);
+      console.log("  5. docker compose start app");
+    } else {
+      console.log("  1. npm run backup                         # 先给当前数据库留一份备份");
+      console.log("  2. pm2 stop 教程网                          # 停站（进程名以 pm2 list 为准）");
+      console.log(`  3. rm -f "${live}-wal" "${live}-shm"`);
+      console.log(`  4. cp "${output}" "${live}"`);
+      console.log("  5. pm2 start 教程网");
+    }
   } finally {
     await rm(partial, { force: true });
   }

@@ -3,6 +3,7 @@ import { cleanFeedbackMessage, MAX_FEEDBACK_MESSAGE } from "@/lib/feedback";
 import { prisma } from "@/lib/prisma";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { NON_HUMAN_AGENT } from "@/lib/view-counter";
+import { isDemoMode } from "@/lib/demo";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
   siteWide.hit("all");
 
   // 只收已发布教程的留言；教程不存在或是草稿时什么也不存
+  // 演示站不存留言：后台对所有访客开放，存下来就等于公开展示陌生人写的话
+  if (isDemoMode()) return new Response(null, { status: 204 });
   const tutorial = await prisma.tutorial.findFirst({ where: { id, published: true }, select: { id: true } });
   if (tutorial) await prisma.feedbackMessage.create({ data: { tutorialId: id, message } });
   return new Response(null, { status: 204 });

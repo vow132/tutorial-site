@@ -14,6 +14,7 @@ import AlertsForm from "./alerts-form";
 import Passkeys from "./passkeys";
 import { relyingParty } from "@/lib/passkeys";
 import { DisableTwoFactorForm, EnableTwoFactorForm, RegenerateRecoveryCodesForm } from "./two-factor-form";
+import { displayIp } from "@/lib/demo";
 
 export const metadata: Metadata = { title: "账号安全" };
 export const dynamic = "force-dynamic";
@@ -217,7 +218,7 @@ export default async function AdminAccountPage({
                 )}
               </span>
               <span className="text-xs text-ink-3">
-                {session.ip ? `${session.ip} · ` : ""}登录于 {dateFormat.format(session.createdAt)}
+                {session.ip ? `${displayIp(session.ip)} · ` : ""}登录于 {dateFormat.format(session.createdAt)}
               </span>
             </li>
           ))}

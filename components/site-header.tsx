@@ -22,10 +22,14 @@ export default async function SiteHeader() {
   });
 
   // 后台有多少一级分类就全部输出，桌面端由胶囊导航分页展示。
+  // 站点设置里的导航链接（关于、友链等）按设置放在分类前面或后面。
+  const links: NavItem[] = settings.navLinks.links.map((link, index) => ({ key: `link-${index}`, ...link }));
   const items: NavItem[] = [
     { key: "home", href: "/", label: "首页" },
     { key: "tutorials", href: "/tutorials", label: "全部教程" },
+    ...(settings.navLinks.position === "before" ? links : []),
     ...categories.map(toNavItem),
+    ...(settings.navLinks.position === "after" ? links : []),
   ];
 
   return (

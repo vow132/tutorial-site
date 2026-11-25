@@ -1,6 +1,7 @@
 import PointerAura from "@/components/pointer-aura";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
+import DemoBanner from "@/components/demo-banner";
 
 export default function SiteLayout({
   children,
@@ -15,6 +16,7 @@ export default function SiteLayout({
       >
         跳到正文
       </a>
+      <DemoBanner area="site" />
       <SiteHeader />
       <main id="main" className="flex-1">
         {children}

@@ -36,6 +36,9 @@ function contentSecurityPolicy(upgradeInsecureRequests: boolean) {
 
 const nextConfig: NextConfig = {
   env: { SITE_BUILD_REVISION: buildRevision() },
+  // Docker 镜像用 standalone 输出：只带网站运行用到的文件（scripts/docker-runtime.mjs 整理成镜像内容），
+  // 镜像小一大半。PM2 部署照常用 next start，不能打开（standalone 下 next start 不可用）。
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
   serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3"],
   poweredByHeader: false,
   // 项目不使用 next/image；关闭后 /_next/image 直接 404，少一个可被攻击的图片处理入口。
