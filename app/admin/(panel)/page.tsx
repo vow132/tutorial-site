@@ -50,7 +50,9 @@ export default async function AdminDashboard({
       prisma.tutorial.count({ where: { published: false } }),
       prisma.category.count(),
       prisma.tutorial.aggregate({ _sum: { views: true } }),
+      // 作者只看自己最近改过的（别人的教程他打不开）
       prisma.tutorial.findMany({
+        where: can(admin.role, "tutorials.others") ? {} : { authorId: admin.id },
         orderBy: { updatedAt: "desc" },
         take: 5,
         select: {
