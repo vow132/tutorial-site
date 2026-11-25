@@ -20,6 +20,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# 先把输出存下来再查：开着 pipefail 时 `命令 | grep -q` 会在 grep 找到后提前退出，
+# 前面的命令收到 SIGPIPE（退出码 141），整条管道就算失败了（输出越长越容易碰上）
+has() { grep -q -- "$2" <<<"$1"; }
+
 wait_healthy() {
   for _ in $(seq 1 90); do
     curl -sf http://127.0.0.1:3000/api/health >/dev/null && return 0
@@ -36,11 +40,12 @@ docker run -d --name "$name" -p 3000:3000 \
   "$image" >/dev/null
 wait_healthy
 
-curl -sf http://127.0.0.1:3000/ | grep -q "Flexbox" || { echo "首页没有示例教程" >&2; exit 1; }
-curl -sf http://127.0.0.1:3000/robots.txt | grep -q "Sitemap: $site/sitemap.xml" || { echo "robots.txt 没用运行时的 SITE_URL" >&2; exit 1; }
+home=$(curl -sf http://127.0.0.1:3000/)
+has "$home" "Flexbox" || { echo "首页没有示例教程" >&2; exit 1; }
+has "$(curl -sf http://127.0.0.1:3000/robots.txt)" "Sitemap: $site/sitemap.xml" || { echo "robots.txt 没用运行时的 SITE_URL" >&2; exit 1; }
 urls=$(curl -sf http://127.0.0.1:3000/sitemap.xml | grep -o "<loc>$site/[^<]*" | wc -l)
 [ "$urls" -gt 2 ] || { echo "sitemap 只有 $urls 条运行时地址（还是构建时用空库生成的版本？）" >&2; exit 1; }
-curl -sf http://127.0.0.1:3000/ | grep -q "<link rel=\"canonical\" href=\"$site/\"\|<link rel=\"canonical\" href=\"$site\"" || { echo "canonical 没用运行时的 SITE_URL" >&2; exit 1; }
+has "$home" "<link rel=\"canonical\" href=\"$site/\"\|<link rel=\"canonical\" href=\"$site\"" || { echo "canonical 没用运行时的 SITE_URL" >&2; exit 1; }
 
 curl -sf -o /dev/null http://127.0.0.1:3000/og/site || { echo "分享图生成失败（字体文件没打进镜像？）" >&2; exit 1; }
 curl -sf -o /dev/null "http://127.0.0.1:3000/brand/icon?s=192" || { echo "网站图标生成失败" >&2; exit 1; }
@@ -67,9 +72,9 @@ docker run -d --name "$name" -p 3000:3000 \
   -e SITE_URL="$site" \
   "$image" >/dev/null
 wait_healthy
-docker logs "$name" 2>&1 | grep -q "安装码" || { echo "没有 ADMIN_PASSWORD 时日志里没有安装码" >&2; exit 1; }
+has "$(docker logs "$name" 2>&1)" "安装码" || { echo "没有 ADMIN_PASSWORD 时日志里没有安装码" >&2; exit 1; }
 location=$(curl -s -o /dev/null -w "%{redirect_url}" http://127.0.0.1:3000/admin/login)
 [[ "$location" == */admin/setup ]] || { echo "没有账号时登录页没有带到安装页（$location）" >&2; exit 1; }
-curl -sf http://127.0.0.1:3000/admin/setup | grep -q "先完成安装" || { echo "安装页打不开" >&2; exit 1; }
-docker exec -u node "$name" npm run -s setup:code | grep -q "安装码" || { echo "npm run setup:code 没有输出安装码" >&2; exit 1; }
+has "$(curl -sf http://127.0.0.1:3000/admin/setup)" "先完成安装" || { echo "安装页打不开" >&2; exit 1; }
+has "$(docker exec -u node "$name" npm run -s setup:code)" "安装码" || { echo "npm run setup:code 没有输出安装码" >&2; exit 1; }
 echo "✅ 冒烟测试通过：$image"
