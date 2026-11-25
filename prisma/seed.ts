@@ -29,6 +29,8 @@ async function main() {
     }
   }
 
+  const owner = await prisma.admin.findFirst({ where: { role: "owner" }, orderBy: { id: "asc" }, select: { id: true } });
+
   // 分类
   const categories = [
     { name: "前端开发", slug: "frontend", icon: "🎨", color: "#6366f1", order: 1, description: "HTML、CSS、JavaScript 与现代框架" },
@@ -153,7 +155,8 @@ await pipeline(
     await prisma.tutorial.upsert({
       where: { slug: t.slug },
       update: {},
-      create: { ...t, content: t.content.trim() },
+      // 示例教程算在站长名下；还没有账号（等安装页创建）时先空着，安装时交给新站长
+      create: { ...t, content: t.content.trim(), authorId: owner?.id ?? null },
     });
   }
 

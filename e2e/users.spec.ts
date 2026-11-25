@@ -13,6 +13,11 @@ test("owners give each writer an account; authors can only reach their own tutor
   const username = `e2e-w-${id}`.slice(0, 32);
   const title = `e2e-署名-${id}`;
   const slug = `e2e-byline-${id}`;
+  const ownerTitle = `e2e-站长的-${id}`;
+
+  // 站长自己的一篇（作者应该碰不到）
+  await createTutorialViaForm(page, { title: ownerTitle, slug: `e2e-owner-${id}` });
+  const others = queryDatabase<{ id: number }>('SELECT id FROM "Tutorial" WHERE slug = ?', `e2e-owner-${id}`)!;
 
   await page.goto("/admin/users");
   await page.getByLabel("用户名", { exact: true }).fill(username);
@@ -42,10 +47,6 @@ test("owners give each writer an account; authors can only reach their own tutor
     await expect(writer.getByText(/没有打开那个页面的权限/)).toBeVisible();
 
     // 别人的教程：列表里看不到，编辑页、导出、一键更新接口都进不去
-    const others = queryDatabase<{ id: number; title: string }>(
-      'SELECT t.id, t.title FROM "Tutorial" t JOIN "Admin" a ON a.id = t.authorId WHERE a.username <> ? LIMIT 1',
-      username,
-    )!;
     await writer.goto("/admin/tutorials");
     await expect(writer.getByText("还没有教程，点击右上角开始创作")).toBeVisible();
     await writer.goto(`/admin/tutorials/${others.id}`);
@@ -88,6 +89,7 @@ test("owners give each writer an account; authors can only reach their own tutor
     const orphan = queryDatabase<{ n: number }>('SELECT COUNT(*) AS n FROM "Tutorial" WHERE slug = ? AND authorId IS NULL', slug);
     expect(orphan?.n ?? 0).toBe(0);
     await deleteTutorialRow(page, title);
+    await deleteTutorialRow(page, ownerTitle);
   }
   expect(errors).toEqual([]);
 });

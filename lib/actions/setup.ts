@@ -81,6 +81,8 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
   });
 
   const removed = keepSamples ? null : await removeSampleData();
+  // 部署时还没有账号，种子数据里的示例教程没有作者：交给新站长
+  await prisma.tutorial.updateMany({ where: { authorId: null }, data: { authorId: created.id } });
 
   await startAdminSession(created);
   await rememberDevice(created.username);
