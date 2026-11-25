@@ -19,7 +19,7 @@ export default async function AdminFeedbackPage({
 }: {
   searchParams: Promise<{ page?: string; show?: string }>;
 }) {
-  await requireAdminPage();
+  await requireAdminPage("feedback");
   const { page: rawPage, show } = await searchParams;
   const unreadOnly = show !== "all";
   const where = unreadOnly ? { read: false } : {};

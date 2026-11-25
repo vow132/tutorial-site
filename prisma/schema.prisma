@@ -52,12 +52,16 @@ model Tutorial {
   notifiedAt       DateTime?
   categoryId       Int
   category         Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  /// 作者（后台账号）；账号被删除时由删除它的站长接手（lib/actions/users.ts），外键兜底置空
+  authorId         Int?
+  author           Admin?              @relation(fields: [authorId], references: [id], onDelete: SetNull)
   tags             TutorialTag[]
   revisions        TutorialRevision[]
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
   @@index([categoryId])
+  @@index([authorId])
   @@index([published, createdAt])
   // 分类列表、上一篇/下一篇、各分类已发布篇数
   @@index([published, categoryId, createdAt])
@@ -156,7 +160,12 @@ model Admin {
   totpSecret    String?
   /// Last accepted TOTP time step, so a code cannot be replayed.
   totpLastStep  Int?
+  /// 角色：owner 站长 / editor 编辑 / author 作者（权限见 lib/roles.ts）。新账号默认权限最小的作者
+  role          String              @default("author")
+  /// 文章页显示的作者署名；为空时不显示署名（不公开登录用户名）
+  displayName   String?
   createdAt     DateTime            @default(now())
+  tutorials     Tutorial[]
   sessions      AdminSession[]
   passkeys      AdminPasskey[]
   recoveryCodes AdminRecoveryCode[]

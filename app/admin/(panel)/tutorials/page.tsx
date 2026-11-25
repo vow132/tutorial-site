@@ -10,6 +10,7 @@ import { categoryTextStyle } from "@/lib/color";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import { helpfulSummary } from "@/lib/feedback";
 import type { Prisma } from "@/generated/prisma/client";
+import { can } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "教程管理" };
 
@@ -31,14 +32,18 @@ const fieldCls =
 export default async function AdminTutorialsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; saved?: string; q?: string; status?: string; category?: string }>;
+  searchParams: Promise<{ page?: string; saved?: string; q?: string; status?: string; category?: string; forbidden?: string }>;
 }) {
-  await requireAdminPage();
-  const { page: rawPage, saved, q: rawQuery, status: rawStatus, category: rawCategory } = await searchParams;
+  const admin = await requireAdminPage("tutorials");
+  const { page: rawPage, saved, q: rawQuery, status: rawStatus, category: rawCategory, forbidden } = await searchParams;
+  // 作者只看得到、改得了自己的教程；编辑和站长看全部，并显示每篇的作者
+  const seesAll = can(admin.role, "tutorials.others");
+  const mine: Prisma.TutorialWhereInput = seesAll ? {} : { authorId: admin.id };
   const query = (rawQuery ?? "").trim().slice(0, 100);
   const status = rawStatus && rawStatus in STATUSES ? (rawStatus as Status) : null;
   const categoryId = Number(rawCategory) || null;
   const where: Prisma.TutorialWhereInput = {
+    ...mine,
     ...(query ? { OR: [{ title: { contains: query } }, { slug: { contains: query } }] } : {}),
     ...(status ? STATUSES[status].where : {}),
     ...(categoryId ? { categoryId } : {}),
@@ -54,7 +59,7 @@ export default async function AdminTutorialsPage({
   const requestedPage = Number.parseInt(rawPage ?? "1", 10);
   const [total, all, categoryRows] = await Promise.all([
     prisma.tutorial.count({ where }),
-    filtered ? prisma.tutorial.count() : null,
+    filtered ? prisma.tutorial.count({ where: mine }) : null,
     prisma.category.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],
       select: { id: true, name: true, parentId: true, order: true },
@@ -81,12 +86,19 @@ export default async function AdminTutorialsPage({
       helpfulYes: true,
       helpfulNo: true,
       category: { select: { name: true, color: true } },
+      author: { select: { username: true, displayName: true } },
     },
   });
+  const showAuthors = seesAll && (await prisma.admin.count()) > 1;
 
   return (
     <div>
       {saved && /^(new|\d+)$/.test(saved) && <ClearDraft draftKey={saved} />}
+      {forbidden && (
+        <p role="alert" className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          你的账号只能查看和修改自己写的教程。
+        </p>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink">教程管理</h1>
@@ -95,12 +107,14 @@ export default async function AdminTutorialsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-        <Link
-          href="/admin/tutorials/import"
-          className="flex h-10 items-center rounded-full border border-line px-4 text-sm text-ink-2 transition-colors hover:bg-paper hover:text-ink"
-        >
-          批量导入
-        </Link>
+        {can(admin.role, "import") && (
+          <Link
+            href="/admin/tutorials/import"
+            className="flex h-10 items-center rounded-full border border-line px-4 text-sm text-ink-2 transition-colors hover:bg-paper hover:text-ink"
+          >
+            批量导入
+          </Link>
+        )}
         <Link
           href="/admin/tutorials/new"
           className="flex h-10 items-center gap-2 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -177,7 +191,10 @@ export default async function AdminTutorialsPage({
                     >
                       {t.title}
                     </Link>
-                    <span className="block truncate text-xs text-ink-3">/{t.slug}</span>
+                    <span className="block truncate text-xs text-ink-3">
+                      /{t.slug}
+                      {showAuthors && t.author && ` · ${t.author.displayName || t.author.username}`}
+                    </span>
                   </td>
                   <td className="hidden whitespace-nowrap px-4 py-4 md:table-cell">
                     <span

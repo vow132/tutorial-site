@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import { tagSuggestions } from "@/lib/tag-sync";
+import { authorOptions } from "@/lib/authors";
 import TutorialForm from "../tutorial-form";
 
 export const metadata: Metadata = { title: "写教程" };
@@ -11,14 +12,15 @@ export const metadata: Metadata = { title: "写教程" };
 export const dynamic = "force-dynamic";
 
 export default async function NewTutorialPage() {
-  await requireAdminPage();
-  const [categoryRows, suggestions, series] = await Promise.all([
+  const admin = await requireAdminPage("tutorials");
+  const [categoryRows, suggestions, series, authors] = await Promise.all([
     prisma.category.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],
       select: { id: true, name: true, parentId: true, order: true },
     }),
     tagSuggestions(),
     prisma.series.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, title: true } }),
+    authorOptions(admin),
   ]);
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
@@ -34,7 +36,15 @@ export default async function NewTutorialPage() {
         像使用 Word 一样撰写，图片可直接拖入正文
       </p>
       <div className="mt-6">
-        <TutorialForm draftKey="new" categories={categories} series={series} tagSuggestions={suggestions} action={createTutorial} />
+        <TutorialForm
+          draftKey="new"
+          categories={categories}
+          series={series}
+          authors={authors}
+          authorId={admin.id}
+          tagSuggestions={suggestions}
+          action={createTutorial}
+        />
       </div>
     </div>
   );

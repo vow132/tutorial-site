@@ -27,6 +27,7 @@ npm test                  # 单元测试
 npm run build
 npm run test:e2e          # 端到端测试（首次运行先 npx playwright install chromium）
 E2E_DEMO=1 npx playwright test   # 演示模式的端到端测试（Windows PowerShell：$env:E2E_DEMO=1; npx playwright test）
+E2E_SETUP=1 npx playwright test  # 首次安装页的端到端测试（自动建一个没有账号的新数据库）
 ```
 
 端到端测试会新建并删除 `e2e-` 开头的数据，**只对开发 / 测试数据库运行**。CI 会在 Node 22 和 24 上跑同样的检查，并单独做依赖安全审计。
@@ -36,7 +37,7 @@ E2E_DEMO=1 npx playwright test   # 演示模式的端到端测试（Windows Powe
 完整的架构说明在 [AGENTS.md](AGENTS.md)，这里列出最容易踩的几条：
 
 - **这是 Next.js 16**：`cookies()`、`headers()`、`params`、`searchParams` 都要 `await`；动态路由的 `params` 不会自动 URL 解码，中文 slug 要 `decodeURIComponent()`。开发和构建都用 webpack，不要切到 Turbopack。
-- **鉴权**：每个后台页面都要调用 `requireAdminPage()`，每个 Server Action 都要 `requireAuth()`；`"use server"` 文件里导出的每个函数都会成为可以被直接调用的接口，辅助函数放到普通模块里。
+- **鉴权**：每个后台页面都要调用 `requireAdminPage()`，每个 Server Action 都要 `requireAuth()`；不传权限时**只有站长**能用，要开放给编辑、作者时写上权限（`lib/roles.ts`），改单篇教程的还要用 `canEditTutorial()` 检查是不是自己的。`"use server"` 文件里导出的每个函数都会成为可以被直接调用的接口，辅助函数放到普通模块里。
 - **前台链接**一律用 `components/intent-link.tsx`，不要直接用 `next/link`。
 - **数据库迁移**：给 `Tutorial` 表加字段只能用 `ALTER TABLE "Tutorial" ADD COLUMN …`，不要用 Prisma 自动生成的「新建表 → 拷数据 → 删旧表」，否则全文搜索的触发器会被一起删掉。写完用 `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma` 确认除全文搜索表外没有差异。
 - **计数器**（阅读量、反馈数）用原生 SQL 自增，不要用 `prisma.tutorial.update`，否则会刷新 `updatedAt`。

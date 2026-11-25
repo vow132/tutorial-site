@@ -3,6 +3,7 @@ import { confirmCurrentPassword, getCurrentAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
 import { getSiteUpdateStatus, startSiteUpdate } from "@/lib/site-update";
+import { can } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,9 +11,12 @@ export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "no-store, private" };
 
 export async function GET() {
-  if (!(await getCurrentAdmin())) {
+  const viewer = await getCurrentAdmin();
+  if (!viewer) {
     return NextResponse.json({ error: "登录已过期，请重新登录后台。" }, { status: 401, headers });
   }
+  // 一键更新只给站长（编辑、作者的仪表盘不显示这个入口）
+  if (!can(viewer.role, "site")) return NextResponse.json({ error: "你的账号没有这个权限" }, { status: 403, headers });
   try { return NextResponse.json(await getSiteUpdateStatus(), { headers }); }
   catch { return NextResponse.json({ error: "无法读取更新状态，请检查服务器配置。" }, { status: 500, headers }); }
 }
@@ -22,6 +26,7 @@ export async function POST(request: Request) {
   if (!admin) {
     return NextResponse.json({ error: "登录已过期，请重新登录后台。" }, { status: 401, headers });
   }
+  if (!can(admin.role, "site")) return NextResponse.json({ error: "你的账号没有这个权限" }, { status: 403, headers });
   if (isDemoMode()) return NextResponse.json({ error: DEMO_READ_ONLY_MESSAGE }, { status: 403, headers });
   // The browser sends JSON only from our own origin. Reject cross-site posts
   // even when a signed administrator cookie accompanies the request.

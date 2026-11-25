@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "教程系列" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminSeriesPage() {
-  await requireAdminPage();
+  await requireAdminPage("taxonomy");
   const [series, published] = await Promise.all([
     prisma.series.findMany({
       orderBy: { createdAt: "desc" },

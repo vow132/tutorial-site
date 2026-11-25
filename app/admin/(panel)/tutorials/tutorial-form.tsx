@@ -41,6 +41,10 @@ type Initial = {
 type Props = {
   categories: Category[];
   series: SeriesOption[];
+  /** 「作者」下拉框的选项：只有编辑和站长有（lib/authors.ts），作者自己的表单是 null，不显示这个字段 */
+  authors?: { id: number; label: string }[] | null;
+  /** 当前作者（新建时是自己） */
+  authorId?: number | null;
   /** 已有标签（按使用次数排序），输入时给出建议 */
   tagSuggestions: string[];
   action: (prev: TutorialFormState, formData: FormData) => Promise<TutorialFormState>;
@@ -173,6 +177,8 @@ export default function TutorialForm({
 function TutorialFields({
   categories,
   series,
+  authors,
+  authorId,
   tagSuggestions,
   action,
   initial,
@@ -252,6 +258,22 @@ function TutorialFields({
           </select>
           <p className="mt-1 text-xs text-ink-3">新加入的教程排在系列末尾，顺序可在「系列」页面调整。</p>
         </div>
+
+        {authors && authors.length > 1 && (
+          <div>
+            <label htmlFor="tutorial-author" className="mb-1.5 block text-sm font-medium text-ink-2">
+              作者
+            </label>
+            <select id="tutorial-author" name="authorId" defaultValue={authorId ?? ""} className={inputCls}>
+              {authors.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-ink-3">文章页显示作者的署名；作者只能修改自己的教程。</p>
+          </div>
+        )}
 
         <div className="md:col-span-2">
           <label className="mb-1.5 block text-sm font-medium text-ink-2">

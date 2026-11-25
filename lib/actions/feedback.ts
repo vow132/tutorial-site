@@ -12,7 +12,7 @@ function refresh() {
 }
 
 export async function setFeedbackRead(formData: FormData) {
-  await requireAuth();
+  await requireAuth("feedback");
   const id = Number(formData.get("id"));
   if (!id) return;
   await prisma.feedbackMessage.updateMany({ where: { id }, data: { read: formData.get("read") === "1" } });
@@ -20,7 +20,7 @@ export async function setFeedbackRead(formData: FormData) {
 }
 
 export async function deleteFeedbackMessage(formData: FormData) {
-  await requireAuth();
+  await requireAuth("feedback");
   const id = Number(formData.get("id"));
   if (!id) return;
   await prisma.feedbackMessage.deleteMany({ where: { id } });
@@ -28,7 +28,7 @@ export async function deleteFeedbackMessage(formData: FormData) {
 }
 
 export async function markAllFeedbackRead() {
-  await requireAuth();
+  await requireAuth("feedback");
   await prisma.feedbackMessage.updateMany({ where: { read: false }, data: { read: true } });
   refresh();
 }

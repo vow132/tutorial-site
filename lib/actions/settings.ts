@@ -14,6 +14,12 @@ import {
 import { normalizeSecurityContact } from "@/lib/security-txt";
 import { parseBrandInput, parseNavLinksInput, parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
 import { uploadedImage } from "@/lib/article";
+import { parseAssetHost } from "@/lib/asset-url";
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
+import { fetchRemoteImage, RemoteImageError } from "@/lib/remote-image";
+import { SITE_URL } from "@/lib/site-url";
 
 export type SettingsFormState = { error?: string; success?: string };
 
@@ -98,6 +104,9 @@ export async function updateSettings(
   const navLinks = parseNavLinksInput({ position: text("navLinks.position"), links: navLinksRaw });
   if ("error" in navLinks) return { error: navLinks.error };
 
+  const assetHost = parseAssetHost(text("assetHost"));
+  if ("error" in assetHost) return { error: assetHost.error };
+
   const startHere = parseStartHereInput({
     enabled: formData.get("startHere.enabled") === "on",
     title: text("startHere.title"),
@@ -126,6 +135,7 @@ export async function updateSettings(
     brand: brand.data,
     footerStatus: text("footerStatus").slice(0, 20),
     navLinks: navLinks.data,
+    assetHost: assetHost.value,
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };
@@ -140,4 +150,39 @@ export async function updateSettings(
   revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidatePath("/", "layout");
   return { success: "设置已保存，前台已生效" };
+}
+
+export type AssetHostTestResult = { ok: boolean; message: string };
+
+/**
+ * 测试图片加速地址：通过它取一张本站已经上传的图片，和本站的文件比对。
+ * 用防 SSRF 的下载（lib/remote-image.ts）：只连公网地址，不能借这里探测服务器内网。
+ */
+export async function testAssetHost(raw: string): Promise<AssetHostTestResult> {
+  if (isDemoMode()) return { ok: false, message: DEMO_READ_ONLY_MESSAGE };
+  await requireAuth();
+  const parsed = parseAssetHost(raw);
+  if ("error" in parsed) return { ok: false, message: parsed.error };
+  if (!parsed.value) return { ok: false, message: "先填写图片加速地址" };
+
+  const dir = path.join(process.cwd(), "public", "uploads");
+  const sample = (await readdir(dir).catch(() => [] as string[])).find((name) => /^[\w-]+\.(?:webp|png|jpe?g|gif)$/i.test(name));
+  if (!sample) return { ok: false, message: "还没有上传过图片：先在后台上传一张图片再测试" };
+  const url = `${parsed.value}/uploads/${sample}`;
+  try {
+    const [remote, local] = await Promise.all([fetchRemoteImage(url, { timeoutMs: 15_000 }), readFile(path.join(dir, sample))]);
+    if (!remote.equals(local)) {
+      return {
+        ok: true,
+        message: `能取到图片，但和本站的文件不完全一样（CDN 可能做了压缩或格式转换）。确认 ${url} 显示正常的话就可以用。`,
+      };
+    }
+    return { ok: true, message: `可以用：通过加速地址取到的 ${sample} 和本站完全一致。保存设置后前台生效。` };
+  } catch (error) {
+    const reason = error instanceof RemoteImageError ? error.message : "连接失败";
+    return {
+      ok: false,
+      message: `通过 ${url} 取图失败（${reason}）。请检查：回源地址是不是本站（${SITE_URL}）；开了防盗链的话把本站域名加进白名单。`,
+    };
+  }
 }

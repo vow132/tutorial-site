@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { SITE_URL } from "@/lib/site-url";
+import { bylineOf } from "@/lib/roles";
 
 // 10 分钟重新生成一次，与下方 Cache-Control 一致。
 export const revalidate = 600;
@@ -29,6 +30,7 @@ export async function GET() {
         excerpt: true,
         createdAt: true,
         category: { select: { name: true } },
+        author: { select: { displayName: true } },
       },
     }),
     // getSettings 带缓存，设置 JSON 损坏或读取失败时回退默认值，不会让订阅源 500。
@@ -40,9 +42,11 @@ export async function GET() {
   const items = tutorials
     .map((t) => {
       const url = `${base}/tutorials/${encodeURIComponent(t.slug)}`;
+      // 有署名时写进 dc:creator（RSS 2.0 的 <author> 要求邮箱）
+      const byline = bylineOf(t.author);
       return `    <item>
       <title>${escapeXml(t.title)}</title>
-      <link>${url}</link>
+      <link>${url}</link>${byline ? `\n      <dc:creator>${escapeXml(byline)}</dc:creator>` : ""}
       <guid isPermaLink="true">${url}</guid>
       <category>${escapeXml(t.category.name)}</category>
       <pubDate>${new Date(t.createdAt).toUTCString()}</pubDate>
@@ -52,7 +56,7 @@ export async function GET() {
     .join("\n");
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>${escapeXml(siteTitle)}</title>
     <link>${base}</link>

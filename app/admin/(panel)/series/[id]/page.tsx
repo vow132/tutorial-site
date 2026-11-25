@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "编辑系列" };
 export const dynamic = "force-dynamic";
 
 export default async function EditSeriesPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdminPage();
+  await requireAdminPage("taxonomy");
   const { id } = await params;
   const series = await prisma.series.findUnique({
     where: { id: Number(id) || 0 },

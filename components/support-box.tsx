@@ -1,13 +1,14 @@
 import type { SupportSettings } from "@/lib/settings-extras";
+import { assetUrl } from "@/lib/asset-url";
 
 /**
  * 文末的打赏与赞助（站点设置 →「赞助与打赏」）。都没设置时什么也不渲染。
  * 打赏用原生 <details> 展开收款码，不需要脚本；赞助链接带 rel="sponsored"。
  */
-export default function SupportBox({ support }: { support: SupportSettings }) {
+export default function SupportBox({ support, assetHost }: { support: SupportSettings; assetHost: string }) {
   const codes = [
-    { src: support.wechatQr, label: "微信" },
-    { src: support.alipayQr, label: "支付宝" },
+    { src: assetUrl(support.wechatQr, assetHost), label: "微信" },
+    { src: assetUrl(support.alipayQr, assetHost), label: "支付宝" },
   ].filter((code) => code.src);
   const sponsor = support.sponsorText;
   if (codes.length === 0 && !sponsor) return null;
@@ -16,7 +17,7 @@ export default function SupportBox({ support }: { support: SupportSettings }) {
     <>
       {support.sponsorImage && (
         // eslint-disable-next-line @next/next/no-img-element -- 后台上传的静态图片
-        <img src={support.sponsorImage} alt="" loading="lazy" decoding="async" className="max-h-12 w-auto rounded-md" />
+        <img src={assetUrl(support.sponsorImage, assetHost)} alt="" loading="lazy" decoding="async" className="max-h-12 w-auto rounded-md" />
       )}
       <span>{sponsor}</span>
     </>

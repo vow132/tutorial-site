@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/admin-auth";
+import { FORBIDDEN_MESSAGE, requireAuth } from "@/lib/admin-auth";
+import { can, canEditTutorial } from "@/lib/roles";
 import { audit } from "@/lib/audit";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
 import { firstUploadedImage, thumbnailFor, uploadedImage } from "@/lib/article";
@@ -21,7 +22,7 @@ export type TutorialFormState = { error?: string };
 /** 封面只接受本站上传的图片（/uploads/文件名），防止填入外链或任意路径。 */
 const COVER_URL = /^\/uploads\/[\w-]+\.(?:webp|png|jpe?g|gif)$/i;
 
-async function parseForm(formData: FormData) {
+async function parseForm(formData: FormData, admin: { id: number; role: string }) {
   const title = String(formData.get("title") ?? "").trim();
   const excerpt = String(formData.get("excerpt") ?? "").trim();
   // 不信任客户端：Server Action 可被绕过编辑器直接调用，入库前按白名单过滤。
@@ -58,12 +59,22 @@ async function parseForm(formData: FormData) {
   if (cover && (!COVER_URL.test(cover) || !(await uploadedImage(cover)))) {
     return { error: "封面图无效或文件已不存在，请重新上传" as const };
   }
+  // 作者：编辑和站长可以在表单里改（例如替别人发稿），作者提交的这个字段一律忽略
+  let authorId: number | undefined;
+  const rawAuthor = Number(formData.get("authorId"));
+  if (can(admin.role, "tutorials.others") && rawAuthor) {
+    if (!(await prisma.admin.findUnique({ where: { id: rawAuthor }, select: { id: true } }))) {
+      return { error: "所选作者的账号不存在，请重新选择" as const };
+    }
+    authorId = rawAuthor;
+  }
 
   // 列表卡片缩略图：封面优先，否则取正文第一张本站上传的图片。
   const thumbnail = await thumbnailFor(cover ?? firstUploadedImage(content));
 
   return {
     data: { title, slug, excerpt: excerpt || null, content, categoryId, seriesId, published, publishAt, cover, thumbnail },
+    authorId,
     tagNames: tags.names,
   };
 }
@@ -81,8 +92,8 @@ export async function createTutorial(
   _prev: TutorialFormState,
   formData: FormData
 ): Promise<TutorialFormState> {
-  const admin = await requireAuth();
-  const parsed = await parseForm(formData);
+  const admin = await requireAuth("tutorials");
+  const parsed = await parseForm(formData, admin);
   if ("error" in parsed) return { error: parsed.error };
 
   const exists = await prisma.tutorial.findUnique({
@@ -91,7 +102,7 @@ export async function createTutorial(
   if (exists) return { error: "Slug 已被占用，请更换" };
 
   const created = await prisma.tutorial.create({
-    data: { ...parsed.data, seriesOrder: await seriesOrderFor(parsed.data.seriesId) },
+    data: { ...parsed.data, authorId: parsed.authorId ?? admin.id, seriesOrder: await seriesOrderFor(parsed.data.seriesId) },
   });
   await setTutorialTags(created.id, parsed.tagNames);
   await audit("tutorial.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
@@ -107,8 +118,11 @@ export async function updateTutorial(
   _prev: TutorialFormState,
   formData: FormData
 ): Promise<TutorialFormState> {
-  const admin = await requireAuth();
-  const parsed = await parseForm(formData);
+  const admin = await requireAuth("tutorials");
+  const current = await prisma.tutorial.findUnique({ where: { id }, select: { authorId: true } });
+  if (!current) return { error: "这篇教程不存在或已被删除" };
+  if (!canEditTutorial(admin, current)) return { error: FORBIDDEN_MESSAGE };
+  const parsed = await parseForm(formData, admin);
   if ("error" in parsed) return { error: parsed.error };
 
   const conflict = await prisma.tutorial.findFirst({
@@ -124,7 +138,11 @@ export async function updateTutorial(
   if (before && contentChanged(before, parsed.data)) await saveRevision(id, before, admin.username);
   await prisma.tutorial.update({
     where: { id },
-    data: { ...parsed.data, seriesOrder: await seriesOrderFor(parsed.data.seriesId, before) },
+    data: {
+      ...parsed.data,
+      ...(parsed.authorId ? { authorId: parsed.authorId } : {}),
+      seriesOrder: await seriesOrderFor(parsed.data.seriesId, before),
+    },
   });
   await setTutorialTags(id, parsed.tagNames);
   await audit("tutorial.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
@@ -134,9 +152,12 @@ export async function updateTutorial(
 }
 
 export async function deleteTutorial(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("tutorials");
   const id = Number(formData.get("id"));
   if (!id) return;
+  const target = await prisma.tutorial.findUnique({ where: { id }, select: { authorId: true } });
+  if (!target) return;
+  if (!canEditTutorial(admin, target)) throw new Error(FORBIDDEN_MESSAGE);
   const deleted = await prisma.tutorial.delete({ where: { id } });
   await audit("tutorial.delete", { actor: admin.username, detail: `#${id} ${deleted.title}` });
   revalidatePublic(deleted.slug);
@@ -144,11 +165,12 @@ export async function deleteTutorial(formData: FormData) {
 }
 
 export async function togglePublish(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("tutorials");
   const id = Number(formData.get("id"));
   if (!id) return;
   const t = await prisma.tutorial.findUnique({ where: { id } });
   if (!t) return;
+  if (!canEditTutorial(admin, t)) throw new Error(FORBIDDEN_MESSAGE);
   await prisma.tutorial.update({
     where: { id },
     // 手动切换状态时取消定时发布
@@ -165,15 +187,16 @@ export async function togglePublish(formData: FormData) {
 
 /** 恢复到某个历史版本：当前内容先存成一个新的历史版本，所以恢复本身也能撤销。 */
 export async function restoreRevision(formData: FormData) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("tutorials");
   const revisionId = Number(formData.get("revisionId"));
   const revision = revisionId
     ? await prisma.tutorialRevision.findUnique({
         where: { id: revisionId },
-        include: { tutorial: { select: { id: true, slug: true, title: true, excerpt: true, content: true, cover: true, updatedAt: true } } },
+        include: { tutorial: { select: { id: true, slug: true, title: true, excerpt: true, content: true, cover: true, updatedAt: true, authorId: true } } },
       })
     : null;
   if (!revision) return;
+  if (!canEditTutorial(admin, revision.tutorial)) throw new Error(FORBIDDEN_MESSAGE);
   const { tutorial } = revision;
   await saveRevision(tutorial.id, tutorial, admin.username);
   await prisma.tutorial.update({

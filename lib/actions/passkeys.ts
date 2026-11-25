@@ -43,7 +43,7 @@ export async function beginPasskeyRegistration(
   currentPassword: string,
 ): Promise<Result & { options?: PublicKeyCredentialCreationOptionsJSON }> {
   if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   const rp = relyingParty();
   if ("error" in rp) return { error: rp.error };
 
@@ -75,7 +75,7 @@ export async function beginPasskeyRegistration(
 
 /** 登记新通行密钥第二步：校验浏览器返回的凭据并保存公钥。 */
 export async function finishPasskeyRegistration(response: RegistrationResponseJSON): Promise<Result> {
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   const rp = relyingParty();
   if ("error" in rp) return { error: rp.error };
   const challenge = await takePasskeyChallenge("register");
@@ -116,7 +116,7 @@ export async function finishPasskeyRegistration(response: RegistrationResponseJS
 
 export async function removePasskey(id: string): Promise<Result> {
   if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   const passkey = await prisma.adminPasskey.findFirst({ where: { id: String(id), adminId: admin.id } });
   if (!passkey) return { error: "通行密钥不存在" };
   await prisma.adminPasskey.delete({ where: { id: passkey.id } });

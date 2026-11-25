@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireAdminPage } from "@/lib/admin-auth";
 import { processArticle, stripHtml } from "@/lib/article";
 import { prisma } from "@/lib/prisma";
 import { MAX_REVISIONS } from "@/lib/revisions";
 import RestoreButton from "./restore-button";
+import { canEditTutorial } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "历史版本" };
 export const dynamic = "force-dynamic";
@@ -22,14 +23,15 @@ export default async function RevisionsPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ restored?: string }>;
 }) {
-  await requireAdminPage();
+  const admin = await requireAdminPage("tutorials");
   const { id } = await params;
   const { restored } = await searchParams;
   const tutorial = await prisma.tutorial.findUnique({
     where: { id: Number(id) || 0 },
-    select: { id: true, title: true, content: true, updatedAt: true },
+    select: { id: true, title: true, content: true, updatedAt: true, authorId: true },
   });
   if (!tutorial) notFound();
+  if (!canEditTutorial(admin, tutorial)) redirect("/admin/tutorials?forbidden=1");
   const revisions = await prisma.tutorialRevision.findMany({
     where: { tutorialId: tutorial.id },
     orderBy: [{ savedAt: "desc" }, { id: "desc" }],

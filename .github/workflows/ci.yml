@@ -67,6 +67,13 @@ jobs:
         env:
           E2E_DEMO: "1"
 
+      # 首次安装：用一个没有后台账号的新数据库，走一遍 /admin/setup
+      - name: 端到端测试（首次安装）
+        if: matrix.node-version == 24
+        run: npm run test:e2e
+        env:
+          E2E_SETUP: "1"
+
       - name: 上传端到端测试失败现场
         if: failure() && matrix.node-version == 24
         uses: actions/upload-artifact@v7

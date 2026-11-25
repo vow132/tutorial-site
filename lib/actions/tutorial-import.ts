@@ -43,7 +43,7 @@ async function availableSlug(base: string) {
 
 export async function importTutorial(input: ImportTutorialInput): Promise<ImportTutorialResult> {
   if (isDemoMode()) return { ok: false, error: DEMO_READ_ONLY_MESSAGE };
-  await requireAuth();
+  const admin = await requireAuth("import");
   if (!input || typeof input !== "object") return { ok: false, error: "数据无效" };
   const title = String(input.title ?? "").trim().slice(0, 200);
   if (!title) return { ok: false, error: "缺少标题" };
@@ -67,6 +67,7 @@ export async function importTutorial(input: ImportTutorialInput): Promise<Import
     updatedAt,
     // 迁移过来的是旧文章：不给订阅者发「新教程」邮件，以后从草稿改成发布也不发
     notifiedAt: new Date(),
+    authorId: admin.id,
   };
 
   const base = normalizeSlug(String(input.slug ?? "").trim(), title);
@@ -89,7 +90,7 @@ export async function importTutorial(input: ImportTutorialInput): Promise<Import
 /** 把外链图片下载到本站（防 SSRF，见 lib/remote-image.ts），返回本站地址。 */
 export async function importRemoteImage(url: string): Promise<{ url: string } | { error: string }> {
   if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
-  await requireAuth();
+  await requireAuth("import");
   if (typeof url !== "string" || url.length > 2048) return { error: "图片地址无效" };
   try {
     const stored = await storeUploadedImage(await fetchRemoteImage(url));
@@ -101,7 +102,7 @@ export async function importRemoteImage(url: string): Promise<{ url: string } | 
 
 /** 一批导入结束：刷新前台缓存、更新搜索索引，记一条安全日志。 */
 export async function finishImport(summary: { created: number; failed: number; images: number; source: string; slugs: string[] }) {
-  const admin = await requireAuth();
+  const admin = await requireAuth("import");
   const count = (value: unknown) => (Number.isInteger(value) && (value as number) >= 0 ? (value as number) : 0);
   const source = typeof summary?.source === "string" ? summary.source.slice(0, 40) : "";
   await audit("tutorial.import", {

@@ -1,6 +1,8 @@
 import IntentLink from "./intent-link";
 import GlowCard from "./glow-card";
 import { categoryTextStyle } from "@/lib/color";
+import { assetUrl } from "@/lib/asset-url";
+import { getSettings } from "@/lib/settings";
 
 type Props = {
   title: string;
@@ -14,7 +16,8 @@ type Props = {
   thumbnail?: string | null;
 };
 
-export default function TutorialCard({
+/** 服务端组件：读站点设置里的图片加速地址（getSettings 每个请求只查一次）。 */
+export default async function TutorialCard({
   title,
   slug,
   excerpt,
@@ -24,6 +27,7 @@ export default function TutorialCard({
   createdAt,
   thumbnail,
 }: Props) {
+  const { assetHost } = await getSettings();
   return (
     <IntentLink href={`/tutorials/${slug}`} className="group block h-full">
       <GlowCard className="flex h-full flex-col p-6">
@@ -56,7 +60,7 @@ export default function TutorialCard({
           {thumbnail && (
             // eslint-disable-next-line @next/next/no-img-element -- 上传目录里的 400px 宽 WebP 小图
             <img
-              src={thumbnail}
+              src={assetUrl(thumbnail, assetHost)}
               alt=""
               width={128}
               height={72}

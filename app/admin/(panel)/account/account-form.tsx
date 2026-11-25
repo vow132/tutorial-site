@@ -19,7 +19,7 @@ export default function AccountForm({ username }: { username: string }) {
     <form action={action} className="space-y-5" autoComplete="off">
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          管理员用户名
+          登录用户名
         </label>
         <input
           name="username"

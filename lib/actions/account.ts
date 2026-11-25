@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { passwordProblem } from "@/lib/password-policy";
+import { parseDisplayName, USERNAME_PATTERN } from "@/lib/roles";
 import { generateRecoveryCodes } from "@/lib/recovery-codes";
 import { LOCKED_TOTP_MESSAGE, sealTotpSecret, verifySecondFactor } from "@/lib/second-factor";
 import { readTotpSetup } from "@/lib/session";
@@ -37,7 +38,7 @@ export async function updateAdminCredentials(
   _prev: CredentialsFormState,
   formData: FormData
 ): Promise<CredentialsFormState> {
-  const { admin: current, sessionId } = await requireSession();
+  const { admin: current, sessionId } = await requireSession("account");
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const username = String(formData.get("username") ?? "").trim();
   const newPassword = String(formData.get("newPassword") ?? "");
@@ -45,7 +46,7 @@ export async function updateAdminCredentials(
 
   const confirmError = await confirmCurrentPassword(current, currentPassword);
   if (confirmError) return { error: confirmError };
-  if (!/^[A-Za-z0-9_-]{3,32}$/.test(username)) {
+  if (!USERNAME_PATTERN.test(username)) {
     return { error: "用户名需为 3-32 位字母、数字、下划线或连字符" };
   }
   if (newPassword) {
@@ -97,7 +98,7 @@ export async function enableTotp(
   _prev: TwoFactorFormState,
   formData: FormData
 ): Promise<TwoFactorFormState> {
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   if (admin.totpSecret) return { error: "两步验证已经开启" };
 
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
@@ -124,7 +125,7 @@ export async function disableTotp(
   _prev: CredentialsFormState,
   formData: FormData
 ): Promise<CredentialsFormState> {
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   if (!admin.totpSecret) return { error: "两步验证未开启" };
 
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
@@ -152,7 +153,7 @@ export async function regenerateRecoveryCodes(
   _prev: TwoFactorFormState,
   formData: FormData
 ): Promise<TwoFactorFormState> {
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   if (!admin.totpSecret) return { error: "请先开启两步验证" };
 
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
@@ -168,7 +169,7 @@ export async function regenerateRecoveryCodes(
 }
 
 export async function revokeOtherSessions() {
-  const { admin, sessionId } = await requireSession();
+  const { admin, sessionId } = await requireSession("account");
   const { count } = await prisma.adminSession.deleteMany({
     where: { adminId: admin.id, NOT: { id: sessionId } },
   });
@@ -177,9 +178,23 @@ export async function revokeOtherSessions() {
 }
 
 export async function logoutEverywhere() {
-  const { admin } = await requireSession();
+  const { admin } = await requireSession("account");
   await prisma.adminSession.deleteMany({ where: { adminId: admin.id } });
   await endCurrentSession();
   await audit("session.revoke_all", { actor: admin.username });
   redirect("/admin/login");
+}
+
+/** 改自己的署名（文章页显示的作者名）：所有角色都能改，写了署名的教程页随之刷新。 */
+export async function updateDisplayName(_prev: CredentialsFormState, formData: FormData): Promise<CredentialsFormState> {
+  const { admin } = await requireSession("account");
+  const parsed = parseDisplayName(formData.get("displayName"));
+  if ("error" in parsed) return { error: parsed.error };
+  if (parsed.value === (admin.displayName ?? null)) return { success: "署名没有变化" };
+  await prisma.admin.update({ where: { id: admin.id }, data: { displayName: parsed.value } });
+  await audit("account.display_name", { actor: admin.username, detail: parsed.value ?? "（不显示署名）" });
+  // 署名出现在文章页（ISR）：作者的教程页全部失效
+  revalidatePath("/tutorials/[slug]", "page");
+  revalidatePath("/admin/account");
+  return { success: parsed.value ? `已保存，文章页会显示「${parsed.value}」` : "已清空，文章页不再显示署名" };
 }

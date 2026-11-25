@@ -1,9 +1,9 @@
-import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { getDatabaseUrl } from "../lib/database-url";
 import { tagSlug } from "../lib/tags";
+import { isUsableAdminPassword, setupHint } from "../lib/setup-code.mjs";
 
 const adapter = new PrismaBetterSqlite3({ url: getDatabaseUrl(), timeout: 5000 });
 const prisma = new PrismaClient({ adapter });
@@ -12,22 +12,24 @@ async function main() {
   // 避免每次部署因用户名已修改而重新创建一个默认 admin。
   const existingAdmin = await prisma.admin.findFirst({ select: { id: true } });
   if (!existingAdmin) {
-    const username = process.env.ADMIN_USERNAME ?? "admin";
-    let password = process.env.ADMIN_PASSWORD;
-    if (!password) {
-      // 生产环境绝不使用公开的默认密码：随机生成并只在部署输出里显示一次。
-      password =
-        process.env.NODE_ENV === "production"
-          ? randomBytes(12).toString("base64url")
-          : "admin123456";
-      if (process.env.NODE_ENV === "production") {
-        console.log(`\n🔐 已创建管理员 ${username}，初始密码：${password}\n   请登录后台立即修改并开启两步验证。\n`);
-      }
+    const username = process.env.ADMIN_USERNAME?.trim() || "admin";
+    const configured = process.env.ADMIN_PASSWORD;
+    if (isUsableAdminPassword(configured)) {
+      await prisma.admin.create({
+        data: { username, role: "owner", password: bcrypt.hashSync(configured!, 12) },
+      });
+    } else if (process.env.NODE_ENV === "production") {
+      // 生产环境没设置管理员密码（或照抄了 .env.example 的占位值）：不建账号，由站长打开安装页设置（lib/setup-code.mjs）
+      console.log(`\n${setupHint(process.env.SITE_URL || "http://你的域名")}\n`);
+    } else {
+      // 开发环境：固定的开发密码，方便本地调试和端到端测试
+      await prisma.admin.create({
+        data: { username, role: "owner", password: bcrypt.hashSync("admin123456", 12) },
+      });
     }
-    await prisma.admin.create({
-      data: { username, password: bcrypt.hashSync(password, 12) },
-    });
   }
+
+  const owner = await prisma.admin.findFirst({ where: { role: "owner" }, orderBy: { id: "asc" }, select: { id: true } });
 
   // 分类
   const categories = [
@@ -153,7 +155,8 @@ await pipeline(
     await prisma.tutorial.upsert({
       where: { slug: t.slug },
       update: {},
-      create: { ...t, content: t.content.trim() },
+      // 示例教程算在站长名下；还没有账号（等安装页创建）时先空着，安装时交给新站长
+      create: { ...t, content: t.content.trim(), authorId: owner?.id ?? null },
     });
   }
 

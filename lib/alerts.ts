@@ -149,6 +149,16 @@ export function alertForAudit(
       return { title: "删除了通行密钥", lines: [...who, `名称：${context.detail ?? "—"}`] };
     case "mail.settings":
       return { title: "邮件订阅的发信设置被修改", lines: [...who, `内容：${context.detail ?? "—"}`, NOT_ME] };
+    case "user.create":
+      return { title: "新建了后台账号", lines: [...who, `新账号：${context.detail ?? "—"}`, NOT_ME] };
+    case "user.update":
+      return context.detail?.includes("角色") ? { title: "后台账号的角色被修改", lines: [...who, `修改内容：${context.detail}`, NOT_ME] } : null;
+    case "user.reset":
+      return { title: "有人重置了另一个后台账号的密码", lines: [...who, `被重置的账号：${context.detail ?? "—"}`, NOT_ME] };
+    case "user.delete":
+      return { title: "删除了后台账号", lines: [...who, `内容：${context.detail ?? "—"}`, NOT_ME] };
+    case "setup.complete":
+      return { title: "网站完成了首次安装", lines: [...who, "站长账号已在安装页面创建。", NOT_ME] };
     default:
       return null;
   }

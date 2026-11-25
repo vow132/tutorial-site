@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "分类管理" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
-  await requireAdminPage();
+  await requireAdminPage("taxonomy");
   const categories = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
     include: { _count: { select: { tutorials: true } } },
