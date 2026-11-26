@@ -133,7 +133,7 @@ docker compose logs -f app     # 看到 Ready 就启动好了；日志里有安�
 - 数据都在 `./docker-data/` 下（`db` 数据库、`uploads` 上传图片、`backups` 备份），更新镜像、重建容器都不会丢。
 - 端口只绑定在 `127.0.0.1:3000`，请在前面用 Nginx / Caddy 配置 HTTPS 反向代理（见「安全加固」），并在 `.env` 里设置 `TRUST_PROXY=true`。用示例 Nginx 配置时，把 `/uploads/` 的 `alias` 改成 `/path/to/tutorial-site/docker-data/uploads/`。
 - 改了 `.env`（比如换域名）后执行 `docker compose up -d`，容器会按新设置重建。
-- 想固定在某个版本：在 `.env` 里设置 `TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.3.0`（`latest` 跟随 master 最新代码，和一键更新一致）。
+- 想固定在某个版本：在 `.env` 里设置 `TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.3.1`（`latest` 跟随 master 最新代码，和一键更新一致）。
 
 更新到新版本（Docker 部署不使用后台的一键更新）：
 

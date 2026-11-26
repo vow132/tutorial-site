@@ -7,7 +7,7 @@
 # 数据都在 ./docker-data 下（数据库、上传图片、备份），更新、重建容器不会丢。
 services:
   app:
-    # 想固定版本时在 .env 里设置 TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.3.0
+    # 想固定版本时在 .env 里设置 TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.3.1
     image: ${TUTORIAL_IMAGE:-ghcr.io/vow132/tutorial-site:latest}
     restart: unless-stopped
     env_file: .env
