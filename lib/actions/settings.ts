@@ -15,6 +15,7 @@ import { normalizeSecurityContact } from "@/lib/security-txt";
 import { parseBrandInput, parseNavLinksInput, parseStartHereInput, parseSupportInput } from "@/lib/settings-extras";
 import { uploadedImage } from "@/lib/article";
 import { parseAssetHost } from "@/lib/asset-url";
+import { parseCommentsInput } from "@/lib/comments";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
@@ -107,6 +108,18 @@ export async function updateSettings(
   const assetHost = parseAssetHost(text("assetHost"));
   if ("error" in assetHost) return { error: assetHost.error };
 
+  const comments = parseCommentsInput({
+    provider: text("comments.provider") || "none",
+    server: text("comments.server"),
+    site: text("comments.site"),
+    repo: text("comments.repo"),
+    repoId: text("comments.repoId"),
+    category: text("comments.category"),
+    categoryId: text("comments.categoryId"),
+    cdn: text("comments.cdn"),
+  });
+  if ("error" in comments) return { error: comments.error };
+
   const startHere = parseStartHereInput({
     enabled: formData.get("startHere.enabled") === "on",
     title: text("startHere.title"),
@@ -136,6 +149,7 @@ export async function updateSettings(
     footerStatus: text("footerStatus").slice(0, 20),
     navLinks: navLinks.data,
     assetHost: assetHost.value,
+    comments: comments.data,
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };

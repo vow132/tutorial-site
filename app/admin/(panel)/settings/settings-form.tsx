@@ -9,6 +9,7 @@ import ImageField from "./image-field";
 import AccentField from "./accent-field";
 import NavLinksField from "./nav-links-field";
 import AssetHostField from "./asset-host-field";
+import CommentsField from "./comments-field";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -262,6 +263,14 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
           <Field label="赞助链接" name="support.sponsorUrl" defaultValue={settings.support.sponsorUrl} placeholder="https://example.com" hint="会加上 rel=sponsored" />
         </div>
         <ImageField name="support.sponsorImage" label="赞助图片" hint="可选，横幅或 logo" initial={settings.support.sponsorImage} />
+      </Section>
+
+      {/* ---------- 评论 ---------- */}
+      <Section
+        title="评论"
+        desc="在每篇教程文末显示第三方评论区（读者滚动到那里才加载）。本站不保存评论，评论存在你选的服务里；国内跟帖评论有实名和审核要求，请在评论服务里开启审核"
+      >
+        <CommentsField initial={settings.comments} />
       </Section>
 
       {/* ---------- 页脚 ---------- */}

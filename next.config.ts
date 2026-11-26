@@ -39,8 +39,9 @@ const nextConfig: NextConfig = {
     "26.*.*.*",
   ],
   async headers() {
-    // 后台（/admin/*）的 CSP 由 proxy.ts 按请求生成（带 nonce，不允许内联脚本），这里只管前台，见 lib/csp.mjs
-    const publicPages = "/((?!admin(?:/|$)).*)";
+    // 后台（/admin/*）的 CSP 由 proxy.ts 按请求生成（带 nonce，不允许内联脚本），这里只管前台，见 lib/csp.mjs。
+    // 评论区小页面（/comments/frame）自己下发只放行所选评论服务的 CSP，并且要能被文章页嵌入，也排除在外
+    const publicPages = "/((?!admin(?:/|$)|comments/frame$).*)";
     const https = [{ type: "header" as const, key: "x-forwarded-proto", value: "https" }];
     return [
       {
@@ -48,12 +49,23 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Content-Security-Policy", value: publicContentSecurityPolicy(false) }],
       },
       {
+        source: "/((?!comments/frame$).*)",
+        headers: [{ key: "X-Frame-Options", value: "DENY" }],
+      },
+      {
+        // 前台允许保留弹窗的 opener：第三方评论（Waline、Artalk 等）的登录弹窗要靠它把结果传回来
+        source: "/((?!admin(?:/|$)).*)",
+        headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }],
+      },
+      {
+        source: "/admin/:path*",
+        headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin" }],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",

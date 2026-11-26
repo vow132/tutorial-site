@@ -26,6 +26,8 @@ import SeriesBox from "@/components/series-box";
 import HelpfulFeedback from "@/components/helpful-feedback";
 import ShareButtons from "@/components/share-buttons";
 import SupportBox from "@/components/support-box";
+import Comments from "@/components/comments";
+import { isDemoMode } from "@/lib/demo";
 import SubscribeForm from "@/components/subscribe-form";
 import { getSubscriptionEnabled } from "@/lib/mail";
 import { bylineOf } from "@/lib/roles";
@@ -347,6 +349,9 @@ export default async function TutorialDetailPage({
               )}
             </nav>
           </Reveal>
+
+          {/* 第三方评论（站点设置里开启；演示站不显示） */}
+          {settings.comments.provider !== "none" && !isDemoMode() && <Comments slug={tutorial.slug} />}
 
           {/* 相关教程：给读者下一步，也让爬虫更快发现同主题文章 */}
           {related.length > 0 && (

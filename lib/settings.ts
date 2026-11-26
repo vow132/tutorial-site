@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS, SLOW_REVALIDATE_SECONDS } from "@/lib/public-data";
 import { readVerification, type SearchVerification } from "@/lib/search-verification";
 import { readAssetHost } from "@/lib/asset-url";
+import { defaultComments, readComments, type CommentsSettings } from "@/lib/comments";
 import {
   defaultBrand,
   defaultNavLinks,
@@ -63,6 +64,8 @@ export type SiteSettings = {
   navLinks: NavLinks;
   /** 图片加速地址（CDN / 对象存储），空串表示不加速（lib/asset-url.ts） */
   assetHost: string;
+  /** 第三方评论，默认关闭（lib/comments.ts） */
+  comments: CommentsSettings;
 };
 
 export const SETTINGS_KEY = "site";
@@ -108,6 +111,7 @@ export const defaultSettings: SiteSettings = {
   footerStatus: "持续更新中",
   navLinks: defaultNavLinks,
   assetHost: "",
+  comments: defaultComments,
 };
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
@@ -139,6 +143,7 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
       footerStatus: typeof parsed.footerStatus === "string" ? parsed.footerStatus : defaultSettings.footerStatus,
       navLinks: readNavLinks(parsed.navLinks),
       assetHost: readAssetHost(parsed.assetHost),
+      comments: readComments(parsed.comments),
     };
   } catch {
     return defaultSettings;
