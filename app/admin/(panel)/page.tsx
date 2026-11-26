@@ -13,7 +13,7 @@ import LaunchChecklist from "./launch-checklist";
 import { getLaunchChecklist } from "@/lib/launch-checklist";
 import { SearchInsights, TrafficSources } from "./reader-insights";
 import ViewTrend from "./view-trend";
-import { can, readRole, ROLES } from "@/lib/roles";
+import { can, canEditTutorial, readRole, ROLES } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "仪表盘" };
 
@@ -39,7 +39,7 @@ export default async function AdminDashboard({
     backup,
     alertConfig,
     trend,
-    top,
+    hot,
     sources,
     topSearches,
     missingSearches,
@@ -74,6 +74,8 @@ export default async function AdminDashboard({
       prisma.feedbackMessage.count({ where: { read: false } }),
     ]);
 
+  // 作者看得到全站的热门教程，但只有自己的能点进编辑页（别人的链接到前台文章），别人已下线的不显示
+  const top = hot.filter((t) => t.published || canEditTutorial(admin, t));
   const current = trend.slice(-30);
   const recentTotal = current.reduce((sum, day) => sum + day.views, 0);
   const previousTotal = trend.slice(0, -30).reduce((sum, day) => sum + day.views, 0);
@@ -235,7 +237,11 @@ export default async function AdminDashboard({
                   <tr key={t.id}>
                     <td className="py-3 pl-6 text-ink-3 tabular-nums">{index + 1}</td>
                     <td className="py-3 pr-4">
-                      <Link href={`/admin/tutorials/${t.id}`} className="block truncate font-medium text-ink hover:text-accent-ink">
+                      <Link
+                        href={canEditTutorial(admin, t) ? `/admin/tutorials/${t.id}` : `/tutorials/${t.slug}`}
+                        prefetch={false}
+                        className="block truncate font-medium text-ink hover:text-accent-ink"
+                      >
                         {t.title}
                       </Link>
                       {!t.published && <span className="text-xs text-amber-600 dark:text-amber-400">已下线</span>}

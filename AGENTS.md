@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # 教程网（商业级图文教程平台）
@@ -29,25 +33,26 @@ npm run setup:code       # 打印首次安装用的安装码（启动日志里�
 npm run backup           # SQLite 在线备份到 backups/（设置 BACKUP_PASSPHRASE 时加密为 .db.gz.enc）
 npm run backup:restore -- <文件>  # 把备份解为独立的 restored-*.db 并做完整性检查（不动线上库）
 npm run uploads:clean    # 列出没被引用的上传图片（-- --apply 移到 uploads-trash/）
-npm run admin:reset      # 应急：重置管理员密码、关闭两步验证（含恢复码）、删除通行密钥、退出所有设备
+npm run admin:reset      # 应急：重置管理员密码、关闭两步验证（含恢复码）、删除通行密钥、退出所有设备（没有站长时同时恢复为站长）
 docker compose up -d     # Docker 部署（拉取 ghcr.io 现成镜像；.env 从 .env.example 复制）；容器里跑运维命令用 docker compose exec -u node app …
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build   # 自己构建镜像
 ```
 
 ## 关键架构决策
-- **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout
-- **角色与权限**（`lib/roles.ts`）：`Admin.role` 是 owner 站长 / editor 编辑 / author 作者（新行默认 author，不认识的值按 author），权限表在 `GRANTS`。`requireAuth(permission)` / `requireSession(permission)` / `requireAdminPage(permission)` **不传权限时只允许站长**，所以新加的页面和 Server Action 默认只有站长能用；开放给编辑、作者的显式写权限（`tutorials`、`taxonomy`、`about`、`feedback`、`import`、`account`、`dashboard`），没权限的页面带回 `/admin?forbidden=1`。作者只能动自己的教程：`Tutorial.authorId` + `canEditTutorial()`，教程的增删改、发布、恢复历史版本、编辑页、历史版本页、预览、Markdown 导出都逐篇检查，后台教程列表对作者只查自己的。侧栏 `sidebar.tsx` 每项带权限。账号管理 `/admin/users`（`lib/actions/users.ts`，只有站长）：随机初始密码只显示一次、改角色和署名（不能改自己的角色，至少留一个站长）、帮人重置（同时清两步验证、恢复码、通行密钥、会话）、删除（教程转给执行删除的站长）。文章署名只用 `Admin.displayName`（`bylineOf()`），不公开登录用户名；文章页、JSON-LD（Person）、RSS（dc:creator）都带
+- **管理员认证**：HMAC 签名 Cookie（`lib/session.ts`）+ 服务端 `AdminSession` 表（`lib/admin-auth.ts`，删行即吊销），bcrypt(12) 存密码，可选 TOTP 两步验证（`lib/totp.ts`）；`proxy.ts` 只验签名（Next 16 中 middleware 已改名 proxy，runtime 仅 nodejs），**每个后台页面都要 `requireAdminPage()`**，不能只靠 layout；`lib/route-guards.test.ts` 扫描源码，保证每个后台页面、接口（route.ts 的 GET/POST…）和 Server Action 都调用了检查函数，不需要登录的入口要写进它的白名单并注明原因
+- **角色与权限**（`lib/roles.ts`）：`Admin.role` 是 owner 站长 / editor 编辑 / author 作者（新行默认 author，不认识的值按 author），权限表在 `GRANTS`。`requireAuth(permission)` / `requireSession(permission)` / `requireAdminPage(permission)` **不传权限时只允许站长**，所以新加的页面和 Server Action 默认只有站长能用；开放给编辑、作者的显式写权限（`tutorials`、`taxonomy`、`about`、`feedback`、`import`、`account`、`dashboard`），没权限的页面带回 `/admin?forbidden=1`。作者只能动自己的教程：`Tutorial.authorId` + `canEditTutorial()`，教程的增删改、发布、恢复历史版本、编辑页、历史版本页、预览、Markdown 导出都逐篇检查，后台教程列表对作者只查自己的。侧栏 `sidebar.tsx` 每项带权限。账号管理 `/admin/users`（`lib/actions/users.ts`，只有站长）：随机初始密码只显示一次、改角色和署名（不能改自己的角色，至少留一个站长：检查和写入在同一个事务里，见 `lib/admin-accounts.ts`，两个站长同时互相降级/删除也只成功一个，`lib/admin-accounts.test.ts` 用真实 SQLite 并发测试）、帮人重置（同时清两步验证、恢复码、通行密钥、会话）、删除（教程转给执行删除的站长）。文章署名只用 `Admin.displayName`（`bylineOf()`），不公开登录用户名；文章页、JSON-LD（Person）、RSS（dc:creator）都带
 - **首次安装**（`/admin/setup`，`lib/actions/setup.ts`）：生产环境没设 `ADMIN_PASSWORD`（或是 `.env.example` 的占位值）时种子数据不建账号，没有任何账号时登录页带到安装页、`instrumentation.ts` 在启动日志里打印安装地址和安装码。安装码由 AUTH_SECRET 推导（`lib/setup-code.mjs`，HMAC，不存储），`npm run setup:code` 可以再看；按 IP / 全站限流；在事务里「没有账号才创建」防两人同时提交。提交后设站名（标题、Logo 字符还是默认值时一起换）、可选删除示例数据（`lib/sample-data-remove.ts`，和后台一键清除共用）、直接登录。`proxy.ts` 放行 `/admin/setup`，页面自己判断已有账号时跳登录页
-- **通行密钥**：`@simplewebauthn/server` + `browser`（浏览器端只在点击时动态加载）。RP ID/Origin 取自 `SITE_URL`（`lib/passkeys.ts` 的 `relyingParty()`，要求域名 + HTTPS，localhost 例外）；挑战放在签名 Cookie 里、一次性使用；可发现凭据 + `userVerification: "required"`，所以通行密钥登录跳过 TOTP。登记要输当前密码。e2e 用 Chromium 虚拟认证器、以 `http://localhost` 访问（WebAuthn 不接受 IP）
+- **通行密钥**：`@simplewebauthn/server` + `browser`（浏览器端只在点击时动态加载）。RP ID/Origin 取自 `SITE_URL`（`lib/passkeys.ts` 的 `relyingParty()`，要求域名 + HTTPS，localhost 例外）；挑战放在签名 Cookie 里，用过的挑战另在服务端记下（`lib/rate-limit.ts` 的 `OneTimeSet`），同一个挑战并发提交也只能用一次；可发现凭据 + `userVerification: "required"`，所以通行密钥登录跳过 TOTP。登记要输当前密码。e2e 用 Chromium 虚拟认证器、以 `http://localhost` 访问（WebAuthn 不接受 IP）
 - **AUTH_SECRET**：一律通过 `lib/auth-secret.mjs` 的 `authSecretFrom()` 读取（会话签名、订阅链接、secret-box 共用）：生产环境没设置或是文档 / `.env.example` 里的占位值时返回 null，调用方拒绝工作；secret-box 仍能用占位值派生的密钥解密旧数据，换成真密钥后启动时自动重新加密。文档里新增占位值时同步加进 `PLACEHOLDER_SECRETS`
 - **敏感字段静态加密**：两步验证密钥、告警配置用 `lib/secret-box.mjs`（AES-256-GCM，`enc:v1:` 前缀，密钥取 `DATA_ENCRYPTION_KEY`，否则由 `AUTH_SECRET` 派生）加密存库，读取时兼容旧明文；`instrumentation.ts` 启动时把明文/旧密钥数据重新加密（`lib/secret-migration.ts`）。新增需要保密的字段时同样走这里，并给一个独立的 purpose
 - **两步验证**：校验统一走 `lib/second-factor.ts` 的 `verifySecondFactor()`（6 位验证码或一次性恢复码，均为条件更新/删除防并发重放）；恢复码只存 SHA-256（`AdminRecoveryCode` 表），关闭两步验证和 `admin:reset` 时一并删除
-- **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器，只记失败；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
+- **登录限流**：`lib/rate-limit.ts` 进程内 LRU 计数器（单进程部署：PM2 固定 1 个实例，Docker 一个进程），只记失败；容量满时优先淘汰过期或没到上限的记录，正在限制中的记录不会被大量随机 key 挤掉；带 `admin_device` 受信任设备 Cookie 的浏览器单独计数。访客 IP 只有 `TRUST_PROXY=true` 时才从代理头读取（`lib/client-ip.ts`）
 - **安全日志**：敏感操作调用 `audit()`（`lib/audit.ts`），后台 `/admin/audit` 查看
 - **安全告警**：`audit()` 写完日志后按动作名决定是否推送（映射在 `lib/alerts.ts` 的 `alertForAudit()`，新增敏感操作时顺带加上）；推送实现在 `lib/alert-transport.mjs`（纯 JS，`scripts/backup.mjs`、`scripts/site-update.mjs` 也直接用它）。配置存 `Setting` 表 key=`alerts`，与公开站点设置分开，密钥不回显到页面；浏览器端只能引用 `lib/alert-channels.mjs`。推送在请求内读配置、网络发送放后台，失败不影响业务。备份过期检查由 `instrumentation.ts` 启动的定时器执行（`lib/backup-watch.ts`），定时器里不能用依赖 Next 缓存的 `getSettings()`
-- **依赖覆盖**：`package.json` 的 `overrides` 把 Prisma CLI 依赖的 `effect` 固定到 3.22.4（3.22.0 及以下有 ReDoS 公告，CI 的依赖审计会失败）；Prisma 自己升级到不再依赖旧版 effect 后可以删掉
+- **依赖覆盖**：`package.json` 的 `overrides` 把 Prisma CLI 依赖的 `effect` 固定到 3.22.4（3.22.0 及以下有 ReDoS 公告，CI 的依赖审计会失败）；Prisma 自己升级到不再依赖旧版 effect 后可以删掉；`minimatch@>=7.0.0 <11.0.1` 覆盖到 11.0.8（ESLint 10.14 / typescript-eslint 8.72 依赖的 10.x 有拒绝服务公告，只影响开发依赖；11 去掉了 `makeRe`，ESLint 只用 `new Minimatch()` / `.match()` / `minimatch()`，改动时对比过 lint 的文件列表和结果完全一致），升级到依赖 minimatch ^11 的 eslint ≥10.15、typescript-eslint ≥8.73 后删掉
 - **给 Tutorial 表加字段**：迁移里只用 `ALTER TABLE "Tutorial" ADD COLUMN …`（外键列也可以 `ADD COLUMN … REFERENCES`），不要用 Prisma 自动生成的「RedefineTables」（新建表→拷数据→删旧表），那样会把 `TutorialSearch` 的三个触发器一起删掉，全文搜索从此不再更新。写完用 `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma` 确认除 FTS 表外没有差异
 - **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`；生产环境启动时设 `journal_mode=WAL` + `synchronous=NORMAL`（同步驱动的每次 fsync 都会卡住整个进程），数据库文件旁会有 `-wal`/`-shm`，**不要直接复制 `.db` 文件做备份**，用 `npm run backup`（在线备份 API）。**WAL 下 Prisma 迁移（`migrate deploy/dev`）要求没有其他进程连着数据库**（迁移引擎会设 `locking_mode=EXCLUSIVE`，否则报 database is locked）：`deploy.sh` 在站点运行时先对快照迁移+构建、最后短暂停站迁移正式库，一键更新同样停站后迁移；开发环境用默认回滚日志模式，`npm run dev` 运行时也能 `prisma migrate dev`
+- **启动任务**：`instrumentation.ts` 只在 `if (process.env.NEXT_RUNTIME === "nodejs")` 分支里动态导入 `lib/server-startup.ts`（打印安装码、重新加密敏感字段、补缩略图、搜索索引、定时发布、备份检查都写在那里）。**不要改成「不是 nodejs 就提前 return」**：开发模式不会剔除后面的代码，edge 编译会去解析 better-sqlite3，`npm run dev` 的所有页面都会 500。下文说的「instrumentation.ts 启动时」都指这里
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单
 - **封面与缩略图**：`Tutorial.cover` 是后台上传的封面（只接受 `/uploads/` 下真实存在的文件），文章页头图、OG、JSON-LD 优先用它；`Tutorial.thumbnail` 是保存时算出的列表缩略图（封面，否则正文第一张上传图，优先 400w 小图，见 `lib/article.ts` 的 `thumbnailFor()`），旧数据由 `instrumentation.ts` 启动时补（`lib/thumbnail-backfill.ts`，用原生 SQL 不动 updatedAt）。列表查询只 select `thumbnail`，不要为了缩略图去读 content
@@ -81,7 +86,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build  
 - **亮 / 暗主题**：根布局的 `themeScript` 在首屏前设置 `<html data-theme>`：读者手动选过（localStorage `tutorial-site-theme`）就用选的，否则跟随系统 `prefers-color-scheme` 并实时跟着变；手动切到和系统一致的一档时清掉记录恢复跟随系统。主题按钮（`components/theme-toggle.tsx`）没有 React 状态，图标靠 CSS 按 `data-theme` 切换。页面里调用 `notFound()` 时 Next 只输出空壳 `<html id="__next_error__">`、整页在浏览器里渲染，内联脚本不会执行，由 `components/theme-boot.tsx` 在首次绘制前补执行（脚本靠 `window.__siteTheme` 保证只执行一次）；改主题脚本时两种情况都要能用
 - **精简模式**：根布局内联脚本在省流量、内存 < 4GB、CPU < 4 核或系统要求减少透明效果时给 `<html>` 加 `data-lite`；`globals.css` 据此关掉 backdrop-filter、`blur-3xl` 光晕和循环动画，`pointer-aura` 也不启动。新增毛玻璃/循环动画时确认精简模式下能关掉
 - **图片上传**：编辑器拖拽/粘贴 → `POST /api/upload`（鉴权 + 文件头识别 PNG/JPG/GIF/WebP + 5MB；不接受 SVG）→ sharp 缩放到 1600px 宽、转 WebP、去 EXIF（GIF 原样）→ 存 `public/uploads/`，宽图另存 `-400w`/`-800w`/`-1200w.webp` 响应式小图（命名在 `lib/image-variants.ts`），`lib/article.ts` 渲染时自动加 `srcset`/`sizes`；旧图用 `npm run images:variants` 补生成。`next start` 只在启动时扫描 public，启动后新增的文件由 `app/uploads/[name]/route.ts` 兜底提供
-- **安全响应头**：CSP/HSTS/nosniff 等统一在 `next.config.ts` 的 `headers()`；HSTS 只在 `X-Forwarded-Proto: https` 时下发，`/uploads/*` 带 `sandbox` CSP
+- **安全响应头**：nosniff/HSTS 等在 `next.config.ts` 的 `headers()`；HSTS 只在 `X-Forwarded-Proto: https` 时下发，`/uploads/*` 带 `sandbox` CSP。CSP 分两套（`lib/csp.mjs`）：前台是 ISR 缓存页，没法每个请求换 nonce，script-src 保留 `'unsafe-inline'`（`next.config.ts` 里排除了 `/admin`）；后台 `/admin/*` 由 `proxy.ts` 每个请求生成 nonce，`'strict-dynamic'`，不允许内联脚本，`app/admin/layout.tsx` 用 `connection()` 保证后台全是动态渲染（静态页拿不到 nonce）。根布局的内联脚本只有 `lib/theme-script.mjs` 这一段固定内容，后台按它的 SHA-256 放行，**不要在里面拼接设置值，也不要在根布局再加别的内联脚本**。两套都保留 style-src `'unsafe-inline'`（React 的 style 属性没法加 nonce）。图片只放行 `data:` `blob:` `https:`
 - 后台结构：`app/admin/login`（登录页）+ `app/admin/(panel)/*`（带侧边栏的面板路由组）
 - **前台链接**：一律用 `components/intent-link.tsx`（悬停/触摸/聚焦时才预取），不要直接用 `next/link`，否则每个页面会对视口内所有链接发预取请求
 - **文章页是 ISR 缓存页**（`revalidate = 60` + 空 `generateStaticParams`；首页同为 60 秒：重新生成若恰好跨过后台修改会存下旧内容，周期短可让它很快自愈，所以别调大；后台指向前台的链接一律 `prefetch={false}`，免得后台页面加载就触发前台重新生成）：页面里不能用 `headers()`/`cookies()`/`after()`，否则整页退回动态渲染；阅读量由 `components/view-beacon.tsx` 上报到 `POST /api/views`。改教程时 `lib/actions/tutorials.ts` 的 `revalidatePublic()` 要把**旧 slug 和新 slug** 都传进去（中文 slug 的原文和编码形式都会失效）
@@ -93,7 +98,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build  
 - **原生 checkbox 驱动的开关**（移动端抽屉、本页目录）：hydration 前也能点开，用 `components/label-button.tsx`（label 不能带 ARIA role，按钮语义放在内层 span 上），CSS 选择器写成 `.xxx-toggle:checked + label .xxx-trigger`
 - **站点设置**：`Setting` 表（key-value，单行 key=`site`，JSON 存全部设置）；类型/默认值/读取在 `lib/settings.ts`（`getSettings()` 自动回退默认值）；后台编辑在 `/admin/settings`（底部栏目是客户端 JSON 编辑器，`autoCategories: true` 的栏目自动输出分类链接；「搜索引擎验证」的平台列表、验证码校验与 meta 输出在 `lib/search-verification.ts`，根布局输出到每个页面；「安全联系方式」生成 `app/.well-known/security.txt/route.ts`，留空返回 404）；前台 layout/页脚/首页 Hero 均从 `getSettings()` 取数
 - **后台表单**：React 19 的 `<form action={…}>` 在 action 结束后会重置表单，服务端校验失败时已填内容会丢失；成功后跳转、或成功后就该保留当前值的表单用 `lib/form-submit.ts` 的 `submitKeepingValues()`（设置页、教程编辑页已改）
-- Server Actions 在 `lib/actions/`，每个都必须 `requireAuth()`（不传权限只允许站长，见「角色与权限」）；变更后 `revalidatePath`。`"use server"` 文件里导出的每个函数都会成为可被直接调用的接口，辅助函数放到普通模块中
+- Server Actions 在 `lib/actions/`，每个都必须 `requireAuth()`（不传权限只允许站长，见「角色与权限」；`lib/route-guards.test.ts` 会检查，不要写内联的 `"use server"` 函数）；变更后 `revalidatePath`。`"use server"` 文件里导出的每个函数都会成为可被直接调用的接口，辅助函数放到普通模块中
 
 ## 默认账号
 - 后台 `/admin`：开发环境 `admin / admin123456`（站长）；生产环境未设置 `ADMIN_PASSWORD` 时不建账号，打开 `/admin/setup` 凭启动日志里的安装码设置站长账号。务必设置随机 `AUTH_SECRET`

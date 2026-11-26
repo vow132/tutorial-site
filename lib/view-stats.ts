@@ -22,6 +22,8 @@ export type TopTutorial = {
   title: string;
   slug: string;
   published: boolean;
+  /** 作者（仪表盘据此判断能不能点进编辑页） */
+  authorId: number | null;
   recentViews: number;
   /** 最近 n 天读到末尾的次数 */
   recentReads: number;
@@ -43,7 +45,7 @@ export async function getTopTutorials(days = 30, limit = 10): Promise<TopTutoria
   if (rows.length === 0) return [];
   const tutorials = await prisma.tutorial.findMany({
     where: { id: { in: rows.map((row) => row.tutorialId) } },
-    select: { id: true, title: true, slug: true, published: true, views: true, helpfulYes: true, helpfulNo: true },
+    select: { id: true, title: true, slug: true, published: true, authorId: true, views: true, helpfulYes: true, helpfulNo: true },
   });
   const byId = new Map(tutorials.map((tutorial) => [tutorial.id, tutorial]));
   return rows.flatMap((row) => {

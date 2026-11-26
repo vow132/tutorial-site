@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { cookieOptions } from "@/lib/admin-auth";
+import { sharedOneTimeSet } from "@/lib/rate-limit";
 import { readPasskeyChallenge, signPasskeyChallenge, type PasskeyPurpose } from "@/lib/session";
 import { SITE_URL } from "@/lib/site-url";
 
@@ -42,11 +43,19 @@ export async function storePasskeyChallenge(
   );
 }
 
+/**
+ * 用过的挑战。挑战放在签名 Cookie 里，用一次就清掉 Cookie；但 Cookie 本身是无状态的，
+ * 同一个 Cookie 在极短时间内并发提交两次时两次都能读到。这里在服务端记下用过的挑战（有效期内），
+ * 第二次一律拒绝，不依赖认证器的签名计数器（很多同步型通行密钥的计数器始终是 0）。
+ */
+const usedChallenges = sharedOneTimeSet("passkey-challenges", CHALLENGE_SECONDS * 1000);
+
 /** 读取并立即作废挑战：每个挑战只能用一次。 */
 export async function takePasskeyChallenge(purpose: PasskeyPurpose) {
   const store = await cookies();
   const challenge = readPasskeyChallenge(store.get(CHALLENGE_COOKIE)?.value, purpose);
   store.set(CHALLENGE_COOKIE, "", await cookieOptions(0, "/admin"));
+  if (!challenge || !usedChallenges.claim(challenge.challenge)) return null;
   return challenge;
 }
 
