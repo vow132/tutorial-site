@@ -45,6 +45,8 @@ type Props = {
   authors?: { id: number; label: string }[] | null;
   /** 当前作者（新建时是自己） */
   authorId?: number | null;
+  /** 编辑器里显示「图片库」按钮（有图片库权限时） */
+  mediaLibrary?: boolean;
   /** 已有标签（按使用次数排序），输入时给出建议 */
   tagSuggestions: string[];
   action: (prev: TutorialFormState, formData: FormData) => Promise<TutorialFormState>;
@@ -179,6 +181,7 @@ function TutorialFields({
   series,
   authors,
   authorId,
+  mediaLibrary = false,
   tagSuggestions,
   action,
   initial,
@@ -300,7 +303,7 @@ function TutorialFields({
             支持拖拽图片、粘贴截图
           </span>
         </label>
-        <RichTextEditor name="content" initialContent={initial?.content ?? ""} />
+        <RichTextEditor name="content" initialContent={initial?.content ?? ""} mediaLibrary={mediaLibrary} />
       </div>
 
       {state.error && (

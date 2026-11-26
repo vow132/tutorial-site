@@ -33,6 +33,7 @@ const PUBLIC_ROUTES: Record<string, string> = {
   "app/api/unsubscribe/route.ts": "退订：凭 HMAC 签名链接",
   "app/api/views/route.ts": "阅读统计上报",
   "app/brand/icon/route.ts": "网站图标",
+  "app/comments/frame/route.ts": "评论区小页面：只给已发布教程输出所选第三方评论服务的嵌入代码",
   "app/favicon.ico/route.ts": "网站图标",
   "app/feed.xml/route.ts": "RSS，只含已发布教程",
   "app/og/site/route.ts": "默认分享图",

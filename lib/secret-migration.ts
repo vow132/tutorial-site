@@ -3,6 +3,8 @@ import { ALERT_SETTING_KEY, parseAlertConfig, serializeAlertConfig } from "@/lib
 import { needsReseal } from "@/lib/secret-box.mjs";
 import { openTotpSecret, sealTotpSecret } from "@/lib/second-factor";
 import { getMailConfig, MAIL_SETTING_KEY, serializeMailConfig } from "@/lib/mail-store";
+import { readStoredTurnstile, TURNSTILE_SETTING_KEY } from "@/lib/turnstile";
+import { loadTurnstile, sealTurnstile } from "@/lib/turnstile-store";
 
 /**
  * 服务启动时运行一次：把还是明文的敏感字段加密，把用旧密钥加密的重新用当前主密钥加密
@@ -48,6 +50,20 @@ export async function resealSecrets() {
       const { count: updated } = await prisma.setting.updateMany({
         where: { key: MAIL_SETTING_KEY, value: mail.value },
         data: { value: serializeMailConfig(config) },
+      });
+      count += updated;
+    }
+  }
+
+  // 人机验证的 Secret Key：开关和 Site Key 是明文，只重新加密 Secret Key
+  const turnstile = await prisma.setting.findUnique({ where: { key: TURNSTILE_SETTING_KEY } });
+  const storedTurnstile = readStoredTurnstile(turnstile?.value);
+  if (turnstile && storedTurnstile.secret && needsReseal(storedTurnstile.secret)) {
+    const config = await loadTurnstile();
+    if (config.secret) {
+      const { count: updated } = await prisma.setting.updateMany({
+        where: { key: TURNSTILE_SETTING_KEY, value: turnstile.value },
+        data: { value: sealTurnstile({ enabled: storedTurnstile.enabled, siteKey: config.siteKey, secret: config.secret }) },
       });
       count += updated;
     }

@@ -149,9 +149,9 @@ export default function Toc({ items }: { items: TocItem[] }) {
     scrollToHeading(id);
   };
 
+  // 外层的侧栏（吸顶、滚动）由文章页提供：系列教程时上面还有「教程书」目录
   return (
-    <aside className="print-hide relative hidden min-w-0 self-stretch lg:block">
-      <nav className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain pb-6" aria-label="本页目录">
+      <nav aria-label="本页目录">
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-3">
           本页目录
         </p>
@@ -176,7 +176,6 @@ export default function Toc({ items }: { items: TocItem[] }) {
           ))}
         </ul>
       </nav>
-    </aside>
   );
 }
 

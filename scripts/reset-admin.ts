@@ -3,7 +3,8 @@
  *   npm run admin:reset                     # 随机生成新密码
  *   npm run admin:reset -- --password '新密码' --username admin
  * 会重置密码、关闭两步验证（连同恢复码）、删除所有通行密钥并吊销该账号的所有登录会话
- * （账号可能已被人控制时，对方可能偷偷添加了通行密钥，必须一并清掉）。
+ * （账号可能已被人控制时，对方可能偷偷添加了通行密钥，必须一并清掉）。开启了人机验证时一并关闭
+ * （比如服务器或浏览器连不上 Cloudflare 导致谁都登录不了），密钥保留，登录后在站点设置里重新开启即可。
  * 不指定 --username 时重置第一个站长；还没有任何账号（安装页面还没完成）时直接创建站长账号；
  * 网站里一个站长都没有时（比如直接改过数据库），被重置的账号同时恢复为站长，保证总能拿回管理权限。
  */
@@ -16,6 +17,7 @@ import { PrismaClient } from "../generated/prisma/client";
 import { getDatabaseUrl } from "../lib/database-url";
 import { passwordProblem } from "../lib/password-policy";
 import { USERNAME_PATTERN } from "../lib/roles";
+import { disabledStoredTurnstile, TURNSTILE_SETTING_KEY } from "../lib/turnstile";
 
 if (process.env.NODE_ENV === "production") loadEnv({ path: ".env.production", quiet: true });
 loadEnv({ path: ".env", quiet: true });
@@ -30,6 +32,15 @@ const { values } = parseArgs({
 const prisma = new PrismaClient({
   adapter: new PrismaBetterSqlite3({ url: getDatabaseUrl(), timeout: 5000 }),
 });
+
+/** 开启了人机验证时关掉它，返回是否关了。 */
+async function disableTurnstile() {
+  const row = await prisma.setting.findUnique({ where: { key: TURNSTILE_SETTING_KEY } });
+  const value = disabledStoredTurnstile(row?.value);
+  if (!row || value === null) return false;
+  await prisma.setting.update({ where: { key: TURNSTILE_SETTING_KEY }, data: { value } });
+  return true;
+}
 
 async function main() {
   // 还没有任何账号：等于在命令行完成安装（创建站长），不用打开 /admin/setup
@@ -80,10 +91,16 @@ async function main() {
     }),
   ]);
 
+  const turnstileOff = await disableTurnstile();
+  if (turnstileOff) {
+    await prisma.auditLog.create({ data: { action: "turnstile.settings", actor: admin.username, detail: "服务器命令行关闭人机验证" } });
+  }
+
   console.log(`✅ 已重置账号 ${admin.username}`);
   if (promote) console.log("   网站里没有站长，这个账号已恢复为站长。");
   if (!values.password) console.log(`   新密码：${password}`);
   console.log("   两步验证已关闭、通行密钥已全部删除，所有已登录设备已退出。");
+  if (turnstileOff) console.log("   人机验证已关闭（密钥还在），登录后可以在「站点设置 → 人机验证」重新开启。");
   console.log("   登录后请立即修改密码，并重新开启两步验证、重新添加通行密钥。");
 }
 

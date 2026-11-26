@@ -10,7 +10,7 @@ const RichTextEditor = dynamic(() => import("@/components/editor/rich-text-edito
   loading: () => <div className="min-h-[460px] animate-pulse rounded-2xl border border-line bg-paper" />,
 });
 
-export default function AboutForm({ title, content }: { title: string; content: string }) {
+export default function AboutForm({ title, content, mediaLibrary = false }: { title: string; content: string; mediaLibrary?: boolean }) {
   const [state, action, pending] = useActionState<AboutFormState, FormData>(updateAbout, {});
   return (
     // 保存后保留当前内容（React 19 的 form action 默认会重置表单）
@@ -34,7 +34,7 @@ export default function AboutForm({ title, content }: { title: string; content: 
             介绍网站、作者和联系方式；清空后前台不显示关于页面
           </span>
         </span>
-        <RichTextEditor name="content" initialContent={content} />
+        <RichTextEditor name="content" initialContent={content} mediaLibrary={mediaLibrary} />
       </div>
       {state.error && (
         <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-500 dark:text-red-400">{state.error}</p>

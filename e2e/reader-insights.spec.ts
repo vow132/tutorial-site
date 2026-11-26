@@ -65,6 +65,8 @@ test.describe("admin", () => {
         timeout: 15_000,
       });
       expect(JSON.parse(beaconBody(read))).toEqual({ id: tutorialId, read: true });
+      // 同时记进本浏览器的阅读进度（系列的「已读」「继续阅读」用它）
+      expect(JSON.parse((await visitor.evaluate(() => localStorage.getItem("tutorial-site-read"))) ?? "[]")).toContain(tutorialId);
       expect(errors).toEqual([]);
       await context.close();
 

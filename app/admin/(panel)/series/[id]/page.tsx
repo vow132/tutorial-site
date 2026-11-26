@@ -6,7 +6,7 @@ import { updateSeries } from "@/lib/actions/series";
 import { prisma } from "@/lib/prisma";
 import { seriesPath } from "@/lib/series";
 import SeriesForm from "../series-form";
-import { AddToSeriesForm, DeleteSeriesButton, SeriesItemActions } from "./series-actions";
+import { AddToSeriesForm, ChapterForm, DeleteSeriesButton, SeriesItemActions } from "./series-actions";
 
 export const metadata: Metadata = { title: "编辑系列" };
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export default async function EditSeriesPage({ params }: { params: Promise<{ id:
     include: {
       tutorials: {
         orderBy: [{ seriesOrder: "asc" }, { createdAt: "asc" }],
-        select: { id: true, title: true, published: true },
+        select: { id: true, title: true, published: true, seriesChapter: true },
       },
     },
   });
@@ -69,12 +69,20 @@ export default async function EditSeriesPage({ params }: { params: Promise<{ id:
         <h2 id="series-items" className="text-base font-semibold text-ink">
           教程顺序 <span className="text-sm font-normal text-ink-3">（{series.tutorials.length} 篇，前台只显示已发布的）</span>
         </h2>
+        <p className="mt-1 text-xs text-ink-3">
+          想分章：给每篇填上章节名，相邻、同名的几篇在系列页和文章侧栏里归为一章（第 1 章、第 2 章…）；都不填就不分章。
+        </p>
+        <datalist id="series-chapters">
+          {[...new Set(series.tutorials.map((t) => t.seriesChapter).filter((c): c is string => Boolean(c)))].map((chapter) => (
+            <option key={chapter} value={chapter} />
+          ))}
+        </datalist>
         {series.tutorials.length === 0 ? (
           <p className="mt-4 text-sm text-ink-3">还没有教程。在下面选择，或在编辑教程时选「所属系列」。</p>
         ) : (
           <ol className="mt-4 divide-y divide-line rounded-2xl border border-line">
             {series.tutorials.map((tutorial, index) => (
-              <li key={tutorial.id} className="flex items-center gap-3 px-4 py-3">
+              <li key={tutorial.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <span className="w-6 shrink-0 text-sm text-ink-3 tabular-nums">{index + 1}</span>
                 <Link href={`/admin/tutorials/${tutorial.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-ink hover:text-accent-ink">
                   {tutorial.title}
@@ -82,6 +90,7 @@ export default async function EditSeriesPage({ params }: { params: Promise<{ id:
                 {!tutorial.published && (
                   <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">草稿</span>
                 )}
+                <ChapterForm tutorialId={tutorial.id} title={tutorial.title} initial={tutorial.seriesChapter ?? ""} listId="series-chapters" />
                 <SeriesItemActions
                   tutorialId={tutorial.id}
                   title={tutorial.title}

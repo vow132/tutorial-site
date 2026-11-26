@@ -11,7 +11,7 @@
 
 export const ROLES = {
   owner: { label: "站长", description: "全部权限：站点设置、账号管理、邮件订阅、安全日志、一键更新" },
-  editor: { label: "编辑", description: "管理所有教程、分类、标签、系列、关于页和读者留言，可以批量导入" },
+  editor: { label: "编辑", description: "管理所有教程、分类、标签、系列、关于页、图片库和读者留言，可以批量导入" },
   author: { label: "作者", description: "只能写、改、发布、删除自己的教程" },
 } as const;
 
@@ -34,12 +34,14 @@ export type Permission =
   /** 读者留言 */
   | "feedback"
   | "import"
+  /** 图片库：浏览、复用、清理上传的图片 */
+  | "media"
   /** 站长才有的：站点设置、账号管理、订阅、安全日志、告警、一键更新、示例数据 */
   | "site";
 
 const GRANTS: Record<Role, ReadonlySet<Permission>> = {
-  owner: new Set<Permission>(["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import", "site"]),
-  editor: new Set<Permission>(["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import"]),
+  owner: new Set<Permission>(["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import", "media", "site"]),
+  editor: new Set<Permission>(["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import", "media"]),
   author: new Set<Permission>(["dashboard", "account", "tutorials"]),
 };
 

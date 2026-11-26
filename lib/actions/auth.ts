@@ -17,6 +17,7 @@ import { passwordProblem } from "@/lib/password-policy";
 import { sharedLimiter, type RateLimiter } from "@/lib/rate-limit";
 import { LOCKED_TOTP_MESSAGE, verifySecondFactor } from "@/lib/second-factor";
 import { isDemoMode } from "@/lib/demo";
+import { verifyHuman } from "@/lib/turnstile-store";
 
 export type LoginState = { error?: string; needsTotp?: boolean };
 
@@ -70,6 +71,10 @@ export async function login(
       needsTotp: showTotp,
     };
   }
+
+  // 开启了人机验证时先核对令牌（每次提交都要，两步验证那一步也一样）；没通过不算一次密码错误
+  const human = await verifyHuman(formData.get("turnstileToken"), "login");
+  if (!human.ok) return { error: human.error, needsTotp: showTotp };
 
   const fail = async (action: string) => {
     for (const [limiter, key] of buckets) limiter.hit(key);

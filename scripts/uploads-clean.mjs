@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * 清理没人引用的上传图片：npm run uploads:clean            # 只列出，不动文件
- *                          npm run uploads:clean -- --apply # 移到 uploads-trash/<时间>/，确认无误后再自己删
+ *                          npm run uploads:clean -- --apply # 移到上传目录里的 .trash/<时间>/，确认无误后再自己删
  *
- * 「引用」包括：教程正文、封面、列表缩略图、历史版本、站点设置和关于页面里出现的 /uploads/ 文件名。
- * 响应式小图（-400w/-800w/-1200w.webp）跟着原图走。最近 7 天内上传的文件一律保留
- * （可能在还没保存的草稿里），可用 --min-age-days 调整。
+ * 「引用」包括：教程正文、封面、列表缩略图、历史版本、站点设置和关于页面里出现的 /uploads/ 文件名
+ * （判断规则在 lib/upload-refs.mjs，和后台「图片库」共用）。响应式小图（-400w/-800w/-1200w.webp）跟着原图走。
+ * 最近 7 天内上传的文件一律保留（可能在还没保存的草稿里），可用 --min-age-days 调整。
  */
 import { mkdir, readdir, rename, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -13,6 +13,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { databaseFile } from "./site-update.mjs";
+import { RECENT_UPLOAD_DAYS, referencedStems, trashDir, uploadStem } from "../lib/upload-refs.mjs";
+
+export { referencedStems, uploadStem };
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "package.json"));
@@ -22,23 +25,6 @@ try {
   if (process.env.NODE_ENV === "production") config({ path: path.join(root, ".env.production"), quiet: true });
   config({ path: path.join(root, ".env"), quiet: true });
 } catch { /* dotenv 不可用时只使用 shell 环境变量 */ }
-
-const VARIANT = /-\d+w\.webp$/i;
-
-/** 文件名 → 「原图」标识：去掉响应式小图后缀和扩展名。 */
-export function uploadStem(name) {
-  return name.replace(VARIANT, "").replace(/\.[a-z0-9]+$/i, "");
-}
-
-/** 从任意文本里找出引用的上传文件，返回它们的 stem 集合。 */
-export function referencedStems(texts) {
-  const stems = new Set();
-  for (const text of texts) {
-    if (!text) continue;
-    for (const match of String(text).matchAll(/\/uploads\/([\w.-]+)/g)) stems.add(uploadStem(match[1]));
-  }
-  return stems;
-}
 
 function readReferences(dbFile) {
   const Database = require("better-sqlite3");
@@ -59,7 +45,7 @@ function readReferences(dbFile) {
   }
 }
 
-export async function findUnusedUploads({ uploadsDir, dbFile, minAgeDays = 7, now = Date.now() }) {
+export async function findUnusedUploads({ uploadsDir, dbFile, minAgeDays = RECENT_UPLOAD_DAYS, now = Date.now() }) {
   const referenced = readReferences(dbFile);
   const names = (await readdir(uploadsDir).catch(() => [])).filter((name) => !name.startsWith("."));
   const unused = [];
@@ -76,7 +62,7 @@ async function main() {
   const { values } = parseArgs({
     options: {
       apply: { type: "boolean", default: false },
-      "min-age-days": { type: "string", default: "7" },
+      "min-age-days": { type: "string", default: String(RECENT_UPLOAD_DAYS) },
       uploads: { type: "string" },
     },
   });
@@ -97,8 +83,8 @@ async function main() {
     console.log("这次只是列出。确认后运行 npm run uploads:clean -- --apply 移到回收目录。");
     return;
   }
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
-  const trash = path.join(path.dirname(path.dirname(uploadsDir)), "uploads-trash", stamp);
+  // 回收目录在上传目录里：Docker 下上传目录是挂载卷，移到卷外面会跨文件系统失败（EXDEV），容器重建也会丢
+  const trash = trashDir(uploadsDir);
   await mkdir(trash, { recursive: true, mode: 0o700 });
   for (const item of unused) await rename(path.join(uploadsDir, item.name), path.join(trash, item.name));
   console.log(`✅ 已移到 ${trash}`);

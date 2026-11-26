@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { headers } from "next/headers";
+import { clientIpFrom, trustsProxy } from "@/lib/client-ip";
 import { getAlertConfig } from "@/lib/alerts";
 import { describeBackup, getBackupStatus } from "@/lib/backup-status";
 import { prisma } from "@/lib/prisma";
@@ -36,7 +37,13 @@ export async function getLaunchChecklist(adminId: number): Promise<ChecklistItem
   ]);
   const host = new URL(SITE_URL).hostname;
   const siteUrlOk = SITE_URL.startsWith("https://") && !/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(host);
-  const behindProxy = Boolean(requestHeaders.get("x-forwarded-for") || requestHeaders.get("x-real-ip"));
+  const behindCloudflare = Boolean(requestHeaders.get("cf-connecting-ip"));
+  // 接在 Cloudflare 后面、TRUST_PROXY=true，但 Nginx 没配 real_ip：代理头里是 Cloudflare 节点的 IP，不是访客的
+  const cloudflareIpLost =
+    behindCloudflare &&
+    process.env.TRUST_PROXY === "true" &&
+    clientIpFrom((name) => requestHeaders.get(name), "true") !== clientIpFrom((name) => requestHeaders.get(name), "cloudflare");
+  const behindProxy = behindCloudflare || Boolean(requestHeaders.get("x-forwarded-for") || requestHeaders.get("x-real-ip"));
   const docker = process.env.DEPLOY_MODE === "docker";
   const branded = settings.brand.logoImage !== "" || settings.logoText !== defaultSettings.logoText || settings.brand.accentColor !== "";
 
@@ -87,12 +94,16 @@ export async function getLaunchChecklist(adminId: number): Promise<ChecklistItem
     },
     {
       key: "trust-proxy",
-      label: "在反向代理后面时设置 TRUST_PROXY=true",
-      done: !behindProxy || process.env.TRUST_PROXY === "true",
+      label: "在反向代理后面时设置 TRUST_PROXY",
+      done: !behindProxy || (trustsProxy() && !cloudflareIpLost),
       hint: behindProxy
-        ? process.env.TRUST_PROXY === "true"
-          ? "已设置"
-          : "检测到请求经过 Nginx 等反向代理：设置 TRUST_PROXY=true，登录限流、阅读去重才拿得到真实 IP"
+        ? cloudflareIpLost
+          ? "网站接在 Cloudflare 后面，但拿到的是 Cloudflare 节点的 IP：在 Nginx 里配置 real_ip（见 README「接入 Cloudflare」），或改成 TRUST_PROXY=cloudflare"
+          : trustsProxy()
+          ? `已设置（TRUST_PROXY=${process.env.TRUST_PROXY}）`
+          : behindCloudflare
+            ? "检测到网站接在 Cloudflare 后面：按 README「接入 Cloudflare」配置 Nginx 的 real_ip 并设置 TRUST_PROXY=true（或 TRUST_PROXY=cloudflare），否则所有访客都会被当成 Cloudflare 的几个 IP，登录限流会互相影响"
+            : "检测到请求经过 Nginx 等反向代理：设置 TRUST_PROXY=true，登录限流、阅读去重才拿得到真实 IP"
         : "没有检测到反向代理",
     },
     {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { COPY_ATTRIBUTION_MIN_LENGTH, copyAttribution } from "@/lib/anti-scrape";
 
 /** 复制到剪贴板：HTTPS / localhost 用 Clipboard API，http 部署退回 execCommand。 */
 async function copyText(text: string) {
@@ -30,11 +31,19 @@ async function copyText(text: string) {
 
 type Zoom = { src: string; alt: string } | null;
 
+/** 选区的这一端在代码块里 */
+function inCode(node: Node | null) {
+  const element = node instanceof Element ? node : node?.parentElement;
+  return Boolean(element?.closest("pre, code, .code-block"));
+}
+
 /**
  * 文章正文是服务端渲染的静态 HTML（ISR 缓存页），交互统一在这里用事件委托接管：
  * 代码块「复制」、标题旁的 # 复制章节链接、点击图片放大，以及旧版 #h-0 式链接的兼容跳转。
+ * 后台开了「复制正文时附上来源」（lib/anti-scrape.ts）时，复制一大段正文会在后面附上标题和原文链接；
+ * 选区从代码块开始或结束、字数太少时不加（「复制」按钮走 Clipboard API，不触发 copy 事件）。
  */
-export default function ArticleEnhancer() {
+export default function ArticleEnhancer({ attribution = null }: { attribution?: { title: string; url: string } | null }) {
   const [zoom, setZoom] = useState<Zoom>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef(0);
@@ -92,12 +101,29 @@ export default function ArticleEnhancer() {
       }
     };
 
+    const onCopy = (event: ClipboardEvent) => {
+      if (!attribution || !event.clipboardData) return;
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+      const text = selection.toString();
+      if (text.trim().length < COPY_ATTRIBUTION_MIN_LENGTH) return;
+      if (inCode(selection.anchorNode) || inCode(selection.focusNode)) return;
+      const copied = document.createElement("div");
+      for (let i = 0; i < selection.rangeCount; i++) copied.append(selection.getRangeAt(i).cloneContents());
+      const source = copyAttribution(attribution.title, attribution.url);
+      event.clipboardData.setData("text/plain", text + source.text);
+      event.clipboardData.setData("text/html", copied.innerHTML + source.html);
+      event.preventDefault();
+    };
+
     article.addEventListener("click", onClick);
+    article.addEventListener("copy", onCopy);
     return () => {
       article.removeEventListener("click", onClick);
+      article.removeEventListener("copy", onCopy);
       window.removeEventListener("hashchange", mapLegacyHash);
     };
-  }, [showToast]);
+  }, [showToast, attribution]);
 
   useEffect(() => {
     if (!zoom) return;

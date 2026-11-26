@@ -142,6 +142,8 @@ export async function updateTutorial(
       ...parsed.data,
       ...(parsed.authorId ? { authorId: parsed.authorId } : {}),
       seriesOrder: await seriesOrderFor(parsed.data.seriesId, before),
+      // 换到别的系列（或移出系列）时，原来的章节名不再适用
+      ...(before && before.seriesId !== parsed.data.seriesId ? { seriesChapter: null } : {}),
     },
   });
   await setTutorialTags(id, parsed.tagNames);

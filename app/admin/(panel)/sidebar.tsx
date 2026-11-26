@@ -50,6 +50,12 @@ const items: AdminItem[] = [
     icon: <path d="M4 4h11v3H4zM4 9.5h11v3H4zM4 15h11v3H4zM17.5 5.5v11" />,
   },
   {
+    href: "/admin/media",
+    label: "图片库",
+    permission: "media",
+    icon: <path d="M3 4h16v14H3zM3 14l4.5-4.5 4 4 2.5-2.5L19 16M14.5 8.5h.01" />,
+  },
+  {
     href: "/admin/feedback",
     label: "读者留言",
     permission: "feedback",

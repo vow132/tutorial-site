@@ -327,7 +327,7 @@ export type PublishedSeries = {
   slug: string;
   description: string | null;
   updatedAt: Date;
-  tutorials: (RelatedRow & { updatedAt: Date })[];
+  tutorials: (RelatedRow & { updatedAt: Date; seriesChapter: string | null })[];
 };
 
 /**
@@ -348,7 +348,7 @@ const cachedPublishedSeries = unstable_cache(
         tutorials: {
           where: { published: true },
           orderBy: [{ seriesOrder: "asc" }, { createdAt: "asc" }],
-          select: { ...relatedTutorialSelect, updatedAt: true },
+          select: { ...relatedTutorialSelect, updatedAt: true, seriesChapter: true },
         },
       },
     });

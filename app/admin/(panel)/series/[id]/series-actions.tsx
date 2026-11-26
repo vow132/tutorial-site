@@ -1,6 +1,8 @@
 "use client";
 
-import { addToSeries, deleteSeries, moveInSeries, removeFromSeries } from "@/lib/actions/series";
+import { useActionState } from "react";
+import { addToSeries, deleteSeries, moveInSeries, removeFromSeries, setSeriesChapter, type ChapterFormState } from "@/lib/actions/series";
+import { MAX_CHAPTER_TITLE } from "@/lib/series";
 
 const smallBtn =
   "h-8 rounded-lg border border-line px-2.5 text-xs text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:opacity-30";
@@ -35,6 +37,34 @@ export function SeriesItemActions({ tutorialId, title, first, last }: { tutorial
         </button>
       </form>
     </div>
+  );
+}
+
+/**
+ * 一篇教程属于哪一章：相邻、同名的几篇在前台归为一章，留空表示不分章。
+ * 候选项是这个系列里已经用过的章节名（datalist），连续几篇填同一个就行。
+ */
+export function ChapterForm({ tutorialId, title, initial, listId }: { tutorialId: number; title: string; initial: string; listId: string }) {
+  const [state, action, pending] = useActionState<ChapterFormState, FormData>(setSeriesChapter, {});
+  return (
+    <form action={action} className="flex items-center gap-1.5">
+      <input type="hidden" name="tutorialId" value={tutorialId} />
+      <input
+        name="chapter"
+        defaultValue={initial}
+        list={listId}
+        maxLength={MAX_CHAPTER_TITLE}
+        placeholder="章节（可选）"
+        aria-label={`「${title}」所属章节`}
+        className="h-8 w-32 rounded-lg border border-line bg-surface px-2 text-xs outline-none focus:border-accent sm:w-40"
+      />
+      <button type="submit" disabled={pending} className={smallBtn}>
+        保存
+      </button>
+      <span role="status" className={`text-xs ${state.error ? "text-red-500" : "text-emerald-600 dark:text-emerald-400"}`}>
+        {state.error ?? state.success ?? ""}
+      </span>
+    </form>
   );
 }
 

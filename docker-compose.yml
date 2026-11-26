@@ -1,5 +1,5 @@
 # 用法（详见 README「Docker 部署」）：
-#   cp .env.example .env     # 填好 SITE_URL、AUTH_SECRET、ADMIN_PASSWORD（站点在 Nginx 后面时再设 TRUST_PROXY=true）
+#   cp .env.example .env     # 填好 SITE_URL、AUTH_SECRET、ADMIN_PASSWORD（站点在 Nginx 后面时再设 TRUST_PROXY=true，接在 Cloudflare 后面见 README「接入 Cloudflare」）
 #   docker compose up -d
 # 默认拉取 GitHub 自动构建好的镜像（amd64 / arm64），不用在服务器上构建。
 # 更新：docker compose pull && docker compose up -d
@@ -7,7 +7,7 @@
 # 数据都在 ./docker-data 下（数据库、上传图片、备份），更新、重建容器不会丢。
 services:
   app:
-    # 想固定版本时在 .env 里设置 TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.3.1
+    # 想固定版本时在 .env 里设置 TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.4.0
     image: ${TUTORIAL_IMAGE:-ghcr.io/vow132/tutorial-site:latest}
     restart: unless-stopped
     env_file: .env

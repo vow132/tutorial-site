@@ -26,12 +26,15 @@ const PORT = Number(process.env.E2E_PORT ?? (DEMO ? 3101 : SETUP ? 3102 : 3100))
  * 通行密钥测试以 http://localhost 访问，其余测试仍用 127.0.0.1。
  */
 const SITE_URL = process.env.SITE_URL ?? `http://localhost:${PORT}`;
+/** 人机验证的假 siteverify（e2e/cloudflare.spec.ts 在这个端口起一个本机服务器；只接受本机地址，见 lib/turnstile.ts） */
+const TURNSTILE_PORT = Number(process.env.E2E_TURNSTILE_PORT ?? 3190);
 const serverEnv = Object.fromEntries(
   // 定时发布每 2 秒检查一次（默认 60 秒），测试不用等一分钟
   Object.entries({
     SCHEDULE_CHECK_SECONDS: "2",
     ...process.env,
     SITE_URL,
+    TURNSTILE_VERIFY_URL: `http://127.0.0.1:${TURNSTILE_PORT}/siteverify`,
     // 演示模式：登录页公开的演示账号就是测试用的管理员
     ...(DEMO ? { DEMO_MODE: "true", ADMIN_USERNAME, ADMIN_PASSWORD } : {}),
   }).filter((entry): entry is [string, string] => entry[1] !== undefined),

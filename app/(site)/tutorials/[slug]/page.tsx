@@ -22,12 +22,15 @@ import ReadingProgress from "@/components/reading-progress";
 import ArticleEnhancer from "@/components/article-enhancer";
 import { categoryTextStyle } from "@/lib/color";
 import TagChips from "@/components/tag-chips";
-import SeriesBox from "@/components/series-box";
+import SeriesBook from "@/components/series-book";
 import HelpfulFeedback from "@/components/helpful-feedback";
 import ShareButtons from "@/components/share-buttons";
 import SupportBox from "@/components/support-box";
+import Comments from "@/components/comments";
+import { isDemoMode } from "@/lib/demo";
 import SubscribeForm from "@/components/subscribe-form";
 import { getSubscriptionEnabled } from "@/lib/mail";
+import { getTurnstileSiteKey } from "@/lib/turnstile-store";
 import { bylineOf } from "@/lib/roles";
 import { assetSrcSet, assetUrl, rewriteAssetHtml } from "@/lib/asset-url";
 
@@ -148,7 +151,7 @@ export default async function TutorialDetailPage({
     shareImage(tutorial),
     tutorial.seriesId ? getPublishedSeries() : Promise.resolve([]),
   ]);
-  const subscribeEnabled = await getSubscriptionEnabled();
+  const [subscribeEnabled, turnstileSiteKey] = await Promise.all([getSubscriptionEnabled(), getTurnstileSiteKey()]);
   const cover = await coverImage(tutorial);
   const series = allSeries.find((item) => item.id === tutorial.seriesId) ?? null;
   const position = series ? seriesPosition(series.tutorials, tutorial.id) : null;
@@ -209,7 +212,7 @@ export default async function TutorialDetailPage({
     <div className="mx-auto max-w-6xl px-4 pt-12" data-motion={settings.articleMotion}>
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
-      <ArticleEnhancer />
+      <ArticleEnhancer attribution={settings.antiScrape.copyAttribution ? { title: tutorial.title, url: articleUrl } : null} />
       <ReadingProgress tutorialId={tutorial.id} />
       {/* 面包屑 */}
       <Reveal>
@@ -294,8 +297,9 @@ export default async function TutorialDetailPage({
             />
           )}
 
+          {/* 「教程书」目录：手机和平板在正文上方，桌面在右侧栏 */}
           {series && (
-            <SeriesBox title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+            <SeriesBook variant="inline" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
           )}
 
           {/* 移动端本页目录（可自行开关） */}
@@ -309,14 +313,14 @@ export default async function TutorialDetailPage({
             />
           </Reveal>
 
-          <HelpfulFeedback id={tutorial.id} />
+          <HelpfulFeedback id={tutorial.id} turnstileSiteKey={turnstileSiteKey} />
           <ShareButtons url={articleUrl} title={tutorial.title} />
           <SupportBox support={settings.support} assetHost={settings.assetHost} />
           {subscribeEnabled && (
             <section aria-labelledby="subscribe-heading" className="subscribe-box print-hide mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
               <h2 id="subscribe-heading" className="text-base font-semibold text-ink">订阅新教程</h2>
               <p className="mt-1 text-sm text-ink-2">有新教程时发邮件提醒你，随时可以退订。</p>
-              <SubscribeForm className="mt-4" />
+              <SubscribeForm className="mt-4" turnstileSiteKey={turnstileSiteKey} />
             </section>
           )}
 
@@ -348,6 +352,9 @@ export default async function TutorialDetailPage({
             </nav>
           </Reveal>
 
+          {/* 第三方评论（站点设置里开启；演示站不显示） */}
+          {settings.comments.provider !== "none" && !isDemoMode() && <Comments slug={tutorial.slug} />}
+
           {/* 相关教程：给读者下一步，也让爬虫更快发现同主题文章 */}
           {related.length > 0 && (
             <section aria-labelledby="related-heading" className="print-hide mt-14">
@@ -376,8 +383,17 @@ export default async function TutorialDetailPage({
           )}
         </div>
 
-        {/* 目录 */}
-        <Toc items={toc} />
+        {/* 右侧栏：系列的「教程书」目录 + 本页目录，一起吸顶 */}
+        {(series || toc.length > 0) && (
+          <aside className="print-hide relative hidden min-w-0 self-stretch lg:block">
+            <div className="sticky top-24 max-h-[calc(100vh-7rem)] space-y-8 overflow-y-auto overscroll-contain pb-6">
+              {series && (
+                <SeriesBook variant="sidebar" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+              )}
+              <Toc items={toc} />
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import ImageField from "./image-field";
 import AccentField from "./accent-field";
 import NavLinksField from "./nav-links-field";
 import AssetHostField from "./asset-host-field";
+import CommentsField from "./comments-field";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -250,6 +251,41 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
         </div>
       </Section>
 
+      {/* ---------- 防爬 ---------- */}
+      <Section
+        title="防爬"
+        desc="公开的内容浏览器能看到，程序就能抓到；这里能做的是让守规矩的 AI 训练爬虫别来、被转载时带上出处。真正挡住批量抓取要靠 Cloudflare 的 Bot Fight Mode 和限速规则，见 README「接入 Cloudflare」"
+      >
+        <label className="flex items-start gap-2 text-sm text-ink-2">
+          <input
+            type="checkbox"
+            name="antiScrape.blockAiCrawlers"
+            defaultChecked={settings.antiScrape.blockAiCrawlers}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+          <span>
+            拒绝 AI 训练爬虫
+            <span className="mt-0.5 block text-xs text-ink-3">
+              在 robots.txt 里拒绝 GPTBot、ClaudeBot、CCBot、Bytespider 等抓内容去训练大模型的爬虫；百度、Google、必应等搜索引擎和 AI 搜索照常收录。守规矩的爬虫会遵守，不守规矩的要靠 Cloudflare 拦。
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-ink-2">
+          <input
+            type="checkbox"
+            name="antiScrape.copyAttribution"
+            defaultChecked={settings.antiScrape.copyAttribution}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+          <span>
+            复制正文时附上来源
+            <span className="mt-0.5 block text-xs text-ink-3">
+              读者复制一大段正文（50 字以上）时，在后面加上「来源：标题 + 原文链接」。复制代码、复制几个字不加。
+            </span>
+          </span>
+        </label>
+      </Section>
+
       {/* ---------- 赞助与打赏 ---------- */}
       <Section title="赞助与打赏" desc="显示在每篇教程的文末；都留空时不显示。收款码请用自己的微信 / 支付宝「收款码」截图">
         <Field label="打赏按钮文字" name="support.donationText" defaultValue={settings.support.donationText} placeholder="觉得有用？请作者喝杯咖啡" />
@@ -262,6 +298,14 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
           <Field label="赞助链接" name="support.sponsorUrl" defaultValue={settings.support.sponsorUrl} placeholder="https://example.com" hint="会加上 rel=sponsored" />
         </div>
         <ImageField name="support.sponsorImage" label="赞助图片" hint="可选，横幅或 logo" initial={settings.support.sponsorImage} />
+      </Section>
+
+      {/* ---------- 评论 ---------- */}
+      <Section
+        title="评论"
+        desc="在每篇教程文末显示第三方评论区（读者滚动到那里才加载）。本站不保存评论，评论存在你选的服务里；国内跟帖评论有实名和审核要求，请在评论服务里开启审核"
+      >
+        <CommentsField initial={settings.comments} />
       </Section>
 
       {/* ---------- 页脚 ---------- */}

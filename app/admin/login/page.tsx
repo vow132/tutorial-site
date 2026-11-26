@@ -7,6 +7,7 @@ import Mascot from "@/components/mascot";
 import SiteLogo from "@/components/site-logo";
 import { demoAccount } from "@/lib/demo";
 import { getSettings } from "@/lib/settings";
+import { currentTurnstileSiteKey } from "@/lib/turnstile-store";
 import LoginForm from "./login-form";
 import PasskeyLogin from "./passkey-login";
 
@@ -34,6 +35,8 @@ export default async function AdminLoginPage({
   const passkeyLogin = !("error" in relyingParty()) && (await prisma.adminPasskey.count()) > 0;
   const settings = await getSettings();
   const demo = demoAccount();
+  // 直接读库：npm run admin:reset 关掉人机验证后立即生效
+  const turnstileSiteKey = await currentTurnstileSiteKey();
 
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center px-4 pb-24 pt-20">
@@ -49,7 +52,7 @@ export default async function AdminLoginPage({
             这是演示站，账号 <strong>{demo.username}</strong>、密码 <strong>{demo.password}</strong> 已经帮你填好。后台可以随便看，保存不了修改。
           </p>
         )}
-        <LoginForm from={safeFrom} initial={demo ?? undefined} />
+        <LoginForm from={safeFrom} initial={demo ?? undefined} turnstileSiteKey={turnstileSiteKey} />
         {passkeyLogin && <PasskeyLogin from={safeFrom} />}
       </div>
     </div>

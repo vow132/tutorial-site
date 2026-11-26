@@ -48,6 +48,10 @@ jobs:
       - name: 单元测试
         run: npm test
 
+      # 开发模式（npm run dev）能打开首页、文章页和后台登录页；Next 16 的开发产物在 .next/dev，不影响后面的生产构建
+      - name: 开发模式冒烟测试
+        run: bash .github/scripts/dev-smoke.sh
+
       - name: 生产构建
         run: npm run build
 

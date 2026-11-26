@@ -5,6 +5,10 @@
 # 登录、搜索限流（按访客 IP）
 limit_req_zone $binary_remote_addr zone=tutorial_login:10m  rate=10r/m;
 limit_req_zone $binary_remote_addr zone=tutorial_search:10m rate=30r/m;
+# 防爬（可选）：限制同一 IP 打开文章页等公开页面的频率。数值放宽一些，免得误伤搜索引擎的爬虫；
+# 接在 Cloudflare 后面时用 Cloudflare 的速率限制规则更合适（能排除已验证的搜索引擎），见 README「接入 Cloudflare」。
+# 打开时同时取消下面「公开页面缓存」里 limit_req 那两行的注释。
+# limit_req_zone $binary_remote_addr zone=tutorial_pages_rl:10m rate=60r/m;
 
 # 公开页面缓存：inactive=7d 让旧页面在 Node 停机时还能兜底 7 天
 proxy_cache_path /var/cache/nginx/tutorial levels=1:2 keys_zone=tutorial_pages:10m
@@ -30,6 +34,34 @@ server {
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
+    # ---- 接在 Cloudflare 后面时（DNS 是橙色云朵）：还原访客真实 IP ----
+    # 不配的话 $remote_addr 是 Cloudflare 节点的 IP：上面的限流、网站的登录限流和安全日志都会把所有访客当成同几个人。
+    # 配好后 .env 里仍然是 TRUST_PROXY=true。IP 段以 https://www.cloudflare.com/ips/ 为准，偶尔会变，记得更新；
+    # 防火墙也只对这些 IP 段放行 80/443，否则别人绕过 Cloudflare 直连源站就能伪造 CF-Connecting-IP。
+    # real_ip_header CF-Connecting-IP;
+    # set_real_ip_from 173.245.48.0/20;
+    # set_real_ip_from 103.21.244.0/22;
+    # set_real_ip_from 103.22.200.0/22;
+    # set_real_ip_from 103.31.4.0/22;
+    # set_real_ip_from 141.101.64.0/18;
+    # set_real_ip_from 108.162.192.0/18;
+    # set_real_ip_from 190.93.240.0/20;
+    # set_real_ip_from 188.114.96.0/20;
+    # set_real_ip_from 197.234.240.0/22;
+    # set_real_ip_from 198.41.128.0/17;
+    # set_real_ip_from 162.158.0.0/15;
+    # set_real_ip_from 104.16.0.0/13;
+    # set_real_ip_from 104.24.0.0/14;
+    # set_real_ip_from 172.64.0.0/13;
+    # set_real_ip_from 131.0.72.0/22;
+    # set_real_ip_from 2400:cb00::/32;
+    # set_real_ip_from 2606:4700::/32;
+    # set_real_ip_from 2803:f800::/32;
+    # set_real_ip_from 2405:b500::/32;
+    # set_real_ip_from 2405:8100::/32;
+    # set_real_ip_from 2a06:98c0::/29;
+    # set_real_ip_from 2c0f:f248::/32;
+
     # 上传图片由 Nginx 直接读磁盘，减轻 Node 压力（不配置也能工作，由 Next 提供）
     location /uploads/ {
         alias /path/to/tutorial-site/public/uploads/;
@@ -46,6 +78,9 @@ server {
     # 后台、接口、搜索、提交表单（POST）不在这里，始终直连 Node。
     location ~ ^/($|tutorials(/|$)|categories/|tags(/|$)|about$|feed\.xml$|sitemap\.xml$|robots\.txt$) {
         proxy_pass http://127.0.0.1:3000;
+        # 防爬（可选，见文件开头的 tutorial_pages_rl）：超出频率返回 429
+        # limit_req zone=tutorial_pages_rl burst=60 nodelay;
+        # limit_req_status 429;
 
         proxy_cache tutorial_pages;
         proxy_cache_key "$scheme$host$request_uri";
