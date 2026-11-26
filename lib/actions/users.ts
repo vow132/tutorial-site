@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { changeAccount, removeAccount } from "@/lib/admin-accounts";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { parseDisplayName, readRole, ROLES, USERNAME_PATTERN, type Role } from "@/lib/roles";
@@ -53,19 +54,13 @@ export async function updateUser(_prev: UserFormState, formData: FormData): Prom
   if (!role) return { error: "请选择角色" };
   const displayName = parseDisplayName(formData.get("displayName"));
   if ("error" in displayName) return { error: displayName.error };
+  if (role === readRole(target.role) && displayName.value === (target.displayName ?? null)) return { success: "没有变化" };
 
-  const current = readRole(target.role);
-  if (role !== current) {
-    if (target.id === admin.id) return { error: "不能修改自己的角色（防止把自己降级后没人能管理网站）" };
-    if (current === "owner" && (await prisma.admin.count({ where: { role: "owner" } })) <= 1) {
-      return { error: "至少要保留一个站长" };
-    }
-  }
-  if (role === current && displayName.value === (target.displayName ?? null)) return { success: "没有变化" };
-
-  await prisma.admin.update({ where: { id }, data: { role, displayName: displayName.value } });
+  // 「不能改自己的角色、至少留一个站长」在事务里检查（lib/admin-accounts.ts）
+  const result = await changeAccount(prisma, { actorId: admin.id, targetId: id, role, displayName: displayName.value });
+  if ("error" in result) return { error: result.error };
   const changes = [
-    role !== current ? `角色 ${ROLES[current].label} → ${ROLES[role].label}` : "",
+    role !== result.previousRole ? `角色 ${ROLES[result.previousRole].label} → ${ROLES[role].label}` : "",
     displayName.value !== (target.displayName ?? null) ? `署名「${displayName.value ?? "（不显示）"}」` : "",
   ].filter(Boolean);
   await audit("user.update", { actor: admin.username, detail: `${target.username}：${changes.join("，")}` });
@@ -106,16 +101,13 @@ export async function deleteUser(_prev: UserFormState, formData: FormData): Prom
   const id = Number(formData.get("id"));
   const target = id ? await prisma.admin.findUnique({ where: { id }, select: { id: true, username: true } }) : null;
   if (!target) return { error: "这个账号不存在或已被删除" };
-  if (target.id === admin.id) return { error: "不能删除自己的账号" };
-  const [moved] = await prisma.$transaction([
-    prisma.tutorial.updateMany({ where: { authorId: id }, data: { authorId: admin.id } }),
-    prisma.admin.delete({ where: { id } }),
-  ]);
+  const result = await removeAccount(prisma, { actorId: admin.id, targetId: id });
+  if ("error" in result) return { error: result.error };
   await audit("user.delete", {
     actor: admin.username,
-    detail: `${target.username}${moved.count ? `，${moved.count} 篇教程转给 ${admin.username}` : ""}`,
+    detail: `${target.username}${result.moved ? `，${result.moved} 篇教程转给 ${admin.username}` : ""}`,
   });
-  if (moved.count) revalidatePath("/tutorials/[slug]", "page");
+  if (result.moved) revalidatePath("/tutorials/[slug]", "page");
   // 这一行随账号一起消失，结果显示在页面顶部
-  redirect(`/admin/users?deleted=${encodeURIComponent(target.username)}&moved=${moved.count}`);
+  redirect(`/admin/users?deleted=${encodeURIComponent(target.username)}&moved=${result.moved}`);
 }
