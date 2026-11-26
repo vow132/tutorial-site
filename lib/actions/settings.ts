@@ -150,6 +150,10 @@ export async function updateSettings(
     navLinks: navLinks.data,
     assetHost: assetHost.value,
     comments: comments.data,
+    antiScrape: {
+      blockAiCrawlers: formData.get("antiScrape.blockAiCrawlers") === "on",
+      copyAttribution: formData.get("antiScrape.copyAttribution") === "on",
+    },
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };
@@ -163,6 +167,8 @@ export async function updateSettings(
   await audit("settings.update", { actor: admin.username });
   revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidatePath("/", "layout");
+  // robots.txt 是单独的路由，不在根布局下面（「拒绝 AI 训练爬虫」开关要马上生效）
+  revalidatePath("/robots.txt");
   return { success: "设置已保存，前台已生效" };
 }
 

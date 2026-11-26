@@ -44,6 +44,7 @@ const LABELS: Record<string, string> = {
   "series.remove": "教程移出系列",
   "subscriber.delete": "删除订阅者",
   "mail.settings": "修改发信设置",
+  "turnstile.settings": "修改人机验证设置",
   "category.create": "新建分类",
   "category.update": "编辑分类",
   "category.delete": "删除分类",
@@ -146,7 +147,7 @@ export default async function AuditLogPage() {
         </table>
       </div>
       <p className="mt-3 text-xs text-ink-3">
-        IP 列需要在反向代理后设置 <code>TRUST_PROXY=true</code> 才会记录。
+        IP 列需要在反向代理后设置 <code>TRUST_PROXY=true</code>（接在 Cloudflare 后面时见 README「接入 Cloudflare」）才会记录。
       </p>
     </div>
   );

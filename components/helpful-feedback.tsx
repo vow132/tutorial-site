@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { MAX_FEEDBACK_MESSAGE } from "@/lib/feedback";
+import TurnstileWidget from "@/components/turnstile-widget";
 
 type Choice = "yes" | "no";
 
@@ -24,11 +25,15 @@ function subscribe(onChange: () => void) {
 /**
  * 文末「这篇教程对你有帮助吗？」。投过票的浏览器记在 localStorage 里，再打开显示已投；
  * 服务端另外按 IP 去重（app/api/feedback/route.ts）。文章页是缓存页，所以状态只在浏览器端读取。
+ * 后台开启了人机验证时（turnstileSiteKey），留言框出现时才加载 Cloudflare 的小组件，投票本身不需要验证。
  */
-export default function HelpfulFeedback({ id }: { id: number }) {
+export default function HelpfulFeedback({ id, turnstileSiteKey = null }: { id: number; turnstileSiteKey?: string | null }) {
   const stored = useSyncExternalStore(subscribe, () => readChoice(id), () => null);
   const [voted, setVoted] = useState<Choice | null>(null);
-  const [note, setNote] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [note, setNote] = useState<"idle" | "sending" | "sent" | "failed" | "waiting">("idle");
+  const [token, setToken] = useState<string | null>(null);
+  const [checkFailed, setCheckFailed] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const choice = voted ?? stored;
 
   // 「没帮助」之后可以留一句话（只发给站长，不公开）
@@ -36,17 +41,25 @@ export default function HelpfulFeedback({ id }: { id: number }) {
     event.preventDefault();
     const message = String(new FormData(event.currentTarget).get("message") ?? "").trim();
     if (message.length < 2) return;
+    if (turnstileSiteKey && !token && !checkFailed) {
+      setNote("waiting");
+      return;
+    }
     setNote("sending");
+    let sent = false;
     try {
       const response = await fetch("/api/feedback/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, message }),
+        body: JSON.stringify({ id, message, turnstileToken: token }),
       });
-      setNote(response.ok ? "sent" : "failed");
+      sent = response.ok;
     } catch {
-      setNote("failed");
+      // 当作没发出去
     }
+    setNote(sent ? "sent" : "failed");
+    // 令牌只能用一次，没发出去就重新验证
+    if (!sent && turnstileSiteKey) setResetKey((value) => value + 1);
   };
 
   const vote = (value: Choice) => {
@@ -119,8 +132,22 @@ export default function HelpfulFeedback({ id }: { id: number }) {
             placeholder="例如：第三步的命令在 Windows 上报错……"
             className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent"
           />
+          {turnstileSiteKey && (
+            <TurnstileWidget
+              className="mt-2"
+              siteKey={turnstileSiteKey}
+              action="feedback"
+              resetKey={resetKey}
+              onToken={(value) => {
+                setToken(value);
+                if (value) setCheckFailed(false);
+              }}
+              onError={() => setCheckFailed(true)}
+            />
+          )}
           <div className="mt-2 flex items-center justify-end gap-3">
             {note === "failed" && <span className="text-xs text-red-500 dark:text-red-400">没发出去，请稍后再试</span>}
+            {note === "waiting" && <span className="text-xs text-ink-3">请稍等，人机验证完成后再发送</span>}
             <button
               type="submit"
               disabled={note === "sending"}

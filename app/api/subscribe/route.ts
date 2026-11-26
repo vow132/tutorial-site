@@ -6,6 +6,7 @@ import { sharedLimiter } from "@/lib/rate-limit";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
 import { confirmEmail, mailConfigComplete, normalizeEmail, signSubscriberToken } from "@/lib/subscription";
+import { verifyHuman } from "@/lib/turnstile-store";
 
 const HOUR_MS = 60 * 60 * 1000;
 /** 同一个地址 10 分钟内不重发确认邮件 */
@@ -19,14 +20,15 @@ const ok = () => Response.json({ ok: true }, { status: 202 });
  * 订阅新教程提醒（components/subscribe-form.tsx）：先发确认邮件，点了链接才算订阅（双重确认）。
  * - 不管地址是否已订阅都回同样的结果，不泄露谁订阅了；
  * - 防止被拿来给别人刷邮件：同源检查、隐藏字段拦机器人、同一 IP 每小时 5 次、全站每小时 60 封确认邮件、
- *   同一地址 10 分钟内不重发。
+ *   同一地址 10 分钟内不重发；后台开启了人机验证时还要核对 Turnstile 令牌。
  */
 export async function POST(request: Request) {
   const site = request.headers.get("sec-fetch-site");
   if (site && site !== "same-origin") return new Response(null, { status: 403 });
-  if (Number(request.headers.get("content-length") ?? 0) > 1024) return new Response(null, { status: 413 });
+  // 邮箱最长 254 个字符，人机验证的令牌最长 2048 个字符
+  if (Number(request.headers.get("content-length") ?? 0) > 4096) return new Response(null, { status: 413 });
 
-  let body: { email?: unknown; website?: unknown };
+  let body: { email?: unknown; website?: unknown; turnstileToken?: unknown };
   try {
     body = ((await request.json()) ?? {}) as typeof body;
   } catch {
@@ -48,6 +50,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "操作太频繁了，请稍后再试" }, { status: 429 });
   }
   if (ip) perVisitor.hit(ip);
+  // 在限流之后核对：乱填令牌的请求也受上面的次数限制，不会无限制地替人去请求 Cloudflare
+  const human = await verifyHuman(body.turnstileToken, "subscribe");
+  if (!human.ok) return Response.json({ error: human.error }, { status: 400 });
 
   await prisma.subscriber.deleteMany({ where: { confirmedAt: null, createdAt: { lt: new Date(Date.now() - PENDING_TTL_MS) } } });
   const existing = await prisma.subscriber.findUnique({ where: { email } });

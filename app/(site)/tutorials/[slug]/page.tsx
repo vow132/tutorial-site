@@ -30,6 +30,7 @@ import Comments from "@/components/comments";
 import { isDemoMode } from "@/lib/demo";
 import SubscribeForm from "@/components/subscribe-form";
 import { getSubscriptionEnabled } from "@/lib/mail";
+import { getTurnstileSiteKey } from "@/lib/turnstile-store";
 import { bylineOf } from "@/lib/roles";
 import { assetSrcSet, assetUrl, rewriteAssetHtml } from "@/lib/asset-url";
 
@@ -150,7 +151,7 @@ export default async function TutorialDetailPage({
     shareImage(tutorial),
     tutorial.seriesId ? getPublishedSeries() : Promise.resolve([]),
   ]);
-  const subscribeEnabled = await getSubscriptionEnabled();
+  const [subscribeEnabled, turnstileSiteKey] = await Promise.all([getSubscriptionEnabled(), getTurnstileSiteKey()]);
   const cover = await coverImage(tutorial);
   const series = allSeries.find((item) => item.id === tutorial.seriesId) ?? null;
   const position = series ? seriesPosition(series.tutorials, tutorial.id) : null;
@@ -211,7 +212,7 @@ export default async function TutorialDetailPage({
     <div className="mx-auto max-w-6xl px-4 pt-12" data-motion={settings.articleMotion}>
       <JsonLd data={jsonLd} />
       <ViewBeacon id={tutorial.id} />
-      <ArticleEnhancer />
+      <ArticleEnhancer attribution={settings.antiScrape.copyAttribution ? { title: tutorial.title, url: articleUrl } : null} />
       <ReadingProgress tutorialId={tutorial.id} />
       {/* 面包屑 */}
       <Reveal>
@@ -312,14 +313,14 @@ export default async function TutorialDetailPage({
             />
           </Reveal>
 
-          <HelpfulFeedback id={tutorial.id} />
+          <HelpfulFeedback id={tutorial.id} turnstileSiteKey={turnstileSiteKey} />
           <ShareButtons url={articleUrl} title={tutorial.title} />
           <SupportBox support={settings.support} assetHost={settings.assetHost} />
           {subscribeEnabled && (
             <section aria-labelledby="subscribe-heading" className="subscribe-box print-hide mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
               <h2 id="subscribe-heading" className="text-base font-semibold text-ink">订阅新教程</h2>
               <p className="mt-1 text-sm text-ink-2">有新教程时发邮件提醒你，随时可以退订。</p>
-              <SubscribeForm className="mt-4" />
+              <SubscribeForm className="mt-4" turnstileSiteKey={turnstileSiteKey} />
             </section>
           )}
 

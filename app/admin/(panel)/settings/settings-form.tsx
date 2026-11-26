@@ -251,6 +251,41 @@ export default function SettingsForm({ settings, series }: { settings: SiteSetti
         </div>
       </Section>
 
+      {/* ---------- 防爬 ---------- */}
+      <Section
+        title="防爬"
+        desc="公开的内容浏览器能看到，程序就能抓到；这里能做的是让守规矩的 AI 训练爬虫别来、被转载时带上出处。真正挡住批量抓取要靠 Cloudflare 的 Bot Fight Mode 和限速规则，见 README「接入 Cloudflare」"
+      >
+        <label className="flex items-start gap-2 text-sm text-ink-2">
+          <input
+            type="checkbox"
+            name="antiScrape.blockAiCrawlers"
+            defaultChecked={settings.antiScrape.blockAiCrawlers}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+          <span>
+            拒绝 AI 训练爬虫
+            <span className="mt-0.5 block text-xs text-ink-3">
+              在 robots.txt 里拒绝 GPTBot、ClaudeBot、CCBot、Bytespider 等抓内容去训练大模型的爬虫；百度、Google、必应等搜索引擎和 AI 搜索照常收录。守规矩的爬虫会遵守，不守规矩的要靠 Cloudflare 拦。
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-ink-2">
+          <input
+            type="checkbox"
+            name="antiScrape.copyAttribution"
+            defaultChecked={settings.antiScrape.copyAttribution}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+          <span>
+            复制正文时附上来源
+            <span className="mt-0.5 block text-xs text-ink-3">
+              读者复制一大段正文（50 字以上）时，在后面加上「来源：标题 + 原文链接」。复制代码、复制几个字不加。
+            </span>
+          </span>
+        </label>
+      </Section>
+
       {/* ---------- 赞助与打赏 ---------- */}
       <Section title="赞助与打赏" desc="显示在每篇教程的文末；都留空时不显示。收款码请用自己的微信 / 支付宝「收款码」截图">
         <Field label="打赏按钮文字" name="support.donationText" defaultValue={settings.support.donationText} placeholder="觉得有用？请作者喝杯咖啡" />
