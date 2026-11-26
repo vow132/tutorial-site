@@ -1,5 +1,7 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { adminContentSecurityPolicy } from "@/lib/csp.mjs";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 const LOOPBACK = /^(?:127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/;
@@ -36,7 +38,15 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.next();
+  // 后台的 CSP：每个请求一个新的 nonce，Next 渲染时从请求头里取出来加到自己的脚本上（lib/csp.mjs）。
+  // 这里只验 Cookie 签名；会话是否被吊销、角色有没有权限，由每个页面、接口、Server Action 自己检查
+  // （requireAdminPage / requireAuth / requireSession / getCurrentAdmin），lib/route-guards.test.ts 保证没有遗漏。
+  const nonce = randomBytes(16).toString("base64");
+  const csp = adminContentSecurityPolicy(nonce, request.headers.get("x-forwarded-proto") === "https");
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("content-security-policy", csp);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("Content-Security-Policy", csp);
   // 运行版本只告诉本机的更新脚本，不对公网暴露（仓库公开，版本号会暴露补丁状态）。
   if (
     pathname === "/admin/login" &&

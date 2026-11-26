@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { execFileSync } from "node:child_process";
+import { publicContentSecurityPolicy } from "./lib/csp.mjs";
 
 function buildRevision() {
   try {
@@ -8,30 +9,6 @@ function buildRevision() {
     // Docker 镜像里没有 .git：构建镜像时用构建参数 BUILD_REVISION 传入提交号（有 Git 仓库时始终以 Git 为准）
     return /^[a-f0-9]{40}$/.test(process.env.BUILD_REVISION ?? "") ? process.env.BUILD_REVISION! : "";
   }
-}
-
-const isDev = process.env.NODE_ENV === "development";
-
-/**
- * Next 的内联 RSC 脚本和主题初始化脚本需要 'unsafe-inline'（nonce 方案会让
- * 所有页面变成动态渲染）。正文 HTML 已在服务端按白名单过滤，CSP 在此之上
- * 再禁止外部脚本、插件、<base> 劫持、表单外发和被其他站点嵌入。
- */
-function contentSecurityPolicy(upgradeInsecureRequests: boolean) {
-  return [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-    "style-src 'self' 'unsafe-inline'",
-    // 正文里可能引用外站 http 图片；HTTPS 下浏览器会自动升级，不构成脚本风险。
-    "img-src 'self' data: blob: https: http:",
-    "font-src 'self' data:",
-    `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    ...(upgradeInsecureRequests ? ["upgrade-insecure-requests"] : []),
-  ].join("; ");
 }
 
 const nextConfig: NextConfig = {
@@ -62,11 +39,17 @@ const nextConfig: NextConfig = {
     "26.*.*.*",
   ],
   async headers() {
+    // 后台（/admin/*）的 CSP 由 proxy.ts 按请求生成（带 nonce，不允许内联脚本），这里只管前台，见 lib/csp.mjs
+    const publicPages = "/((?!admin(?:/|$)).*)";
+    const https = [{ type: "header" as const, key: "x-forwarded-proto", value: "https" }];
     return [
+      {
+        source: publicPages,
+        headers: [{ key: "Content-Security-Policy", value: publicContentSecurityPolicy(false) }],
+      },
       {
         source: "/(.*)",
         headers: [
-          { key: "Content-Security-Policy", value: contentSecurityPolicy(false) },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -80,12 +63,14 @@ const nextConfig: NextConfig = {
       {
         // 只有经 HTTPS 反向代理（会设置 X-Forwarded-Proto: https）访问时才启用
         // HSTS 与自动升级，直接 http://IP:3000 访问的部署不受影响。
+        source: publicPages,
+        has: https,
+        headers: [{ key: "Content-Security-Policy", value: publicContentSecurityPolicy(true) }],
+      },
+      {
         source: "/(.*)",
-        has: [{ type: "header", key: "x-forwarded-proto", value: "https" }],
-        headers: [
-          { key: "Content-Security-Policy", value: contentSecurityPolicy(true) },
-          { key: "Strict-Transport-Security", value: "max-age=31536000" },
-        ],
+        has: https,
+        headers: [{ key: "Strict-Transport-Security", value: "max-age=31536000" }],
       },
       {
         // 上传文件即使被直接打开也不能执行任何脚本；文件名含随机串、永不覆盖，可长期缓存。
