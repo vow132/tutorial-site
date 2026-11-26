@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bylineOf, can, canEditTutorial, parseDisplayName, readRole, type Permission } from "./roles";
 
-const ALL: Permission[] = ["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import", "site"];
+const ALL: Permission[] = ["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import", "media", "site"];
 
 test("owners can do everything, editors everything but site administration, authors only their own tutorials", () => {
   for (const permission of ALL) assert.equal(can("owner", permission), true, `owner ${permission}`);

@@ -64,8 +64,10 @@ test("only old, unreferenced uploads are reported, and --apply moves them to the
     const left = await readdir(uploads);
     assert.ok(!left.includes("orphan.webp") && !left.includes("orphan-400w.webp"));
     assert.ok(left.includes("body.webp") && left.includes("fresh.webp"));
-    const [trash] = await readdir(path.join(dir, "uploads-trash"));
-    assert.deepEqual((await readdir(path.join(dir, "uploads-trash", trash))).sort(), ["orphan-400w.webp", "orphan.webp"]);
+    // 回收目录在上传目录里（同一个挂载卷），再跑一次清理也不会把它当成没用的文件
+    const [trash] = await readdir(path.join(uploads, ".trash"));
+    assert.deepEqual((await readdir(path.join(uploads, ".trash", trash))).sort(), ["orphan-400w.webp", "orphan.webp"]);
+    assert.deepEqual(await findUnusedUploads({ uploadsDir: uploads, dbFile }), []);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -8,6 +8,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Placeholder } from "@tiptap/extensions";
 import { altFromFileName } from "@/lib/image-alt";
+import MediaPicker from "./media-picker";
 import { CALLOUT_TYPES } from "@/lib/callouts";
 import { Callout } from "./callout";
 import { ArticleTable } from "./table";
@@ -102,10 +103,14 @@ const TEXT_COLORS: { label: string; value: string | null }[] = [
 export default function RichTextEditor({
   name,
   initialContent = "",
+  mediaLibrary = false,
 }: {
   name: string;
   initialContent?: string;
+  /** 显示「图片库」按钮：从上传过的图片里挑一张插入（需要图片库权限，lib/roles.ts） */
+  mediaLibrary?: boolean;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
@@ -576,6 +581,11 @@ export default function RichTextEditor({
         >
           🖼 图片
         </button>
+        {mediaLibrary && (
+          <button type="button" title="从上传过的图片里挑一张插入" onClick={() => setPickerOpen(true)} className={btn(false)}>
+            图片库
+          </button>
+        )}
         <button
           type="button"
           title="图片说明（先选中一张图片）"
@@ -605,6 +615,17 @@ export default function RichTextEditor({
           </div>
         )}
       </div>
+
+      {mediaLibrary && (
+        <MediaPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onPick={(url) => {
+            setPickerOpen(false);
+            editor.chain().focus().insertContent({ type: "image", attrs: { src: url, alt: null } }).run();
+          }}
+        />
+      )}
 
       <input
         ref={fileInputRef}

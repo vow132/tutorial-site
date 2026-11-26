@@ -7,7 +7,7 @@ import { updateTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import { tagSuggestions, tutorialTagNames } from "@/lib/tag-sync";
 import TutorialForm from "../tutorial-form";
-import { canEditTutorial } from "@/lib/roles";
+import { can, canEditTutorial } from "@/lib/roles";
 import { authorOptions } from "@/lib/authors";
 
 export const metadata: Metadata = { title: "编辑教程" };
@@ -87,6 +87,7 @@ export default async function EditTutorialPage({
           series={series}
           authors={authors}
           authorId={tutorial.authorId}
+          mediaLibrary={can(admin.role, "media")}
           tagSuggestions={suggestions}
           action={boundAction}
           initial={{

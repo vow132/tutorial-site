@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
+import { can } from "@/lib/roles";
 import { prisma } from "@/lib/prisma";
 import { createTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
@@ -42,6 +43,7 @@ export default async function NewTutorialPage() {
           series={series}
           authors={authors}
           authorId={admin.id}
+          mediaLibrary={can(admin.role, "media")}
           tagSuggestions={suggestions}
           action={createTutorial}
         />

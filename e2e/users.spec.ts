@@ -38,7 +38,7 @@ test("owners give each writer an account; authors can only reach their own tutor
     await expect(writer).toHaveURL(/\/admin$/);
     const nav = writer.getByRole("navigation", { name: "后台导航" }).first();
     await expect(nav.getByRole("link", { name: "教程管理" })).toBeAttached();
-    for (const hidden of ["站点设置", "账号管理", "分类管理", "安全日志", "邮件订阅"]) {
+    for (const hidden of ["站点设置", "账号管理", "分类管理", "安全日志", "邮件订阅", "图片库"]) {
       await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
     }
     // 直接打开没权限的页面：带回仪表盘并说明
@@ -53,6 +53,7 @@ test("owners give each writer an account; authors can only reach their own tutor
     await expect(writer).toHaveURL(/\/admin\/tutorials\?forbidden=1$/);
     expect((await writer.request.get(`/admin/tutorials/${others.id}/markdown`)).status()).toBe(403);
     expect((await writer.request.get("/api/admin/site-update")).status()).toBe(403);
+    expect((await writer.request.get("/api/admin/media")).status()).toBe(403);
 
     // 自己写一篇：作者是自己，文章页显示署名（不显示登录用户名）
     await createTutorialViaForm(writer, { title, slug });

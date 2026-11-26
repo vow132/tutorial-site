@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin-auth";
+import { can } from "@/lib/roles";
 import { hasAboutContent, readAboutForAdmin } from "@/lib/about";
 import { getSettings } from "@/lib/settings";
 import AboutForm from "./about-form";
@@ -9,7 +10,7 @@ export const metadata: Metadata = { title: "关于页面" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminAboutPage() {
-  await requireAdminPage("about");
+  const admin = await requireAdminPage("about");
   const [about, settings] = await Promise.all([readAboutForAdmin(), getSettings()]);
   const linked = settings.footerColumns.some((column) => column.links.some((link) => link.href === "/about"));
 
@@ -33,7 +34,7 @@ export default async function AdminAboutPage() {
         </p>
       )}
       <div className="mt-6">
-        <AboutForm title={about.title} content={about.content} />
+        <AboutForm title={about.title} content={about.content} mediaLibrary={can(admin.role, "media")} />
       </div>
     </div>
   );
