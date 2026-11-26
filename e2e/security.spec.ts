@@ -34,22 +34,34 @@ test("admin pages get a strict per-request CSP: a fresh nonce, no 'unsafe-inline
   expect(first).not.toContain(",");
 });
 
-test("an injected inline script does not run on admin pages", async ({ page }) => {
+/*
+ * 模拟白名单被绕过、HTML 里混进了内联事件处理器（XSS 最常见的形式）。
+ * 前台的 CSP 带 'unsafe-inline'，会执行（用来证明这个测试真的能分辨）；后台的严格 CSP 会拦下。
+ */
+async function injectedHandlerRuns(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    const box = document.createElement("div");
+    box.innerHTML = '<img src="/e2e-missing-image.png" alt="" onerror="window.__injected = true">';
+    document.body.appendChild(box);
+  });
+  // 图片 404 后 onerror 才会触发（如果允许执行的话）
+  await page.waitForTimeout(500);
+  return page.evaluate(() => (window as Window & { __injected?: boolean }).__injected === true);
+}
+
+test("an injected inline event handler runs on public pages but not on admin pages", async ({ page }) => {
   const violations: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error" && /Content Security Policy/i.test(message.text())) violations.push(message.text());
   });
+  await page.goto("/");
+  expect(await injectedHandlerRuns(page)).toBe(true);
+
   await page.goto("/admin/login");
-  // 正常页面：框架脚本带 nonce，可以交互（主题脚本按哈希放行，data-theme 已设置）
+  // 正常页面照常工作：框架脚本带 nonce，主题脚本按哈希放行（data-theme 已设置）
   await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
-  const ran = await page.evaluate(() => {
-    const script = document.createElement("script");
-    script.textContent = "window.__injected = true";
-    document.body.appendChild(script);
-    return (window as Window & { __injected?: boolean }).__injected === true;
-  });
-  expect(ran).toBe(false);
-  await expect.poll(() => violations.length).toBeGreaterThan(0);
+  expect(await injectedHandlerRuns(page)).toBe(false);
+  expect(violations.some((text) => /inline event handler|script-src/i.test(text))).toBe(true);
 });
 
 test("a wrong password is rejected", async ({ page }) => {
