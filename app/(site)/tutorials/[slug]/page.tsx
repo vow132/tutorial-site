@@ -22,7 +22,7 @@ import ReadingProgress from "@/components/reading-progress";
 import ArticleEnhancer from "@/components/article-enhancer";
 import { categoryTextStyle } from "@/lib/color";
 import TagChips from "@/components/tag-chips";
-import SeriesBox from "@/components/series-box";
+import SeriesBook from "@/components/series-book";
 import HelpfulFeedback from "@/components/helpful-feedback";
 import ShareButtons from "@/components/share-buttons";
 import SupportBox from "@/components/support-box";
@@ -296,8 +296,9 @@ export default async function TutorialDetailPage({
             />
           )}
 
+          {/* 「教程书」目录：手机和平板在正文上方，桌面在右侧栏 */}
           {series && (
-            <SeriesBox title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+            <SeriesBook variant="inline" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
           )}
 
           {/* 移动端本页目录（可自行开关） */}
@@ -381,8 +382,17 @@ export default async function TutorialDetailPage({
           )}
         </div>
 
-        {/* 目录 */}
-        <Toc items={toc} />
+        {/* 右侧栏：系列的「教程书」目录 + 本页目录，一起吸顶 */}
+        {(series || toc.length > 0) && (
+          <aside className="print-hide relative hidden min-w-0 self-stretch lg:block">
+            <div className="sticky top-24 max-h-[calc(100vh-7rem)] space-y-8 overflow-y-auto overscroll-contain pb-6">
+              {series && (
+                <SeriesBook variant="sidebar" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+              )}
+              <Toc items={toc} />
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );

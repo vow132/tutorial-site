@@ -2,8 +2,12 @@ import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 import { collectErrors } from "./helpers";
 
+/**
+ * 页面里第一个指向 prefix 的链接。跳过其他测试建的 e2e- 教程：列表是 ISR 缓存页，那些测试刚删掉的教程
+ * 可能还留在缓存的列表里（第一次访问拿到旧页面、后台再刷新），点进去就是 404。
+ */
 async function firstHref(page: import("@playwright/test").Page, prefix: string) {
-  const href = await page.locator(`main a[href^="${prefix}"]`).first().getAttribute("href");
+  const href = await page.locator(`main a[href^="${prefix}"]:not([href*="e2e-"])`).first().getAttribute("href");
   expect(href, `a link starting with ${prefix}`).toBeTruthy();
   return href!;
 }

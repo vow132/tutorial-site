@@ -46,6 +46,8 @@ model Tutorial {
   seriesId         Int?
   series           Series?             @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   seriesOrder      Int                 @default(0)
+  /// 系列里的章节名：相邻、同名的几篇归为一章（lib/series.ts 的 groupByChapter），空表示不分章
+  seriesChapter    String?
   dailyViews       TutorialDailyView[]
   feedbackMessages FeedbackMessage[]
   /// 已经给订阅者发过「新教程」邮件的时间；每篇只发一次（撤回再发布不会重发）

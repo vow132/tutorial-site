@@ -6,7 +6,8 @@ import Reveal from "@/components/reveal";
 import { categoryTextStyle } from "@/lib/color";
 import { getPublishedSeries } from "@/lib/public-data";
 import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
-import { MIN_INDEXABLE_SERIES_TUTORIALS, seriesPath } from "@/lib/series";
+import { groupByChapter, MIN_INDEXABLE_SERIES_TUTORIALS, seriesPath } from "@/lib/series";
+import { ReadMark, SeriesProgress } from "@/components/reading-history";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
 import { decodeSegment } from "@/lib/url";
@@ -42,6 +43,9 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
   const series = await findSeries(slug);
   if (!series) notFound();
   const url = absoluteUrl(seriesPath(series.slug));
+  const groups = groupByChapter(series.tutorials);
+  // 只给有章节名的组编号：第 1 章、第 2 章…
+  const chapterNumbers = new Map(groups.filter((group) => group.chapter).map((group, index) => [group, index + 1]));
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-14">
@@ -78,37 +82,55 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
         {series.description && <p className="mt-3 text-base leading-relaxed text-ink-2">{series.description}</p>}
       </Reveal>
 
+      {/* 阅读进度和「继续阅读」：只记在本浏览器里（lib/reading-history.ts） */}
+      <SeriesProgress tutorials={groups.flatMap((group) => group.items)} />
+
       <h2 className="sr-only">本系列教程（按阅读顺序）</h2>
-      <ol className="mt-10 space-y-3">
-        {series.tutorials.map((t, index) => (
-          <li key={t.id}>
-            <Reveal delay={Math.min(index, 5) * 0.05}>
-              <IntentLink
-                href={`/tutorials/${t.slug}`}
-                className="group flex gap-4 rounded-2xl border border-line bg-surface p-5 transition-colors hover:border-accent/50"
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-ink tabular-nums"
-                >
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="sr-only">第 {index + 1} 篇：</span>
-                  <span className="block font-semibold text-ink group-hover:text-accent-ink">{t.title}</span>
-                  {t.excerpt && <span className="mt-1 line-clamp-2 block text-sm text-ink-2">{t.excerpt}</span>}
-                  <span className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink-3">
-                    <span className="cat-text" style={categoryTextStyle(t.category.color)}>
-                      {t.category.name}
-                    </span>
-                    <span>{t.views} 次阅读</span>
-                  </span>
-                </span>
-              </IntentLink>
-            </Reveal>
-          </li>
+      <div className="mt-10 space-y-10">
+        {groups.map((group, groupIndex) => (
+          <section key={`${groupIndex}-${group.chapter ?? ""}`} aria-label={group.chapter ?? undefined}>
+            {group.chapter && (
+              <h3 className="mb-3 flex items-baseline gap-3 text-lg font-bold text-ink">
+                <span className="text-sm font-semibold text-accent-ink tabular-nums">第 {chapterNumbers.get(group)} 章</span>
+                {group.chapter}
+              </h3>
+            )}
+            <ol className="space-y-3">
+              {group.items.map((t) => (
+                <li key={t.id}>
+                  <Reveal delay={Math.min(t.number - 1, 5) * 0.05}>
+                    <IntentLink
+                      href={`/tutorials/${t.slug}`}
+                      className="group flex gap-4 rounded-2xl border border-line bg-surface p-5 transition-colors hover:border-accent/50"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-ink tabular-nums"
+                      >
+                        {t.number}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="sr-only">第 {t.number} 篇：</span>
+                        <span className="flex items-start gap-1.5">
+                          <span className="font-semibold text-ink group-hover:text-accent-ink">{t.title}</span>
+                          <ReadMark id={t.id} />
+                        </span>
+                        {t.excerpt && <span className="mt-1 line-clamp-2 block text-sm text-ink-2">{t.excerpt}</span>}
+                        <span className="mt-2 flex flex-wrap items-center gap-3 text-xs text-ink-3">
+                          <span className="cat-text" style={categoryTextStyle(t.category.color)}>
+                            {t.category.name}
+                          </span>
+                          <span>{t.views} 次阅读</span>
+                        </span>
+                      </span>
+                    </IntentLink>
+                  </Reveal>
+                </li>
+              ))}
+            </ol>
+          </section>
         ))}
-      </ol>
+      </div>
     </div>
   );
 }

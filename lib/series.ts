@@ -35,3 +35,35 @@ export function seriesPosition<T extends { id: number }>(tutorials: T[], id: num
     next: tutorials[index + 1] ?? null,
   };
 }
+
+export const MAX_CHAPTER_TITLE = 30;
+
+/** 后台填写的章节名：空表示不分章；最多 MAX_CHAPTER_TITLE 个字。 */
+export function parseChapterInput(raw: unknown): { value: string | null } | { error: string } {
+  const value = String(raw ?? "").replace(/\s+/g, " ").trim();
+  if (!value) return { value: null };
+  if (Array.from(value).length > MAX_CHAPTER_TITLE) return { error: `章节名最多 ${MAX_CHAPTER_TITLE} 个字` };
+  return { value };
+}
+
+export type ChapterGroup<T> = { chapter: string | null; items: (T & { number: number })[] };
+
+/**
+ * 按章节分组（「教程书」目录）：顺序不变，相邻、章节名相同的归为一章；没填章节名的单独成组、不显示章节标题。
+ * 编号贯穿整个系列（第 1、2、3… 篇），不按章重新编号。
+ */
+export function groupByChapter<T extends { seriesChapter?: string | null }>(tutorials: T[]): ChapterGroup<T>[] {
+  const groups: ChapterGroup<T>[] = [];
+  tutorials.forEach((tutorial, index) => {
+    const chapter = tutorial.seriesChapter?.trim() || null;
+    const last = groups.at(-1);
+    if (last && last.chapter === chapter) last.items.push({ ...tutorial, number: index + 1 });
+    else groups.push({ chapter, items: [{ ...tutorial, number: index + 1 }] });
+  });
+  return groups;
+}
+
+/** 系列里第一篇没读完的（都读完了返回 null）。 */
+export function firstUnread<T extends { id: number }>(tutorials: T[], read: ReadonlySet<number>): T | null {
+  return tutorials.find((tutorial) => !read.has(tutorial.id)) ?? null;
+}

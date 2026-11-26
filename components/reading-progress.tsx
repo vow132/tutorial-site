@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { sendBeacon } from "./view-beacon";
+import { markTutorialRead } from "@/lib/reading-history";
 
 /** 读到正文末尾、并且在页面上停留了这么久，才算「读完」（快速划到底不算）。 */
 const MIN_READ_MS = 10_000;
@@ -24,6 +25,8 @@ export default function ReadingProgress({ target = ".article-body", tutorialId }
     const reportRead = () => {
       if (reported || !tutorialId || !reachedEnd || Date.now() - startedAt < MIN_READ_MS) return;
       reported = true;
+      // 「教程书」的阅读进度（只记在本浏览器里）
+      markTutorialRead(tutorialId);
       try {
         const key = `read:${tutorialId}`;
         if (sessionStorage.getItem(key)) return;

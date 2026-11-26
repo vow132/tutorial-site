@@ -6,9 +6,10 @@ import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS } from "@/lib/public-data";
-import { parseSeriesInput, seriesPath } from "@/lib/series";
+import { parseChapterInput, parseSeriesInput, seriesPath } from "@/lib/series";
 
 export type SeriesFormState = { error?: string; success?: string };
+export type ChapterFormState = { error?: string; success?: string };
 
 /**
  * 系列变动影响：系列页、系列列表，以及系列里每篇教程的文章页（文章页是 ISR，
@@ -108,7 +109,7 @@ export async function addToSeries(formData: FormData) {
   if (!series || !tutorial || tutorial.seriesId === seriesId) return;
   const ids = await orderedIds(seriesId);
   // 用原生 SQL 改归属：教程内容没变，不刷新 updatedAt（sitemap lastmod 不受影响）
-  await prisma.$executeRaw`UPDATE "Tutorial" SET "seriesId" = ${seriesId}, "seriesOrder" = ${ids.length + 1} WHERE "id" = ${tutorialId}`;
+  await prisma.$executeRaw`UPDATE "Tutorial" SET "seriesId" = ${seriesId}, "seriesOrder" = ${ids.length + 1}, "seriesChapter" = NULL WHERE "id" = ${tutorialId}`;
   // 从别的系列移过来时，原系列剩下的重新编号
   if (tutorial.seriesId) await renumberRaw(await orderedIds(tutorial.seriesId));
   await audit("series.add", { actor: admin.username, detail: `${tutorial.title} → ${series.title}` });
@@ -126,7 +127,7 @@ export async function removeFromSeries(formData: FormData) {
     : null;
   if (!tutorial?.seriesId || !tutorial.series) return;
   const slugs = await memberSlugs(tutorial.seriesId);
-  await prisma.$executeRaw`UPDATE "Tutorial" SET "seriesId" = NULL, "seriesOrder" = 0 WHERE "id" = ${tutorialId}`;
+  await prisma.$executeRaw`UPDATE "Tutorial" SET "seriesId" = NULL, "seriesOrder" = 0, "seriesChapter" = NULL WHERE "id" = ${tutorialId}`;
   await renumberRaw(await orderedIds(tutorial.seriesId));
   await audit("series.remove", { actor: admin.username, detail: `${tutorial.title} ← ${tutorial.series.title}` });
   revalidateSeries([tutorial.series.slug], slugs);
@@ -152,6 +153,26 @@ export async function moveInSeries(formData: FormData) {
   revalidateSeries([tutorial.series?.slug], await memberSlugs(tutorial.seriesId));
   revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
   revalidatePath(`/admin/series/${tutorial.seriesId}`);
+}
+
+/**
+ * 设置一篇在系列里属于哪一章（空 = 不分章）。相邻、同名的几篇在前台归为一章（lib/series.ts 的 groupByChapter）。
+ * 用原生 SQL：分章不算修改教程内容，不刷新 updatedAt。
+ */
+export async function setSeriesChapter(_prev: ChapterFormState, formData: FormData): Promise<ChapterFormState> {
+  await requireAuth("taxonomy");
+  const tutorialId = Number(formData.get("tutorialId"));
+  const parsed = parseChapterInput(formData.get("chapter"));
+  if ("error" in parsed) return { error: parsed.error };
+  const tutorial = tutorialId
+    ? await prisma.tutorial.findUnique({ where: { id: tutorialId }, select: { seriesId: true, series: { select: { slug: true } } } })
+    : null;
+  if (!tutorial?.seriesId) return { error: "这篇教程已经不在系列里了" };
+  await prisma.$executeRaw`UPDATE "Tutorial" SET "seriesChapter" = ${parsed.value} WHERE "id" = ${tutorialId}`;
+  revalidateSeries([tutorial.series?.slug], await memberSlugs(tutorial.seriesId));
+  revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
+  revalidatePath(`/admin/series/${tutorial.seriesId}`);
+  return { success: "已保存" };
 }
 
 /** 按给定顺序重新编号为 1..n。用原生 SQL：调整顺序不算修改教程内容，不刷新 updatedAt。 */
