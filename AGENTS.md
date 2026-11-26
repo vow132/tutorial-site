@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # 教程网（商业级图文教程平台）
@@ -48,6 +52,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build  
 - **依赖覆盖**：`package.json` 的 `overrides` 把 Prisma CLI 依赖的 `effect` 固定到 3.22.4（3.22.0 及以下有 ReDoS 公告，CI 的依赖审计会失败）；Prisma 自己升级到不再依赖旧版 effect 后可以删掉；`minimatch@>=7.0.0 <11.0.1` 覆盖到 11.0.8（ESLint 10.14 / typescript-eslint 8.72 依赖的 10.x 有拒绝服务公告，只影响开发依赖；11 去掉了 `makeRe`，ESLint 只用 `new Minimatch()` / `.match()` / `minimatch()`，改动时对比过 lint 的文件列表和结果完全一致），升级到依赖 minimatch ^11 的 eslint ≥10.15、typescript-eslint ≥8.73 后删掉
 - **给 Tutorial 表加字段**：迁移里只用 `ALTER TABLE "Tutorial" ADD COLUMN …`（外键列也可以 `ADD COLUMN … REFERENCES`），不要用 Prisma 自动生成的「RedefineTables」（新建表→拷数据→删旧表），那样会把 `TutorialSearch` 的三个触发器一起删掉，全文搜索从此不再更新。写完用 `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma` 确认除 FTS 表外没有差异
 - **Prisma 7**：schema 里 datasource **不能写 url**，连接串在 `prisma.config.ts`；客户端用 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) })`（`lib/prisma.ts`），生成代码在 `generated/prisma/`；生产环境启动时设 `journal_mode=WAL` + `synchronous=NORMAL`（同步驱动的每次 fsync 都会卡住整个进程），数据库文件旁会有 `-wal`/`-shm`，**不要直接复制 `.db` 文件做备份**，用 `npm run backup`（在线备份 API）。**WAL 下 Prisma 迁移（`migrate deploy/dev`）要求没有其他进程连着数据库**（迁移引擎会设 `locking_mode=EXCLUSIVE`，否则报 database is locked）：`deploy.sh` 在站点运行时先对快照迁移+构建、最后短暂停站迁移正式库，一键更新同样停站后迁移；开发环境用默认回滚日志模式，`npm run dev` 运行时也能 `prisma migrate dev`
+- **启动任务**：`instrumentation.ts` 只在 `if (process.env.NEXT_RUNTIME === "nodejs")` 分支里动态导入 `lib/server-startup.ts`（打印安装码、重新加密敏感字段、补缩略图、搜索索引、定时发布、备份检查都写在那里）。**不要改成「不是 nodejs 就提前 return」**：开发模式不会剔除后面的代码，edge 编译会去解析 better-sqlite3，`npm run dev` 的所有页面都会 500。下文说的「instrumentation.ts 启动时」都指这里
 - **Next 16 async APIs**：`cookies()`/`headers()`/`params`/`searchParams` 全部要 `await`；**动态路由 params 不会自动 URL 解码，含中文 slug 必须 `decodeURIComponent()`**
 - **内容流**：Tiptap 产 HTML → `sanitizeArticleHtml()`（`lib/sanitize.ts`，入库和渲染各过滤一次）→ 前台 `lib/article.ts` 服务端提取 TOC + highlight.js 高亮 → `dangerouslySetInnerHTML` 渲染。新增编辑器扩展时同步放宽白名单
 - **封面与缩略图**：`Tutorial.cover` 是后台上传的封面（只接受 `/uploads/` 下真实存在的文件），文章页头图、OG、JSON-LD 优先用它；`Tutorial.thumbnail` 是保存时算出的列表缩略图（封面，否则正文第一张上传图，优先 400w 小图，见 `lib/article.ts` 的 `thumbnailFor()`），旧数据由 `instrumentation.ts` 启动时补（`lib/thumbnail-backfill.ts`，用原生 SQL 不动 updatedAt）。列表查询只 select `thumbnail`，不要为了缩略图去读 content
