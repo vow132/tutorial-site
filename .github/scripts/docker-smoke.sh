@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 启动镜像做一次冒烟测试：第一次启动建库并写入示例数据、页面用的是运行时的 SITE_URL 和真实数据、
 # 分享图和图标能生成、运维命令（备份、还原、清理、重置管理员、迁移）都能用、重启不会重复写入示例数据；
-# 不设 ADMIN_PASSWORD 时走首次安装页。
+# 不设 ADMIN_PASSWORD 时走首次安装页；演示站只靠环境变量一步就能起来。
 # 用法：docker-smoke.sh <镜像>
 set -euo pipefail
 image="$1"
@@ -77,4 +77,17 @@ location=$(curl -s -o /dev/null -w "%{redirect_url}" http://127.0.0.1:3000/admin
 [[ "$location" == */admin/setup ]] || { echo "没有账号时登录页没有带到安装页（$location）" >&2; exit 1; }
 has "$(curl -sf http://127.0.0.1:3000/admin/setup)" "先完成安装" || { echo "安装页打不开" >&2; exit 1; }
 has "$(docker exec -u node "$name" npm run -s setup:code)" "安装码" || { echo "npm run setup:code 没有输出安装码" >&2; exit 1; }
+docker rm -f "$name" >/dev/null
+
+# 演示站（README「演示站」）：.env 里写好演示账号和 DEMO_MODE，第一次启动就是带示例教程、后台只读的演示站
+docker run -d --name "$name" -p 3000:3000 \
+  -e AUTH_SECRET=ci-smoke-test-only-never-use-in-production \
+  -e SITE_URL="$site" \
+  -e ADMIN_USERNAME=demo -e ADMIN_PASSWORD=ci-demo-password -e DEMO_MODE=true \
+  "$image" >/dev/null
+wait_healthy
+home=$(curl -sf http://127.0.0.1:3000/)
+has "$home" "这是演示站" || { echo "演示模式下首页没有演示站横幅" >&2; exit 1; }
+has "$home" "Flexbox" || { echo "演示站首页没有示例教程" >&2; exit 1; }
+has "$(curl -sf http://127.0.0.1:3000/admin/login)" "ci-demo-password" || { echo "演示站登录页没有显示演示账号" >&2; exit 1; }
 echo "✅ 冒烟测试通过：$image"

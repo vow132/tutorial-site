@@ -248,11 +248,24 @@ E2E_ADMIN_PASSWORD='你的后台密码' npm run test:e2e   # 默认读取 ADMIN_
 
 ### 演示站（可选）
 
-想公开展示这套程序、让别人看看后台长什么样，可以单独部署一份并打开演示模式：
+想公开展示这套程序、让别人看看后台长什么样，可以单独部署一份并打开演示模式。
 
-1. 照常部署（Docker 或 PM2），在后台写好或批量导入演示内容、设置好品牌；
-2. 把管理员密码改成要公开的演示密码，同时关掉两步验证、删掉通行密钥：`npm run admin:reset -- --password 演示密码`（Docker：`docker compose exec -u node app npm run admin:reset -- --password 演示密码`）；
-3. 在 `.env`（PM2 部署是 `.env.production`）里加上 `DEMO_MODE="true"`，`ADMIN_PASSWORD` 改成同一个演示密码，然后重启网站（Docker：`docker compose up -d`）。
+**全新部署（一步）**：照「Docker 部署」准备好 `.env`，再加上公开的演示账号和演示模式，启动后就是一个带示例教程、后台只读的演示站：
+
+```bash
+SITE_URL="https://demo.example.com"
+AUTH_SECRET="用 openssl rand -base64 48 生成"
+ADMIN_USERNAME="demo"
+ADMIN_PASSWORD="一个只用于演示站的密码"
+DEMO_MODE="true"
+```
+
+想换成自己的演示内容、品牌：先注释掉 `DEMO_MODE` 重启（`docker compose up -d`），用上面的账号登录后台写好或批量导入，再打开 `DEMO_MODE` 重启。
+
+**把已有的站改成演示站**：
+
+1. 把管理员密码改成要公开的演示密码，同时关掉两步验证、删掉通行密钥：`npm run admin:reset -- --password 演示密码`（Docker：`docker compose exec -u node app npm run admin:reset -- --password 演示密码`）；
+2. 在 `.env`（PM2 部署是 `.env.production`）里加上 `DEMO_MODE="true"`，`ADMIN_PASSWORD` 改成同一个演示密码，然后重启网站（Docker：`docker compose up -d`）。
 
 演示模式下：
 
@@ -286,7 +299,7 @@ npm run admin:reset                       # 重置第一个站长：随机生成
 npm run admin:reset -- --password '新的强密码' --username admin
 ```
 
-多人协作时，编辑、作者忘记密码可以由站长在「账号管理」里重置，不用登服务器。该命令会重置密码、关闭两步验证（连同恢复码）、删除所有通行密钥并退出所有设备。更换了 `AUTH_SECRET` 又没有单独设置 `DATA_ENCRYPTION_KEY` 时，旧的两步验证密钥会无法解密（登录页会提示），用恢复码登录或运行此命令即可。后台 **安全日志**（`/admin/audit`）记录登录、改密、发布、上传、部署等操作，保留一年。
+多人协作时，编辑、作者忘记密码可以由站长在「账号管理」里重置，不用登服务器。该命令会重置密码、关闭两步验证（连同恢复码）、删除所有通行密钥并退出所有设备；网站里一个站长都没有时（比如直接改过数据库），被重置的账号同时恢复为站长。更换了 `AUTH_SECRET` 又没有单独设置 `DATA_ENCRYPTION_KEY` 时，旧的两步验证密钥会无法解密（登录页会提示），用恢复码登录或运行此命令即可。后台 **安全日志**（`/admin/audit`）记录登录、改密、发布、上传、部署等操作，保留一年。
 
 ## 安全加固（上线必做）
 
