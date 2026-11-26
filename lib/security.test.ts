@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { passwordProblem } from "./password-policy";
-import { RateLimiter } from "./rate-limit";
+import { OneTimeSet, RateLimiter } from "./rate-limit";
 import { sanitizeArticleHtml } from "./sanitize";
 import { readDevice, readSession, readTotpSetup, signDevice, signSession, signTotpSetup } from "./session";
 import { base32Decode, base32Encode, totpCode, verifyTotp } from "./totp";
@@ -38,6 +38,27 @@ test("rate limiter counts per key, expires, and stays bounded", () => {
   limiter.hit("e", 2000);
   assert.equal(limiter.retryAfter("e", 2000), 1);
   assert.equal(limiter.retryAfter("b", 2000), 0, "oldest entry evicted at capacity");
+});
+
+test("flooding the rate limiter with new keys does not evict a key that is currently blocked", () => {
+  const limiter = new RateLimiter(3, 60_000, 100);
+  for (let i = 0; i < 3; i++) limiter.hit("attacker", 0);
+  assert.ok(limiter.retryAfter("attacker", 0) > 0);
+  // 一万个不同的 key：容量只有 100，旧的计数被淘汰，但正在限制中的那条留着
+  for (let i = 0; i < 10_000; i++) limiter.hit(`junk-${i}`, 1);
+  assert.ok(limiter.retryAfter("attacker", 2) > 0, "blocked entry survived the flood");
+  assert.equal(limiter.retryAfter("junk-0", 2), 0, "unblocked entries were evicted instead");
+  assert.equal(limiter.retryAfter("attacker", 60_000), 0, "and it still expires on time");
+});
+
+test("one-time values (passkey challenges) can be claimed once within their lifetime", () => {
+  const used = new OneTimeSet(300_000, 3);
+  assert.equal(used.claim("c1", 0), true);
+  assert.equal(used.claim("c1", 1), false, "replaying the same challenge is refused");
+  assert.equal(used.claim("c2", 1), true);
+  assert.equal(used.claim("c1", 300_001), true, "forgotten after it expires (the signed cookie has expired too)");
+  for (const value of ["a", "b", "c", "d"]) used.claim(value, 300_002);
+  assert.equal(used.claim("d", 300_003), false, "still bounded in size, newest kept");
 });
 
 test("article sanitizer keeps editor markup and strips script vectors", () => {
