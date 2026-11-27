@@ -325,6 +325,8 @@ test("anti-scraping settings: AI crawlers in robots.txt and a source line on cop
     expect(robots).toContain("User-Agent: *\nAllow: /");
 
     await page.goto(`/tutorials/${slug}`);
+    // page.goto 在 load 事件时返回，React 可能还没把复制事件接上（CI 上偶尔会这样）
+    await expect(page.locator(".article-body[data-enhanced]")).toBeAttached();
     const body = await copy(".article-body p");
     expect(body.prevented).toBe(true);
     expect(body.text.startsWith(paragraph)).toBe(true);
@@ -340,6 +342,7 @@ test("anti-scraping settings: AI crawlers in robots.txt and a source line on cop
     robots = await (await page.request.get("/robots.txt")).text();
     expect(robots).not.toContain("GPTBot");
     await page.goto(`/tutorials/${slug}`);
+    await expect(page.locator(".article-body[data-enhanced]")).toBeAttached();
     expect((await copy(".article-body p")).prevented).toBe(false);
   } finally {
     await setToggles(false).catch(() => {});

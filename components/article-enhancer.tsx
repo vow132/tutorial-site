@@ -118,10 +118,13 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
 
     article.addEventListener("click", onClick);
     article.addEventListener("copy", onCopy);
+    // 事件委托已经接上（hydration 完成）：端到端测试等这个标记再操作，不和 React 抢时间
+    article.dataset.enhanced = "";
     return () => {
       article.removeEventListener("click", onClick);
       article.removeEventListener("copy", onCopy);
       window.removeEventListener("hashchange", mapLegacyHash);
+      delete article.dataset.enhanced;
     };
   }, [showToast, attribution]);
 
