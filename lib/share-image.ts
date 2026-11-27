@@ -54,8 +54,8 @@ type SiteCardSource = {
   brand: { accentColor: string };
 };
 
-/** 首页、列表页等没有配图时的分享图内容：首页大标题 + 徽标文字，按站点主题色绘制。 */
-export function siteShareCard(settings: SiteCardSource): ShareCard {
+/** 首页、列表页等没有配图时的分享图内容：首页大标题 + 徽标文字，按站点主题色绘制。cta 是网站语言的「访问网站 →」 */
+export function siteShareCard(settings: SiteCardSource, cta = "访问网站 →"): ShareCard {
   const accent = settings.brand.accentColor || "#6366f1";
   const hero = `${settings.heroTitleA}${settings.heroTitleB}${settings.heroAccent}`.trim();
   return {
@@ -65,7 +65,7 @@ export function siteShareCard(settings: SiteCardSource): ShareCard {
     siteName: settings.siteName,
     logoText: settings.logoText,
     accent,
-    cta: "访问网站 →",
+    cta,
   };
 }
 

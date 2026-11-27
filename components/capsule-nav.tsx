@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { categoryLinkTarget, isExternalHref } from "@/lib/categories";
 import LabelButton from "@/components/label-button";
+import { useI18n } from "@/lib/i18n/client";
 
 export type NavItem = {
   key: string;
@@ -121,6 +122,7 @@ function MobileNavItem({
   const hasChildren = Boolean(item.children?.length);
   const external = isExternalHref(item.href);
   const submenuToggleId = useId();
+  const { m, f } = useI18n();
 
   return (
     <div>
@@ -139,7 +141,7 @@ function MobileNavItem({
           <LabelButton
             htmlFor={submenuToggleId}
             tabIndex={open ? 0 : -1}
-            aria-label={`展开或收起${item.label}子分类`}
+            aria-label={f(m.reader.nav.expandChildren, { name: item.label })}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
@@ -211,7 +213,7 @@ function MobileNavItem({
               onClick={closeDrawer}
               className="flex min-h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-medium text-accent-ink transition-colors hover:bg-accent-soft"
             >
-              查看此分类
+              {m.reader.nav.viewCategory}
               {external && <span aria-hidden="true">↗</span>}
             </IntentLink>
             {item.children!.map((child) => (
@@ -293,12 +295,13 @@ function DesktopNavArrow({
   disabled: boolean;
   onClick: () => void;
 }) {
+  const { m } = useI18n();
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={direction === "prev" ? "上一组分类" : "下一组分类"}
+      aria-label={direction === "prev" ? m.reader.nav.prevGroup : m.reader.nav.nextGroup}
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
     >
       <svg
@@ -535,6 +538,8 @@ function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string })
 export default function CapsuleNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { m } = useI18n();
+  const t = m.reader.nav;
   const drawerId = useId();
   const toggleId = useId();
   const toggleRef = useRef<HTMLInputElement>(null);
@@ -639,7 +644,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
         htmlFor={toggleId}
         className="mobile-drawer-trigger flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line bg-surface/90 shadow-capsule backdrop-blur-md transition-colors hover:bg-paper lg:hidden"
         tabIndex={0}
-        aria-label="打开菜单"
+        aria-label={t.openMenu}
         aria-controls={drawerId}
         aria-expanded={open}
         onKeyDown={(event) => {
@@ -661,7 +666,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
       >
         <LabelButton
           htmlFor={toggleId}
-          aria-label="关闭菜单"
+          aria-label={t.closeMenu}
           tabIndex={open ? 0 : -1}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -676,7 +681,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
           id={drawerId}
           role="dialog"
           aria-modal="true"
-          aria-label="网站菜单"
+          aria-label={t.menu}
           className="mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,22rem)] flex-col overscroll-contain border-r border-line bg-surface shadow-2xl transition-transform duration-300 ease-out"
         >
           <div className="flex items-center justify-between border-b border-line px-5 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -684,7 +689,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-3">
                 Navigation
               </p>
-              <p className="mt-1 text-lg font-bold text-ink">菜单导航</p>
+              <p className="mt-1 text-lg font-bold text-ink">{t.menuTitle}</p>
             </div>
             <LabelButton
               ref={closeButtonRef}
@@ -697,7 +702,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
                 }
               }}
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2"
-              aria-label="关闭菜单"
+              aria-label={t.closeMenu}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <path d="M4 4l10 10M14 4 4 14" />
@@ -705,7 +710,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
             </LabelButton>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="移动端导航">
+          <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label={t.mobileNav}>
             <div className="space-y-1.5">
               {items.map((item, index) => (
                 <MobileNavItem
@@ -722,7 +727,7 @@ export default function CapsuleNav({ items }: { items: NavItem[] }) {
           </nav>
 
           <div className="border-t border-line px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-xs leading-5 text-ink-3">
-            选择栏目，快速浏览对应教程。
+            {t.menuHint}
           </div>
         </aside>
       </div>

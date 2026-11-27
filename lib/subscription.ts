@@ -1,5 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { authSecretFrom } from "@/lib/auth-secret.mjs";
+import { format } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/locales";
+import { email as zhEmail } from "@/lib/i18n/messages/zh-CN/email";
 
 /**
  * 邮件订阅的纯函数：邮箱校验、发信配置校验、确认/退订链接签名、邮件内容。
@@ -105,8 +108,11 @@ const escapeHtml = (text: string) =>
 
 type Email = { subject: string; text: string; html: string };
 
-function layout(siteName: string, body: string, footer: string) {
-  return `<!doctype html><html lang="zh-CN"><body style="margin:0;background:#f7f8fa;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#17181c">
+/** 邮件文案：调用方传网站语言的 m.email（不传时用简体中文，测试用） */
+type EmailText = typeof zhEmail;
+
+function layout(siteName: string, body: string, footer: string, locale: Locale) {
+  return `<!doctype html><html lang="${locale}"><body style="margin:0;background:#f7f8fa;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#17181c">
 <div style="max-width:560px;margin:0 auto;padding:32px 20px">
 <p style="margin:0 0 16px;font-size:14px;color:#6b7280">${escapeHtml(siteName)}</p>
 <div style="background:#fff;border:1px solid #e9ebf0;border-radius:16px;padding:28px">${body}</div>
@@ -117,17 +123,27 @@ function layout(siteName: string, body: string, footer: string) {
 const button = (url: string, label: string) =>
   `<a href="${escapeHtml(url)}" style="display:inline-block;margin-top:20px;background:#17181c;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">${escapeHtml(label)}</a>`;
 
-export function confirmEmail({ siteName, confirmUrl }: { siteName: string; confirmUrl: string }): Email {
-  const subject = `请确认订阅「${siteName}」的新教程提醒`;
+export function confirmEmail({
+  siteName,
+  confirmUrl,
+  t = zhEmail,
+  locale = "zh-CN",
+}: {
+  siteName: string;
+  confirmUrl: string;
+  t?: EmailText;
+  locale?: Locale;
+}): Email {
   return {
-    subject,
-    text: `你好！\n\n有人（希望是你）用这个邮箱订阅了「${siteName}」的新教程提醒。打开下面的链接确认订阅：\n\n${confirmUrl}\n\n如果不是你本人操作，忽略这封邮件即可，不会再收到任何邮件。`,
+    subject: format(t.confirmSubject, { site: siteName }),
+    text: format(t.confirmText, { site: siteName, url: confirmUrl }),
     html: layout(
       siteName,
-      `<h1 style="margin:0;font-size:20px">确认订阅新教程提醒</h1>
-<p style="margin:12px 0 0;font-size:15px;line-height:1.7;color:#4b5563">有人（希望是你）用这个邮箱订阅了「${escapeHtml(siteName)}」的新教程提醒。点下面的按钮确认，之后每有新教程发布会发一封邮件给你。</p>
-${button(confirmUrl, "确认订阅")}`,
-      "如果不是你本人操作，忽略这封邮件即可，不会再收到任何邮件。",
+      `<h1 style="margin:0;font-size:20px">${escapeHtml(t.confirmHeading)}</h1>
+<p style="margin:12px 0 0;font-size:15px;line-height:1.7;color:#4b5563">${escapeHtml(format(t.confirmBody, { site: siteName }))}</p>
+${button(confirmUrl, t.confirmButton)}`,
+      escapeHtml(t.confirmFooter),
+      locale,
     ),
   };
 }
@@ -138,24 +154,30 @@ export function newTutorialEmail({
   excerpt,
   url,
   unsubscribeUrl,
+  t = zhEmail,
+  locale = "zh-CN",
 }: {
   siteName: string;
   title: string;
   excerpt: string | null;
   url: string;
   unsubscribeUrl: string;
+  t?: EmailText;
+  locale?: Locale;
 }): Email {
   const summary = excerpt?.trim() ?? "";
+  const link = `<a href="${escapeHtml(unsubscribeUrl)}" style="color:#6b7280">${escapeHtml(t.unsubscribeLink)}</a>`;
   return {
-    subject: `新教程：${title}`,
-    text: `「${siteName}」发布了新教程：\n\n${title}\n${summary ? `\n${summary}\n` : ""}\n阅读全文：${url}\n\n不想再收到？退订：${unsubscribeUrl}`,
+    subject: format(t.newSubject, { title }),
+    text: `${format(t.newIntro, { site: siteName })}\n\n${title}\n${summary ? `\n${summary}\n` : ""}\n${format(t.newReadMore, { url })}\n\n${format(t.newUnsubscribe, { url: unsubscribeUrl })}`,
     html: layout(
       siteName,
-      `<p style="margin:0;font-size:13px;color:#4f46e5">新教程</p>
+      `<p style="margin:0;font-size:13px;color:#4f46e5">${escapeHtml(t.newLabel)}</p>
 <h1 style="margin:8px 0 0;font-size:20px;line-height:1.4">${escapeHtml(title)}</h1>
 ${summary ? `<p style="margin:12px 0 0;font-size:15px;line-height:1.7;color:#4b5563">${escapeHtml(summary)}</p>` : ""}
-${button(url, "阅读全文")}`,
-      `你收到这封邮件是因为订阅了「${escapeHtml(siteName)}」的新教程提醒。<a href="${escapeHtml(unsubscribeUrl)}" style="color:#6b7280">退订</a>`,
+${button(url, t.newButton)}`,
+      escapeHtml(format(t.newFooter, { site: siteName, link: "\u0000" })).replace("\u0000", link),
+      locale,
     ),
   };
 }

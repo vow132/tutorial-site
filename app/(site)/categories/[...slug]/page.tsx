@@ -15,6 +15,7 @@ import { decodeSegment } from "@/lib/url";
 import { getSettings } from "@/lib/settings";
 import { breadcrumbJsonLd, pageMetadata, pageSuffix, withPage } from "@/lib/seo";
 import JsonLd from "@/components/json-ld";
+import { getSiteI18n, type I18n } from "@/lib/i18n/server";
 
 const PAGE_SIZE = 9;
 
@@ -27,9 +28,10 @@ function resolveSlug(segments: string[]): string {
 
 const categoryPath = (slug: string) => `/categories/${encodeURIComponent(slug)}`;
 
-/** 分类名本身以“教程”结尾时不再重复（避免“前端教程教程”）。 */
-function categoryTitle(name: string) {
-  return /教程$/.test(name) ? name : `${name}教程`;
+/** 分类页标题：分类名本身已经以「教程」之类结尾时不再重复（避免「前端教程教程」），规则在字典里。 */
+function categoryTitle(name: string, { m, f }: I18n) {
+  const t = m.site.categories;
+  return new RegExp(t.titleSuffixPattern, "i").test(name) ? name : f(t.title, { name });
 }
 
 type CategoryRow = Awaited<ReturnType<typeof getCategoriesWithCounts>>[number];
@@ -65,22 +67,23 @@ export async function generateMetadata({
 
   const { page: pageStr } = await searchParams;
   // 与页面相同的页码收敛规则（结果有缓存）：?page=999 的规范地址指向最后一页。
-  const [{ page, total }, settings] = await Promise.all([
+  const [{ page, total }, settings, i18n] = await Promise.all([
     getPublishedTutorialPage({
       categoryId: category.id,
       page: Number(pageStr) || 1,
       pageSize: PAGE_SIZE,
     }),
     getSettings(),
+    getSiteI18n(),
   ]);
-  const name = categoryTitle(category.name);
+  const { m, f, plural } = i18n;
+  const name = categoryTitle(category.name, i18n);
   const description =
-    category.description?.trim() ||
-    `${settings.siteName}「${category.name}」分类下的图文教程，共 ${total} 篇，持续更新。`;
+    category.description?.trim() || plural(total, m.site.categories.description, { site: settings.siteName, name: category.name });
 
   return pageMetadata({
-    title: `${name}${pageSuffix(page)}`,
-    description: page > 1 ? `${description}（第 ${page} 页）` : description,
+    title: `${name}${pageSuffix(page, m.site.pageSuffix)}`,
+    description: page > 1 ? `${description}${f(m.site.pageInDescription, { page })}` : description,
     path: withPage(categoryPath(category.slug), page),
   });
 }
@@ -103,7 +106,8 @@ export default async function CategoryPage({
     redirect(`/categories/${encodeURIComponent(slug)}${query}`);
   }
 
-  const allCategories = await getCategoriesWithCounts();
+  const [allCategories, { m, f, plural }] = await Promise.all([getCategoriesWithCounts(), getSiteI18n()]);
+  const t = m.site.categories;
   const category = allCategories.find((item) => item.slug === slug);
   if (!category) notFound();
 
@@ -132,7 +136,7 @@ export default async function CategoryPage({
     node._count.tutorials;
 
   const jsonLd = breadcrumbJsonLd([
-    { name: "首页", path: "/" },
+    { name: m.site.nav.home, path: "/" },
     ...ancestors.map((ancestor) => ({ name: ancestor.name, path: categoryPath(ancestor.slug) })),
     { name: category.name },
   ]);
@@ -143,7 +147,7 @@ export default async function CategoryPage({
       <Reveal fade={false}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink-3">
           <IntentLink href="/" className="transition-colors hover:text-accent">
-            首页
+            {m.site.nav.home}
           </IntentLink>
           {ancestors.map((ancestor) => (
             <span key={ancestor.id} className="contents">
@@ -173,7 +177,7 @@ export default async function CategoryPage({
               {category.name}
             </h1>
             <p className="mt-1.5 text-sm text-ink-2">
-              {category.description ?? "暂无描述"} · 共 {total} 篇
+              {category.description ?? m.site.noDescription} · {plural(total, m.site.totalTutorials)}
             </p>
           </div>
         </div>
@@ -182,7 +186,7 @@ export default async function CategoryPage({
       {categoryNode.children.length > 0 && (
         <section className="mt-10">
           <Reveal>
-            <h2 className="text-lg font-bold text-ink">子分类</h2>
+            <h2 className="text-lg font-bold text-ink">{t.subcategoriesHeading}</h2>
           </Reveal>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {categoryNode.children.map((child, index) => (
@@ -203,10 +207,8 @@ export default async function CategoryPage({
                       {child.name}
                     </span>
                     <span className="mt-0.5 block text-xs text-ink-3">
-                      {countTutorials(child)} 篇教程
-                      {child.children.length > 0
-                        ? ` · ${child.children.length} 个子分类`
-                        : ""}
+                      {plural(countTutorials(child), t.childTutorials)}
+                      {child.children.length > 0 ? plural(child.children.length, t.childSubcategories) : ""}
                     </span>
                   </span>
                   <span className="text-ink-3">→</span>
@@ -219,11 +221,11 @@ export default async function CategoryPage({
 
       {tutorials.length === 0 ? (
         <div className="mt-12 rounded-3xl border border-dashed border-line bg-surface/60 py-20 text-center text-ink-3">
-          该分类下暂无教程
+          {t.empty}
         </div>
       ) : (
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <h2 className="sr-only">{category.name}的教程</h2>
+          <h2 className="sr-only">{f(t.listHeading, { name: category.name })}</h2>
           {tutorials.map((tutorial, index) => (
             <Reveal key={tutorial.id} delay={Math.min(index, 5) * 0.05}>
               <TutorialCard
@@ -245,6 +247,7 @@ export default async function CategoryPage({
         page={safePage}
         totalPages={totalPages}
         basePath={`/categories/${slug}`}
+        labels={m.site.pagination}
       />
     </div>
   );

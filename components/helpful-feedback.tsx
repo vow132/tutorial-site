@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { MAX_FEEDBACK_MESSAGE } from "@/lib/feedback";
 import TurnstileWidget from "@/components/turnstile-widget";
+import { useI18n } from "@/lib/i18n/client";
 
 type Choice = "yes" | "no";
 
@@ -35,6 +36,8 @@ export default function HelpfulFeedback({ id, turnstileSiteKey = null }: { id: n
   const [checkFailed, setCheckFailed] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const choice = voted ?? stored;
+  const { m } = useI18n();
+  const t = m.reader.helpful;
 
   // 「没帮助」之后可以留一句话（只发给站长，不公开）
   const sendNote = async (event: FormEvent<HTMLFormElement>) => {
@@ -104,32 +107,33 @@ export default function HelpfulFeedback({ id, turnstileSiteKey = null }: { id: n
       className="helpful-feedback print-hide mt-12 flex flex-col items-center gap-4 rounded-2xl border border-line bg-surface px-6 py-7 text-center"
     >
       <h2 id="helpful-heading" className="text-base font-semibold text-ink">
-        这篇教程对你有帮助吗？
+        {t.question}
       </h2>
       <div className="flex flex-wrap justify-center gap-3">
-        {button("yes", "有帮助", "👍")}
-        {button("no", "没帮助", "👎")}
+        {button("yes", t.yes, "👍")}
+        {button("no", t.no, "👎")}
       </div>
       <p role="status" className="min-h-5 text-sm text-ink-3">
         {note === "sent"
-          ? "收到了，谢谢你花时间写下来！"
+          ? t.noteSent
           : choice === "yes"
-            ? "谢谢你的反馈！"
+            ? t.thanksYes
             : choice === "no"
-              ? "谢谢反馈，我们会继续改进这篇教程。"
+              ? t.thanksNo
               : ""}
       </p>
       {voted === "no" && note !== "sent" && (
         <form onSubmit={sendNote} className="w-full max-w-lg text-left">
           <label htmlFor="helpful-note" className="mb-1.5 block text-sm text-ink-2">
-            哪里没讲清楚？<span className="text-ink-3">（选填，只有站长能看到）</span>
+            {t.noteLabel}
+            <span className="text-ink-3">{t.noteHint}</span>
           </label>
           <textarea
             id="helpful-note"
             name="message"
             rows={3}
             maxLength={MAX_FEEDBACK_MESSAGE}
-            placeholder="例如：第三步的命令在 Windows 上报错……"
+            placeholder={t.notePlaceholder}
             className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent"
           />
           {turnstileSiteKey && (
@@ -146,14 +150,14 @@ export default function HelpfulFeedback({ id, turnstileSiteKey = null }: { id: n
             />
           )}
           <div className="mt-2 flex items-center justify-end gap-3">
-            {note === "failed" && <span className="text-xs text-red-500 dark:text-red-400">没发出去，请稍后再试</span>}
-            {note === "waiting" && <span className="text-xs text-ink-3">请稍等，人机验证完成后再发送</span>}
+            {note === "failed" && <span className="text-xs text-red-500 dark:text-red-400">{t.noteFailed}</span>}
+            {note === "waiting" && <span className="text-xs text-ink-3">{t.noteWaiting}</span>}
             <button
               type="submit"
               disabled={note === "sending"}
               className="h-9 rounded-full bg-btn px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {note === "sending" ? "发送中…" : "发送"}
+              {note === "sending" ? t.sending : t.send}
             </button>
           </div>
         </form>

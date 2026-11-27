@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 type Props = { url: string; title: string };
 
@@ -8,7 +9,7 @@ const canNativeShare = () => typeof navigator !== "undefined" && typeof navigato
 const noopSubscribe = () => () => {};
 
 /** 二维码矩阵画成一个 SVG path（深色模块是一个个 1×1 的小方块），留出 2 格白边。 */
-function QrSvg({ modules }: { modules: boolean[][] }) {
+function QrSvg({ modules, label }: { modules: boolean[][]; label: string }) {
   const size = modules.length + 4;
   let d = "";
   modules.forEach((row, y) =>
@@ -17,7 +18,7 @@ function QrSvg({ modules }: { modules: boolean[][] }) {
     }),
   );
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width="168" height="168" role="img" aria-label="本文地址的二维码" shapeRendering="crispEdges">
+    <svg viewBox={`0 0 ${size} ${size}`} width="168" height="168" role="img" aria-label={label} shapeRendering="crispEdges">
       <rect width={size} height={size} fill="#fff" />
       <path d={d} fill="#17181c" />
     </svg>
@@ -52,6 +53,8 @@ export default function ShareButtons({ url, title }: Props) {
   const [status, setStatus] = useState("");
   const [qr, setQr] = useState<boolean[][] | null>(null);
   const [open, setOpen] = useState(false);
+  const { m } = useI18n();
+  const t = m.reader.share;
   const panelId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
   const timer = useRef(0);
@@ -94,12 +97,12 @@ export default function ShareButtons({ url, title }: Props) {
 
   return (
     <div ref={wrapper} className="share-buttons print-hide relative mt-6 flex flex-wrap items-center justify-center gap-2">
-      <span className="text-sm text-ink-3">分享给朋友：</span>
-      <button type="button" className={button} onClick={async () => flash((await copyText(url)) ? "链接已复制" : "复制失败，请手动复制地址栏")}>
-        复制链接
+      <span className="text-sm text-ink-3">{t.label}</span>
+      <button type="button" className={button} onClick={async () => flash((await copyText(url)) ? t.linkCopied : t.copyFailed)}>
+        {t.copyLink}
       </button>
       <button type="button" className={button} onClick={toggleQr} aria-expanded={open} aria-controls={panelId}>
-        微信扫码
+        {t.wechat}
       </button>
       {native && (
         <button
@@ -107,7 +110,7 @@ export default function ShareButtons({ url, title }: Props) {
           className={button}
           onClick={() => navigator.share({ title, url }).catch(() => undefined)}
         >
-          更多…
+          {t.more}
         </button>
       )}
       <span role="status" className="w-full text-center text-xs text-ink-3 empty:hidden">
@@ -119,9 +122,9 @@ export default function ShareButtons({ url, title }: Props) {
           className="absolute bottom-full left-1/2 z-20 mb-2 w-52 -translate-x-1/2 rounded-2xl border border-line bg-surface p-4 text-center shadow-capsule"
         >
           <div className="flex justify-center">
-            <QrSvg modules={qr} />
+            <QrSvg modules={qr} label={t.qrAlt} />
           </div>
-          <p className="mt-2 text-xs text-ink-3">微信扫一扫，在手机上打开或转发</p>
+          <p className="mt-2 text-xs text-ink-3">{t.qrHint}</p>
         </div>
       )}
     </div>

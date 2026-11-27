@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TURNSTILE_SCRIPT_URL, type TurnstileAction } from "@/lib/turnstile";
+import { useI18n } from "@/lib/i18n/client";
+import type { Locale } from "@/lib/i18n/locales";
 
 type RenderOptions = {
   sitekey: string;
@@ -28,6 +30,9 @@ declare global {
 }
 
 let scriptPromise: Promise<TurnstileApi> | null = null;
+
+/** Cloudflare 小组件的语言代码 */
+const TURNSTILE_LANGUAGE: Record<Locale, string> = { "zh-CN": "zh-cn", en: "en", ru: "ru", ja: "ja" };
 
 /**
  * Cloudflare 的脚本只在第一次需要时加载一次。后台是 nonce + 'strict-dynamic' 的 CSP：
@@ -74,6 +79,7 @@ export default function TurnstileWidget({
   const widgetRef = useRef<string | null>(null);
   const callbacks = useRef({ onToken, onError });
   const [failed, setFailed] = useState(false);
+  const { m, locale } = useI18n();
 
   useEffect(() => {
     callbacks.current = { onToken, onError };
@@ -90,7 +96,7 @@ export default function TurnstileWidget({
             sitekey: siteKey,
             action,
             theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light",
-            language: "zh-cn",
+            language: TURNSTILE_LANGUAGE[locale],
             // flexible 最窄 300px：手机上的登录卡片等放不下时用 compact（150×140）
             size: container.clientWidth >= 300 ? "flexible" : "compact",
             "response-field": false,
@@ -113,7 +119,7 @@ export default function TurnstileWidget({
       if (widgetRef.current && window.turnstile) window.turnstile.remove(widgetRef.current);
       widgetRef.current = null;
     };
-  }, [siteKey, action]);
+  }, [siteKey, action, locale]);
 
   const lastResetKey = useRef(resetKey);
   useEffect(() => {
@@ -129,7 +135,7 @@ export default function TurnstileWidget({
       <div ref={containerRef} className="turnstile-box min-h-[65px]" data-turnstile-action={action} />
       {failed && (
         <p role="alert" className="mt-1.5 text-xs text-red-500 dark:text-red-400">
-          人机验证加载失败（可能连不上 Cloudflare），请刷新页面再试。
+          {m.reader.turnstile.loadFailed}
         </p>
       )}
     </div>

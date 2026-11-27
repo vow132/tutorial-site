@@ -95,17 +95,15 @@ export async function checkTurnstileToken(secret: string, token: unknown, action
   return verifyTurnstileToken({ secret, token: value, action, hostname: expectedHostname(), ip: await getClientIp() });
 }
 
-export const HUMAN_CHECK_FAILED = "人机验证没通过，请重新验证后再提交";
-
 /**
  * 登录、订阅、读者留言提交时调用：没开启人机验证时直接放行；开启时核对令牌。
- * 失败原因只写进服务器日志，不告诉提交的人。
+ * 失败原因只写进服务器日志，不告诉提交的人（提示文字由调用方按自己的语言给：m.email.humanCheckFailed）。
  */
-export async function verifyHuman(token: unknown, action: TurnstileAction): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function verifyHuman(token: unknown, action: TurnstileAction): Promise<{ ok: boolean }> {
   const config = await loadTurnstile();
   if (!config.enabled) return { ok: true };
   const verdict = await checkTurnstileToken(config.secret, token, action);
   if (verdict.ok) return { ok: true };
   if (verdict.reason !== "missing token") console.warn(`[turnstile] ${action} 验证失败：${verdict.reason}`);
-  return { ok: false, error: HUMAN_CHECK_FAILED };
+  return { ok: false };
 }

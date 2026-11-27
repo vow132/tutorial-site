@@ -33,6 +33,8 @@ import { getSubscriptionEnabled } from "@/lib/mail";
 import { getTurnstileSiteKey } from "@/lib/turnstile-store";
 import { bylineOf } from "@/lib/roles";
 import { assetSrcSet, assetUrl, rewriteAssetHtml } from "@/lib/asset-url";
+import { getSiteI18n } from "@/lib/i18n/server";
+import { READING_CHARS_PER_MINUTE } from "@/lib/i18n/locales";
 
 /**
  * 文章页是 ISR 缓存页：首次访问时生成，之后直接返回缓存 HTML，每分钟最多在后台
@@ -47,8 +49,7 @@ export function generateStaticParams() {
   return [];
 }
 
-const formatDate = (date: Date) =>
-  date.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
+const LONG_DATE: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
 
 type PublishedTutorial = NonNullable<Awaited<ReturnType<typeof getPublishedTutorial>>>;
 
@@ -72,7 +73,7 @@ async function coverImage(tutorial: PublishedTutorial) {
 async function shareImage(tutorial: PublishedTutorial) {
   const cover = await coverImage(tutorial);
   if (cover) return { url: cover.url, width: cover.width, height: cover.height, alt: tutorial.title };
-  const { siteName, logoText, brand } = await getSettings();
+  const [{ siteName, logoText, brand }, { m }] = await Promise.all([getSettings(), getSiteI18n()]);
   return {
     url: shareImagePath(tutorial.id, {
       title: tutorial.title,
@@ -81,6 +82,7 @@ async function shareImage(tutorial: PublishedTutorial) {
       siteName,
       logoText,
       accent: brand.accentColor || undefined,
+      cta: m.site.share.articleCta,
     }),
     ...SHARE_IMAGE_SIZE,
     alt: tutorial.title,
@@ -99,7 +101,8 @@ export async function generateMetadata({
   // 才能返回真实的 404 状态码（否则 loading.tsx 先行输出 200）。
   if (!t) notFound();
   // 与页面渲染共用同一份处理结果（processArticle 按内容哈希缓存）。
-  const { html } = await processArticle(t.content);
+  const { m } = await getSiteI18n();
+  const { html } = await processArticle(t.content, m.site.articleHtml);
   return pageMetadata({
     title: t.title,
     description: describe(t, html),
@@ -124,6 +127,7 @@ export default async function TutorialDetailPage({
 
   const tutorial = slug ? await getPublishedTutorial(slug) : null;
   if (!tutorial) notFound();
+  const { m, f, plural, date, locale } = await getSiteI18n();
 
   // 上一篇 / 下一篇：属于系列时按系列顺序，否则同分类内按时间
   const [categoryPrev, categoryNext, processed, settings, relatedCandidates, image, allSeries] = await Promise.all([
@@ -145,19 +149,21 @@ export default async function TutorialDetailPage({
       orderBy: { createdAt: "asc" },
       select: { id: true, title: true, slug: true },
     }),
-    processArticle(tutorial.content),
+    processArticle(tutorial.content, m.site.articleHtml),
     getSettings(),
     getRelatedTutorialCandidates(tutorial.id, tutorial.categoryId),
     shareImage(tutorial),
     tutorial.seriesId ? getPublishedSeries() : Promise.resolve([]),
   ]);
   const [subscribeEnabled, turnstileSiteKey] = await Promise.all([getSubscriptionEnabled(), getTurnstileSiteKey()]);
+  const t = m.site.article;
+  const formatDate = (value: Date) => date(value, LONG_DATE);
   const cover = await coverImage(tutorial);
   const series = allSeries.find((item) => item.id === tutorial.seriesId) ?? null;
   const position = series ? seriesPosition(series.tutorials, tutorial.id) : null;
   const prev = position ? position.prev : categoryPrev;
   const next = position ? position.next : categoryNext;
-  const neighborNote = position ? "（本系列）" : "";
+  const neighborNote = position ? t.fromSeries : "";
 
   // 上一篇/下一篇已经有入口，相关教程里不再重复出现。
   const related = relatedCandidates
@@ -188,13 +194,13 @@ export default async function TutorialDetailPage({
             }
           : {}),
         ...(tutorial.tags.length ? { keywords: tutorial.tags.map(({ tag }) => tag.name).join(",") } : {}),
-        inLanguage: "zh-CN",
+        inLanguage: locale,
         // 有署名时作者是这个人，否则还是站点本身
         author: byline ? { "@type": "Person", name: byline } : site,
         publisher: site,
       },
       breadcrumbJsonLd([
-        { name: "首页", path: "/" },
+        { name: m.site.nav.home, path: "/" },
         {
           name: tutorial.category.name,
           path: `/categories/${encodeURIComponent(tutorial.category.slug)}`,
@@ -206,7 +212,7 @@ export default async function TutorialDetailPage({
   // 修改日期与发布日期不是同一天时才显示「更新于」（阅读量计数不会改动 updatedAt）。
   const updated = formatDate(tutorial.updatedAt) !== formatDate(tutorial.createdAt);
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;
-  const minutes = Math.max(1, Math.round(words / 400));
+  const minutes = Math.max(1, Math.round(words / READING_CHARS_PER_MINUTE[locale]));
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-12" data-motion={settings.articleMotion}>
@@ -217,7 +223,7 @@ export default async function TutorialDetailPage({
       {/* 面包屑 */}
       <Reveal>
         <nav className="print-hide flex items-center gap-2 text-sm text-ink-3">
-          <IntentLink href="/" className="transition-colors hover:text-accent">首页</IntentLink>
+          <IntentLink href="/" className="transition-colors hover:text-accent">{m.site.nav.home}</IntentLink>
           <span>/</span>
           <IntentLink
             href={getCategoryHref(tutorial.category)}
@@ -256,24 +262,24 @@ export default async function TutorialDetailPage({
                 <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-ink-3">
                   {byline && (
                     <span>
-                      作者 <span className="font-medium text-ink-2">{byline}</span>
+                      {t.author} <span className="font-medium text-ink-2">{byline}</span>
                     </span>
                   )}
                   <span>
-                    发布于{" "}
+                    {t.published}{" "}
                     <time dateTime={tutorial.createdAt.toISOString()}>{formatDate(tutorial.createdAt)}</time>
                   </span>
                   {updated && (
                     <span>
-                      更新于{" "}
+                      {t.updated}{" "}
                       <time dateTime={tutorial.updatedAt.toISOString()}>{formatDate(tutorial.updatedAt)}</time>
                     </span>
                   )}
-                  <span>约 {minutes} 分钟读完</span>
-                  <span>{tutorial.views} 次阅读</span>
+                  <span>{plural(minutes, t.readingTime)}</span>
+                  <span>{plural(tutorial.views, m.site.views)}</span>
                 </div>
                 <TagChips
-                  label="标签"
+                  label={t.tags}
                   className="mt-4"
                   tags={tutorial.tags.map(({ tag }) => tag)}
                 />
@@ -299,7 +305,7 @@ export default async function TutorialDetailPage({
 
           {/* 「教程书」目录：手机和平板在正文上方，桌面在右侧栏 */}
           {series && (
-            <SeriesBook variant="inline" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+            <SeriesBook variant="inline" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} m={m} />
           )}
 
           {/* 移动端本页目录（可自行开关） */}
@@ -315,11 +321,11 @@ export default async function TutorialDetailPage({
 
           <HelpfulFeedback id={tutorial.id} turnstileSiteKey={turnstileSiteKey} />
           <ShareButtons url={articleUrl} title={tutorial.title} />
-          <SupportBox support={settings.support} assetHost={settings.assetHost} />
+          <SupportBox support={settings.support} assetHost={settings.assetHost} m={m} />
           {subscribeEnabled && (
             <section aria-labelledby="subscribe-heading" className="subscribe-box print-hide mt-8 rounded-2xl border border-line bg-surface p-5 sm:p-6">
-              <h2 id="subscribe-heading" className="text-base font-semibold text-ink">订阅新教程</h2>
-              <p className="mt-1 text-sm text-ink-2">有新教程时发邮件提醒你，随时可以退订。</p>
+              <h2 id="subscribe-heading" className="text-base font-semibold text-ink">{t.subscribeTitle}</h2>
+              <p className="mt-1 text-sm text-ink-2">{t.subscribeIntro}</p>
               <SubscribeForm className="mt-4" turnstileSiteKey={turnstileSiteKey} />
             </section>
           )}
@@ -330,7 +336,7 @@ export default async function TutorialDetailPage({
               {prev ? (
                 <IntentLink href={`/tutorials/${prev.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5">
-                    <span className="text-xs text-ink-3">← 上一篇{neighborNote}</span>
+                    <span className="text-xs text-ink-3">{f(t.prev, { note: neighborNote })}</span>
                     <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
                       {prev.title}
                     </p>
@@ -342,7 +348,7 @@ export default async function TutorialDetailPage({
               {next && (
                 <IntentLink href={`/tutorials/${next.slug}`} className="block h-full">
                   <GlowCard className="group h-full p-5 text-right">
-                    <span className="text-xs text-ink-3">下一篇{neighborNote} →</span>
+                    <span className="text-xs text-ink-3">{f(t.next, { note: neighborNote })}</span>
                     <p className="mt-1.5 truncate text-sm font-semibold text-ink transition-colors group-hover:text-accent">
                       {next.title}
                     </p>
@@ -360,7 +366,7 @@ export default async function TutorialDetailPage({
             <section aria-labelledby="related-heading" className="print-hide mt-14">
               <Reveal mode="scroll">
                 <h2 id="related-heading" className="text-lg font-bold text-ink">
-                  相关教程
+                  {t.related}
                 </h2>
               </Reveal>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -388,7 +394,7 @@ export default async function TutorialDetailPage({
           <aside className="print-hide relative hidden min-w-0 self-stretch lg:block">
             <div className="sticky top-24 max-h-[calc(100vh-7rem)] space-y-8 overflow-y-auto overscroll-contain pb-6">
               {series && (
-                <SeriesBook variant="sidebar" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} />
+                <SeriesBook variant="sidebar" title={series.title} slug={series.slug} tutorials={series.tutorials} currentId={tutorial.id} m={m} />
               )}
               <Toc items={toc} />
             </div>

@@ -47,12 +47,12 @@ export const defaultSupport: SupportSettings = {
 const str = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
 
 /** 从存储的 JSON 读出（字段缺失或类型不对时用默认值）。 */
-export function readStartHere(raw: unknown): StartHere {
+export function readStartHere(raw: unknown, fallback: StartHere = defaultStartHere): StartHere {
   const value = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof StartHere, unknown>>;
   return {
-    enabled: typeof value.enabled === "boolean" ? value.enabled : defaultStartHere.enabled,
-    title: str(value.title, defaultStartHere.title),
-    intro: str(value.intro, defaultStartHere.intro),
+    enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
+    title: str(value.title, fallback.title),
+    intro: str(value.intro, fallback.intro),
     seriesSlugs: Array.isArray(value.seriesSlugs)
       ? value.seriesSlugs.filter((slug): slug is string => typeof slug === "string").slice(0, MAX_START_HERE_SERIES)
       : [],

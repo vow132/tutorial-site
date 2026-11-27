@@ -9,6 +9,8 @@
  * 这里都是纯函数：设置的读取 / 校验、前端资源地址、评论页的 CSP 和初始化参数。
  */
 
+import type { Locale } from "@/lib/i18n/locales";
+
 export const COMMENT_PROVIDERS = {
   none: { label: "关闭" },
   waline: { label: "Waline" },
@@ -154,10 +156,21 @@ export type CommentEmbed = {
   frameOrigins: string[];
 };
 
+/**
+ * 各评论组件自己的界面语言代码（跟网站语言走）。Twikoo 没有俄语界面，俄语站点用英语。
+ */
+const WIDGET_LANG: Record<"waline" | "twikoo" | "artalk" | "giscus", Record<Locale, string>> = {
+  waline: { "zh-CN": "zh-CN", en: "en-US", ru: "ru-RU", ja: "jp-JP" },
+  twikoo: { "zh-CN": "zh-CN", en: "en", ru: "en", ja: "ja" },
+  artalk: { "zh-CN": "zh-CN", en: "en", ru: "ru", ja: "ja" },
+  giscus: { "zh-CN": "zh-CN", en: "en", ru: "ru", ja: "ja" },
+};
+
 export function commentEmbed(
   settings: CommentsSettings,
   page: { path: string; title: string },
   theme: CommentTheme,
+  locale: Locale = "zh-CN",
 ): CommentEmbed | null {
   switch (settings.provider) {
     case "waline": {
@@ -168,7 +181,7 @@ export function commentEmbed(
         script: cdnFileUrl(settings.cdn, client.pkg, client.version, client.js),
         style: cdnFileUrl(settings.cdn, client.pkg, client.version, client.css),
         // 表情包、GIF 搜索默认从境外服务加载，先关掉；需要的话在 Waline 服务端配置
-        options: { serverURL: settings.server, path: page.path, lang: "zh-CN", dark: 'html[data-theme="dark"]', emoji: false, search: false },
+        options: { serverURL: settings.server, path: page.path, lang: WIDGET_LANG.waline[locale], dark: 'html[data-theme="dark"]', emoji: false, search: false },
         scriptOrigins: [COMMENT_CDNS[settings.cdn].origin],
         frameOrigins: [],
       };
@@ -179,7 +192,7 @@ export function commentEmbed(
         provider: "twikoo",
         pagePath: page.path,
         script: cdnFileUrl(settings.cdn, client.pkg, client.version, client.js),
-        options: { envId: settings.server, path: page.path, lang: "zh-CN" },
+        options: { envId: settings.server, path: page.path, lang: WIDGET_LANG.twikoo[locale] },
         scriptOrigins: [COMMENT_CDNS[settings.cdn].origin],
         frameOrigins: [],
       };
@@ -191,7 +204,7 @@ export function commentEmbed(
         pagePath: page.path,
         script: `${settings.server}/dist/Artalk.js`,
         style: `${settings.server}/dist/Artalk.css`,
-        options: { server: settings.server, site: settings.site, pageKey: page.path, pageTitle: page.title, darkMode: theme === "dark", locale: "zh-CN" },
+        options: { server: settings.server, site: settings.site, pageKey: page.path, pageTitle: page.title, darkMode: theme === "dark", locale: WIDGET_LANG.artalk[locale] },
         scriptOrigins: [origin],
         frameOrigins: [],
       };
@@ -214,7 +227,7 @@ export function commentEmbed(
           "data-emit-metadata": "0",
           "data-input-position": "top",
           "data-theme": theme,
-          "data-lang": "zh-CN",
+          "data-lang": WIDGET_LANG.giscus[locale],
           "data-loading": "lazy",
         },
         scriptOrigins: ["https://giscus.app"],
@@ -262,7 +275,12 @@ const scriptJson = (value: unknown) =>
  * 评论页（/comments/frame）的完整 HTML。初始化脚本带 nonce；高度变化时通知文章页调整 iframe 高度，
  * 文章页切换亮 / 暗主题时跟着切换。脚本没能从 CDN / 评论服务下载时显示提示，而不是一片空白。
  */
-export function commentFrameHtml(embed: CommentEmbed, nonce: string, theme: CommentTheme) {
+export function commentFrameHtml(
+  embed: CommentEmbed,
+  nonce: string,
+  theme: CommentTheme,
+  text: { lang: Locale; title: string; loadFailed: string } = { lang: "zh-CN", title: "评论", loadFailed: "评论没能加载出来：评论服务或脚本地址暂时无法访问，请稍后刷新再试。" },
+) {
   const n = escapeAttr(nonce);
   const attributes = Object.entries(embed.attributes ?? {})
     .map(([key, value]) => ` ${key}="${escapeAttr(value)}"`)
@@ -271,18 +289,19 @@ export function commentFrameHtml(embed: CommentEmbed, nonce: string, theme: Comm
     provider: embed.provider,
     options: { ...embed.options, el: "#comments" },
     back: `${encodeURI(embed.pagePath)}#comments`,
+    failed: text.loadFailed,
   });
   const providerScript =
     embed.provider === "giscus"
       ? `<script nonce="${n}" src="${escapeAttr(embed.script)}"${attributes} crossorigin="anonymous" async></script>`
       : `<script nonce="${n}" src="${escapeAttr(embed.script)}"></script>`;
   return `<!doctype html>
-<html lang="zh-CN" data-theme="${theme}" style="color-scheme:${theme}">
+<html lang="${escapeAttr(text.lang)}" data-theme="${theme}" style="color-scheme:${theme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>评论</title>
+<title>${escapeAttr(text.title)}</title>
 <style nonce="${n}">
 body{margin:0;background:transparent;color:#1f2328;font:15px/1.6 system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
 html[data-theme="dark"] body{color:#e6edf3}
@@ -330,7 +349,7 @@ ${providerScript}
     if (event.origin !== location.origin || event.source !== parent) return;
     if (event.data && event.data.type === "comments:theme") setTheme(event.data.theme === "dark" ? "dark" : "light");
   });
-  var failed = "评论没能加载出来：评论服务或脚本地址暂时无法访问，请稍后刷新再试。";
+  var failed = cfg.failed;
   try {
     if (cfg.provider === "waline") {
       if (!window.Waline) return notice(failed);

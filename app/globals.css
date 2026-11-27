@@ -19,6 +19,10 @@
   --shadow-lifted: 0 18px 50px -20px rgb(var(--shadow-rgb) / 0.28);
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     system-ui, -apple-system, sans-serif;
+  /* 日文：汉字要用日文字形，不能落到中文字体上；英文、俄文优先系统字体 */
+  --font-ja: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP",
+    system-ui, -apple-system, sans-serif;
+  --font-latin: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
 
 /* 语义色：值随主题切换（dark 由下方变量覆盖驱动） */
@@ -113,6 +117,24 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/*
+ * 按界面语言换字体：<html lang> 是网站语言，后台外层的 <div lang> 是管理员自己的语言，子元素继承。
+ * 只作用在带 lang 的那个元素上（不在 @layer 里：要压过上面 body 的默认字体）。
+ */
+html[lang|="ja"] body,
+body [lang|="ja"] {
+  font-family: var(--font-ja);
+}
+html[lang="en"] body,
+html[lang="ru"] body,
+body [lang="en"],
+body [lang="ru"] {
+  font-family: var(--font-latin);
+}
+body [lang|="zh"] {
+  font-family: var(--font-sans);
 }
 
 ::selection {

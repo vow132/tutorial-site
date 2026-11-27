@@ -10,18 +10,19 @@ export const ABOUT_KEY = "about";
 
 export type AboutPage = { title: string; content: string; updatedAt: string | null };
 
+/** 没填标题时用的默认标题（网站语言的 defaults.aboutTitle；不传时用简体中文） */
 export const DEFAULT_ABOUT_TITLE = "关于本站";
 
-export function parseAbout(raw: string | null | undefined): AboutPage {
+export function parseAbout(raw: string | null | undefined, defaultTitle = DEFAULT_ABOUT_TITLE): AboutPage {
   try {
     const value = raw ? (JSON.parse(raw) as Partial<AboutPage>) : {};
     return {
-      title: typeof value.title === "string" && value.title.trim() ? value.title.trim() : DEFAULT_ABOUT_TITLE,
+      title: typeof value.title === "string" && value.title.trim() ? value.title.trim() : defaultTitle,
       content: typeof value.content === "string" ? value.content : "",
       updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
     };
   } catch {
-    return { title: DEFAULT_ABOUT_TITLE, content: "", updatedAt: null };
+    return { title: defaultTitle, content: "", updatedAt: null };
   }
 }
 
@@ -36,11 +37,11 @@ const cachedAbout = unstable_cache(
   { tags: [CACHE_TAGS.about], revalidate: SLOW_REVALIDATE_SECONDS },
 );
 
-export async function getAbout() {
-  return parseAbout(await cachedAbout());
+export async function getAbout(defaultTitle?: string) {
+  return parseAbout(await cachedAbout(), defaultTitle);
 }
 
 /** 后台编辑用：不走缓存，直接读库。 */
-export async function readAboutForAdmin() {
-  return parseAbout((await prisma.setting.findUnique({ where: { key: ABOUT_KEY } }))?.value);
+export async function readAboutForAdmin(defaultTitle?: string) {
+  return parseAbout((await prisma.setting.findUnique({ where: { key: ABOUT_KEY } }))?.value, defaultTitle);
 }

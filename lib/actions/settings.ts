@@ -4,7 +4,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
-import { SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
+import { defaultSettingsFor, getSettings, LOCALIZED_TEXT_FIELDS, SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
+import { readLocale } from "@/lib/i18n/locales";
 import { CACHE_TAGS } from "@/lib/public-data";
 import {
   SEARCH_ENGINES,
@@ -127,10 +128,15 @@ export async function updateSettings(
     seriesSlugs: formData.getAll("startHere.series").map(String),
   });
 
+  // 网站语言：换了语言时，还是旧语言默认值（站长没改过）的文字一起换成新语言的默认值
+  const previous = await getSettings();
+  const locale = readLocale(text("locale"), previous.locale);
+  const fresh = defaultSettingsFor(locale);
   const settings: SiteSettings = {
-    siteName: text("siteName") || "教程网",
-    logoText: text("logoText") || "教",
-    siteTitle: text("siteTitle") || "教程网",
+    locale,
+    siteName: text("siteName") || fresh.siteName,
+    logoText: text("logoText") || fresh.logoText,
+    siteTitle: text("siteTitle") || fresh.siteTitle,
     siteDescription: text("siteDescription"),
     heroBadge: text("heroBadge"),
     heroTitleA: text("heroTitleA"),
@@ -157,6 +163,7 @@ export async function updateSettings(
   };
 
   if (!settings.siteTitle) return { error: "网站标题不能为空" };
+  if (locale !== previous.locale) switchDefaultTexts(settings, previous.locale);
 
   await prisma.setting.upsert({
     where: { key: SETTINGS_KEY },
@@ -170,6 +177,18 @@ export async function updateSettings(
   // robots.txt 是单独的路由，不在根布局下面（「拒绝 AI 训练爬虫」开关要马上生效）
   revalidatePath("/robots.txt");
   return { success: "设置已保存，前台已生效" };
+}
+
+/** 换网站语言：还是旧语言默认值的文字（站长没改过）换成新语言的默认值，页脚栏目和「从这里开始」同理 */
+function switchDefaultTexts(settings: SiteSettings, from: SiteSettings["locale"]) {
+  const before = defaultSettingsFor(from);
+  const after = defaultSettingsFor(settings.locale);
+  for (const field of LOCALIZED_TEXT_FIELDS) {
+    if (settings[field] === before[field]) settings[field] = after[field];
+  }
+  if (JSON.stringify(settings.footerColumns) === JSON.stringify(before.footerColumns)) settings.footerColumns = after.footerColumns;
+  if (settings.startHere.title === before.startHere.title) settings.startHere.title = after.startHere.title;
+  if (settings.startHere.intro === before.startHere.intro) settings.startHere.intro = after.startHere.intro;
 }
 
 export type AssetHostTestResult = { ok: boolean; message: string };

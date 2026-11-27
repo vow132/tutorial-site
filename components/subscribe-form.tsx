@@ -2,6 +2,7 @@
 
 import { useId, useState, type FormEvent } from "react";
 import TurnstileWidget from "@/components/turnstile-widget";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * 订阅新教程提醒：提交邮箱后发确认邮件，点了邮件里的链接才算订阅。
@@ -16,6 +17,8 @@ export default function SubscribeForm({ className = "", turnstileSiteKey = null 
   const [checkFailed, setCheckFailed] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const id = useId();
+  const { m, f } = useI18n();
+  const t = m.reader.subscribe;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -24,7 +27,7 @@ export default function SubscribeForm({ className = "", turnstileSiteKey = null 
     if (turnstileSiteKey && !token && !checkFailed) {
       setShowCheck(true);
       setStatus("error");
-      setMessage("请稍等，人机验证完成后再点订阅");
+      setMessage(t.waiting);
       return;
     }
     setStatus("sending");
@@ -36,15 +39,15 @@ export default function SubscribeForm({ className = "", turnstileSiteKey = null 
       });
       if (response.ok) {
         setStatus("sent");
-        setMessage(`确认邮件已发到 ${email}，点邮件里的链接完成订阅（没收到的话看看垃圾邮件）。`);
+        setMessage(f(t.sent, { email }));
         return;
       }
       const body = (await response.json().catch(() => ({}))) as { error?: string };
       setStatus("error");
-      setMessage(body.error ?? "订阅失败，请稍后再试");
+      setMessage(body.error ?? t.failed);
     } catch {
       setStatus("error");
-      setMessage("网络有点问题，请稍后再试");
+      setMessage(t.network);
     }
     // 令牌只能用一次，没订阅成功就重新验证
     if (turnstileSiteKey) setResetKey((value) => value + 1);
@@ -60,7 +63,7 @@ export default function SubscribeForm({ className = "", turnstileSiteKey = null 
         <form onSubmit={submit}>
           <div className="flex flex-col gap-2 sm:flex-row">
             <label htmlFor={`${id}-email`} className="sr-only">
-              邮箱地址
+              {t.emailLabel}
             </label>
             <input
               id={`${id}-email`}
@@ -69,7 +72,7 @@ export default function SubscribeForm({ className = "", turnstileSiteKey = null 
               required
               maxLength={254}
               autoComplete="email"
-              placeholder="你的邮箱"
+              placeholder={t.emailPlaceholder}
               onFocus={() => setShowCheck(true)}
               className="h-10 min-w-0 flex-1 rounded-full border border-line bg-paper px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-accent"
             />
@@ -80,7 +83,7 @@ export default function SubscribeForm({ className = "", turnstileSiteKey = null 
               disabled={status === "sending"}
               className="h-10 shrink-0 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {status === "sending" ? "提交中…" : "订阅"}
+              {status === "sending" ? t.submitting : t.submit}
             </button>
           </div>
           {turnstileSiteKey && showCheck && (

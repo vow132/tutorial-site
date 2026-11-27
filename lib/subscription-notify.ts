@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { createMailer, getMailConfig } from "@/lib/mail";
 import { defaultSettings, SETTINGS_KEY } from "@/lib/settings";
+import { readLocale } from "@/lib/i18n/locales";
+import { messagesFor } from "@/lib/i18n/messages";
 import { absoluteUrl } from "@/lib/site-url";
 import { mailConfigComplete, newTutorialEmail, signSubscriberToken } from "@/lib/subscription";
 
@@ -16,14 +18,16 @@ const GAP_MS = 300;
 /** 和 Prisma 在 SQLite 里存 DateTime 的格式一致（原生 SQL 写入，不刷新 updatedAt）。 */
 const sqliteNow = () => new Date().toISOString().replace("Z", "+00:00");
 
-/** 站点名：发信在请求之外慢慢进行，不能用依赖 Next 缓存的 getSettings()，直接读库。 */
-async function siteName() {
+/** 站点名和网站语言：发信在请求之外慢慢进行，不能用依赖 Next 缓存的 getSettings()，直接读库。 */
+async function siteInfo() {
   const row = await prisma.setting.findUnique({ where: { key: SETTINGS_KEY } });
   try {
-    const name = (JSON.parse(row?.value ?? "{}") as { siteName?: unknown }).siteName;
-    return typeof name === "string" && name ? name : defaultSettings.siteName;
+    const parsed = JSON.parse(row?.value ?? "{}") as { siteName?: unknown; locale?: unknown };
+    const locale = readLocale(parsed.locale);
+    const name = typeof parsed.siteName === "string" && parsed.siteName ? parsed.siteName : messagesFor(locale).defaults.siteName;
+    return { name, locale };
   } catch {
-    return defaultSettings.siteName;
+    return { name: defaultSettings.siteName, locale: defaultSettings.locale };
   }
 }
 
@@ -43,7 +47,8 @@ async function send(tutorialId: number) {
   if (claimed !== 1) return;
   const tutorial = await prisma.tutorial.findUnique({ where: { id: tutorialId }, select: { title: true, slug: true, excerpt: true } });
   if (!tutorial) return;
-  const name = await siteName();
+  const { name, locale } = await siteInfo();
+  const t = messagesFor(locale).email;
   const url = absoluteUrl(`/tutorials/${encodeURIComponent(tutorial.slug)}`);
   const mailer = createMailer(config, name);
   let sent = 0;
@@ -63,7 +68,7 @@ async function send(tutorialId: number) {
         try {
           await mailer.send({
             to: subscriber.email,
-            ...newTutorialEmail({ siteName: name, title: tutorial.title, excerpt: tutorial.excerpt, url, unsubscribeUrl }),
+            ...newTutorialEmail({ siteName: name, title: tutorial.title, excerpt: tutorial.excerpt, url, unsubscribeUrl, t, locale }),
             // 邮箱客户端里的「退订」按钮（RFC 8058 一键退订）
             headers: { "List-Unsubscribe": `<${oneClick}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
           });

@@ -7,11 +7,13 @@ import CapsuleNav, { type NavItem } from "./capsule-nav";
 import Mascot from "./mascot";
 import SearchInput from "./search-input";
 import ThemeToggle from "./theme-toggle";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 export default async function SiteHeader() {
-  const [categories, settings] = await Promise.all([
+  const [categories, settings, { m }] = await Promise.all([
     getPublicCategoryTree(),
     getSettings(),
+    getSiteI18n(),
   ]);
 
   const toNavItem = (category: (typeof categories)[number]): NavItem => ({
@@ -25,8 +27,8 @@ export default async function SiteHeader() {
   // 站点设置里的导航链接（关于、友链等）按设置放在分类前面或后面。
   const links: NavItem[] = settings.navLinks.links.map((link, index) => ({ key: `link-${index}`, ...link }));
   const items: NavItem[] = [
-    { key: "home", href: "/", label: "首页" },
-    { key: "tutorials", href: "/tutorials", label: "全部教程" },
+    { key: "home", href: "/", label: m.site.nav.home },
+    { key: "tutorials", href: "/tutorials", label: m.site.nav.allTutorials },
     ...(settings.navLinks.position === "before" ? links : []),
     ...categories.map(toNavItem),
     ...(settings.navLinks.position === "after" ? links : []),
@@ -52,8 +54,8 @@ export default async function SiteHeader() {
           <CapsuleNav items={items} />
         </div>
 
-        <ThemeToggle />
-        <SearchInput />
+        <ThemeToggle label={m.reader.theme.toggle} />
+        <SearchInput labels={m.site.search} />
       </div>
     </header>
   );

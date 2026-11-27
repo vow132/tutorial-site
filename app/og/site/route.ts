@@ -1,6 +1,7 @@
 import { getSettings } from "@/lib/settings";
 import { shareImageVersion, siteShareCard } from "@/lib/share-image";
 import { renderShareImage } from "@/lib/share-image-render";
+import { messagesFor } from "@/lib/i18n/messages";
 
 /**
  * 站点默认分享图：/og/site?v=<版本>。首页、列表页等没有配图的页面用它，
@@ -9,7 +10,7 @@ import { renderShareImage } from "@/lib/share-image-render";
  */
 export async function GET(request: Request) {
   const settings = await getSettings();
-  const card = siteShareCard(settings);
+  const card = siteShareCard(settings, messagesFor(settings.locale).site.share.siteCta);
   const version = shareImageVersion(card);
   try {
     const png = await renderShareImage(`site:${version}`, card);

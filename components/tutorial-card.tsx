@@ -3,6 +3,7 @@ import GlowCard from "./glow-card";
 import { categoryTextStyle } from "@/lib/color";
 import { assetUrl } from "@/lib/asset-url";
 import { getSettings } from "@/lib/settings";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 type Props = {
   title: string;
@@ -27,7 +28,7 @@ export default async function TutorialCard({
   createdAt,
   thumbnail,
 }: Props) {
-  const { assetHost } = await getSettings();
+  const [{ assetHost }, { m, date, plural }] = await Promise.all([getSettings(), getSiteI18n()]);
   return (
     <IntentLink href={`/tutorials/${slug}`} className="group block h-full">
       <GlowCard className="flex h-full flex-col p-6">
@@ -41,11 +42,7 @@ export default async function TutorialCard({
           </span>
           <span>·</span>
           <time dateTime={createdAt.toISOString()}>
-            {createdAt.toLocaleDateString("zh-CN", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
+            {date(createdAt, { year: "numeric", month: "short", day: "numeric" })}
           </time>
         </div>
         <div className="mt-3 flex flex-1 gap-4">
@@ -54,7 +51,7 @@ export default async function TutorialCard({
               {title}
             </h3>
             <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-2 line-clamp-2">
-              {excerpt ?? "暂无摘要"}
+              {excerpt ?? m.site.noExcerpt}
             </p>
           </div>
           {thumbnail && (
@@ -76,10 +73,10 @@ export default async function TutorialCard({
               <path d="M1 7s2.2-4 6-4 6 4 6 4-2.2 4-6 4-6-4-6-4Z" />
               <circle cx="7" cy="7" r="1.8" />
             </svg>
-            {views} 阅读
+            {plural(views, m.site.views)}
           </span>
           <span className="flex items-center gap-1 font-medium text-ink-2">
-            开始阅读
+            {m.site.card.startReading}
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
               <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
             </svg>

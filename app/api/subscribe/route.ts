@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
 import { confirmEmail, mailConfigComplete, normalizeEmail, signSubscriberToken } from "@/lib/subscription";
 import { verifyHuman } from "@/lib/turnstile-store";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 const HOUR_MS = 60 * 60 * 1000;
 /** 同一个地址 10 分钟内不重发确认邮件 */
@@ -35,24 +36,25 @@ export async function POST(request: Request) {
     return new Response(null, { status: 400 });
   }
   const email = normalizeEmail(body.email);
-  if (!email) return Response.json({ error: "邮箱格式不对" }, { status: 400 });
+  const { m, locale } = await getSiteI18n();
+  if (!email) return Response.json({ error: m.email.invalidEmail }, { status: 400 });
   // 隐藏的「网址」字段：真人看不到也不会填，填了的是机器人，假装成功
   if (typeof body.website === "string" && body.website.trim()) return ok();
 
   const config = await getMailConfig();
   // 演示站不发邮件：否则谁都能用它给任意邮箱发确认信
-  if (isDemoMode() || !config.enabled || !mailConfigComplete(config)) return Response.json({ error: "邮件订阅暂未开启" }, { status: 404 });
+  if (isDemoMode() || !config.enabled || !mailConfigComplete(config)) return Response.json({ error: m.email.subscribeDisabled }, { status: 404 });
 
   const ip = await getClientIp();
   const perVisitor = sharedLimiter("subscribe-visitor", 5, HOUR_MS, 20_000);
   const siteWide = sharedLimiter("subscribe-global", 60, HOUR_MS, 1);
   if ((ip && perVisitor.retryAfter(ip) > 0) || siteWide.retryAfter("all") > 0) {
-    return Response.json({ error: "操作太频繁了，请稍后再试" }, { status: 429 });
+    return Response.json({ error: m.email.tooFrequent }, { status: 429 });
   }
   if (ip) perVisitor.hit(ip);
   // 在限流之后核对：乱填令牌的请求也受上面的次数限制，不会无限制地替人去请求 Cloudflare
   const human = await verifyHuman(body.turnstileToken, "subscribe");
-  if (!human.ok) return Response.json({ error: human.error }, { status: 400 });
+  if (!human.ok) return Response.json({ error: m.email.humanCheckFailed }, { status: 400 });
 
   await prisma.subscriber.deleteMany({ where: { confirmedAt: null, createdAt: { lt: new Date(Date.now() - PENDING_TTL_MS) } } });
   const existing = await prisma.subscriber.findUnique({ where: { email } });
@@ -67,12 +69,12 @@ export async function POST(request: Request) {
   const { siteName } = await getSettings();
   const confirmUrl = absoluteUrl(`/subscribe/confirm?token=${signSubscriberToken(subscriber.id, "confirm")}`);
   try {
-    await sendOne(config, siteName, { to: email, ...confirmEmail({ siteName, confirmUrl }) });
+    await sendOne(config, siteName, { to: email, ...confirmEmail({ siteName, confirmUrl, t: m.email, locale }) });
   } catch (error) {
     console.warn("[subscription] 确认邮件发送失败：", error instanceof Error ? error.message : error);
     // 允许稍后重试
     await prisma.subscriber.update({ where: { id: subscriber.id }, data: { confirmSentAt: null } });
-    return Response.json({ error: "确认邮件没发出去，请稍后再试" }, { status: 502 });
+    return Response.json({ error: m.email.sendFailed }, { status: 502 });
   }
   return ok();
 }

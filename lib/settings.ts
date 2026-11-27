@@ -6,6 +6,8 @@ import { readVerification, type SearchVerification } from "@/lib/search-verifica
 import { readAssetHost } from "@/lib/asset-url";
 import { defaultComments, readComments, type CommentsSettings } from "@/lib/comments";
 import { defaultAntiScrape, readAntiScrape, type AntiScrapeSettings } from "@/lib/anti-scrape";
+import { DEFAULT_LOCALE, LOCALES, readLocale, type Locale } from "@/lib/i18n/locales";
+import { messagesFor } from "@/lib/i18n/messages";
 import {
   defaultBrand,
   defaultNavLinks,
@@ -32,6 +34,8 @@ export type FooterColumn = {
 };
 
 export type SiteSettings = {
+  /** 网站语言：前台界面用这个语言显示，也是后台的默认语言（lib/i18n） */
+  locale: Locale;
   // 基本信息
   siteName: string;
   logoText: string;
@@ -73,50 +77,76 @@ export type SiteSettings = {
 
 export const SETTINGS_KEY = "site";
 
-export const defaultSettings: SiteSettings = {
-  siteName: "教程网",
-  logoText: "教",
-  siteTitle: "教程网 · 高质量图文教程",
-  siteDescription:
-    "用简洁的方式，交付可靠的知识。前端、后端、数据库、运维与设计的实战图文教程。",
-  heroBadge: "持续更新的知识库",
-  heroTitleA: "把复杂的知识",
-  heroTitleB: "讲得",
-  heroAccent: "简单明白",
-  heroSubtitle:
-    "前端、后端、数据库、运维与设计——每一篇教程都经过精心编排，拒绝废话，直达核心。",
-  footerTagline: "用简洁的方式，交付可靠的知识。持续更新高质量图文教程。",
-  copyright: "教程网 · 用心写好每一篇教程",
-  footerColumns: [
-    { title: "教程分类", autoCategories: true, links: [] },
-    {
-      title: "快速入口",
-      links: [
-        { label: "全部教程", href: "/tutorials" },
-        { label: "全部标签", href: "/tags" },
-        { label: "搜索", href: "/search" },
-      ],
-    },
-    {
-      title: "关于",
-      links: [
-        { label: "关于本站", href: "/about" },
-        { label: "RSS 订阅", href: "/feed.xml" },
-      ],
-    },
-  ],
-  verification: {},
-  securityContact: "",
-  startHere: defaultStartHere,
-  articleMotion: "calm",
-  support: defaultSupport,
-  brand: defaultBrand,
-  footerStatus: "持续更新中",
-  navLinks: defaultNavLinks,
-  assetHost: "",
-  comments: defaultComments,
-  antiScrape: defaultAntiScrape,
-};
+/** 某个语言的默认设置：文字取自字典的 defaults（lib/i18n/messages/<语言>/defaults.ts）。 */
+export function defaultSettingsFor(locale: Locale): SiteSettings {
+  const d = messagesFor(locale).defaults;
+  return {
+    locale,
+    siteName: d.siteName,
+    logoText: d.logoText,
+    siteTitle: d.siteTitle,
+    siteDescription: d.siteDescription,
+    heroBadge: d.heroBadge,
+    heroTitleA: d.heroTitleA,
+    heroTitleB: d.heroTitleB,
+    heroAccent: d.heroAccent,
+    heroSubtitle: d.heroSubtitle,
+    footerTagline: d.footerTagline,
+    copyright: d.copyright,
+    footerColumns: [
+      { title: d.footerCategories, autoCategories: true, links: [] },
+      {
+        title: d.footerQuickLinks,
+        links: [
+          { label: d.linkAllTutorials, href: "/tutorials" },
+          { label: d.linkAllTags, href: "/tags" },
+          { label: d.linkSearch, href: "/search" },
+        ],
+      },
+      {
+        title: d.footerAbout,
+        links: [
+          { label: d.linkAbout, href: "/about" },
+          { label: d.linkRss, href: "/feed.xml" },
+        ],
+      },
+    ],
+    verification: {},
+    securityContact: "",
+    startHere: { ...defaultStartHere, title: d.startHereTitle, intro: d.startHereIntro },
+    articleMotion: "calm",
+    support: defaultSupport,
+    brand: defaultBrand,
+    footerStatus: d.footerStatus,
+    navLinks: defaultNavLinks,
+    assetHost: "",
+    comments: defaultComments,
+    antiScrape: defaultAntiScrape,
+  };
+}
+
+export const defaultSettings: SiteSettings = defaultSettingsFor(DEFAULT_LOCALE);
+
+/** 换网站语言时会跟着换成新语言默认值的文字字段（还是旧语言默认值、站长没改过的才换） */
+export const LOCALIZED_TEXT_FIELDS = [
+  "siteName",
+  "logoText",
+  "siteTitle",
+  "siteDescription",
+  "heroBadge",
+  "heroTitleA",
+  "heroTitleB",
+  "heroAccent",
+  "heroSubtitle",
+  "footerTagline",
+  "copyright",
+  "footerStatus",
+] as const;
+
+/** 这个值是不是某种语言的默认文字（站长还没改过） */
+export function isDefaultText(field: (typeof LOCALIZED_TEXT_FIELDS)[number], value: string): boolean {
+  return LOCALES.some((locale) => defaultSettingsFor(locale)[field] === value);
+}
 
 /** 设置几乎不变却每个页面都要读，缓存原始 JSON；后台保存时按标签失效。 */
 const cachedSettingsValue = unstable_cache(
@@ -132,19 +162,22 @@ export const getSettings = cache(async function getSettings(): Promise<SiteSetti
     const value = await cachedSettingsValue();
     if (!value) return defaultSettings;
     const parsed = JSON.parse(value) as Partial<SiteSettings>;
+    const locale = readLocale(parsed.locale);
+    const base = defaultSettingsFor(locale);
     return {
-      ...defaultSettings,
+      ...base,
       ...parsed,
+      locale,
       footerColumns: Array.isArray(parsed.footerColumns)
         ? parsed.footerColumns
-        : defaultSettings.footerColumns,
+        : base.footerColumns,
       verification: readVerification(parsed.verification),
       securityContact: typeof parsed.securityContact === "string" ? parsed.securityContact : "",
-      startHere: readStartHere(parsed.startHere),
+      startHere: readStartHere(parsed.startHere, base.startHere),
       articleMotion: readArticleMotion(parsed.articleMotion),
       support: readSupport(parsed.support),
       brand: readBrand(parsed.brand),
-      footerStatus: typeof parsed.footerStatus === "string" ? parsed.footerStatus : defaultSettings.footerStatus,
+      footerStatus: typeof parsed.footerStatus === "string" ? parsed.footerStatus : base.footerStatus,
       navLinks: readNavLinks(parsed.navLinks),
       assetHost: readAssetHost(parsed.assetHost),
       comments: readComments(parsed.comments),
