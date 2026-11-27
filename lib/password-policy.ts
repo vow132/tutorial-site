@@ -10,18 +10,27 @@ export const MIN_PASSWORD_LENGTH = 10;
 /** bcrypt 只使用前 72 字节，更长的部分不会参与校验。 */
 const MAX_PASSWORD_BYTES = 72;
 
+/** 不合格原因的文案：后台传管理员语言的 m.admin.password；不传时用简体中文（命令行脚本、测试） */
+export type PasswordText = { tooShort: string; tooLong: string; common: string; tooSimple: string };
+const ZH: PasswordText = {
+  tooShort: "新密码至少需要 {n} 位",
+  tooLong: "新密码过长（最多 72 字节）",
+  common: "密码过于常见或包含用户名，请换一个更难猜的密码",
+  tooSimple: "密码字符种类太少，请混用字母、数字或符号",
+};
+
 /** 返回不合格原因；合格时返回 null。 */
-export function passwordProblem(password: string, username: string): string | null {
+export function passwordProblem(password: string, username: string, t: PasswordText = ZH): string | null {
   if (password.length < MIN_PASSWORD_LENGTH) {
-    return `新密码至少需要 ${MIN_PASSWORD_LENGTH} 位`;
+    return t.tooShort.replace("{n}", String(MIN_PASSWORD_LENGTH));
   }
   if (Buffer.byteLength(password) > MAX_PASSWORD_BYTES) {
-    return "新密码过长（最多 72 字节）";
+    return t.tooLong;
   }
   const lower = password.toLowerCase();
   if (COMMON_PASSWORDS.has(lower) || (username && lower.includes(username.toLowerCase()))) {
-    return "密码过于常见或包含用户名，请换一个更难猜的密码";
+    return t.common;
   }
-  if (new Set(password).size < 5) return "密码字符种类太少，请混用字母、数字或符号";
+  if (new Set(password).size < 5) return t.tooSimple;
   return null;
 }

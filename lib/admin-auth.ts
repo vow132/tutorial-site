@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 import { sharedLimiter } from "@/lib/rate-limit";
-import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
+import { isDemoMode } from "@/lib/demo";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { can, type Permission } from "@/lib/roles";
 import {
   credentialFingerprint,
@@ -109,7 +110,11 @@ export async function getCurrentAdmin() {
   return (await getCurrentSession())?.admin ?? null;
 }
 
-export const FORBIDDEN_MESSAGE = "你的账号没有这个权限";
+/** 拒绝写操作：按管理员的后台语言给出原因 */
+async function deny(reason: "sessionExpired" | "forbidden" | "demoReadOnly"): Promise<never> {
+  const { m } = await getAdminI18n();
+  throw new Error(m.admin[reason]);
+}
 
 /**
  * 写操作（每个 Server Action）用：没登录、没有权限就拒绝。
@@ -119,9 +124,9 @@ export const FORBIDDEN_MESSAGE = "你的账号没有这个权限";
  */
 export async function requireAuth(permission: Permission = "site") {
   const admin = await getCurrentAdmin();
-  if (!admin) throw new Error("未登录或会话已过期");
-  if (!can(admin.role, permission)) throw new Error(FORBIDDEN_MESSAGE);
-  if (isDemoMode()) throw new Error(DEMO_READ_ONLY_MESSAGE);
+  if (!admin) return deny("sessionExpired");
+  if (!can(admin.role, permission)) return deny("forbidden");
+  if (isDemoMode()) return deny("demoReadOnly");
   return admin;
 }
 
@@ -140,9 +145,9 @@ export async function requireAdminPage(permission: Permission = "site") {
 /** 同 requireAuth()，还要当前会话 ID 的写操作用（改自己的密码、两步验证、通行密钥传 "account"）。 */
 export async function requireSession(permission: Permission = "site") {
   const current = await getCurrentSession();
-  if (!current) throw new Error("未登录或会话已过期");
-  if (!can(current.admin.role, permission)) throw new Error(FORBIDDEN_MESSAGE);
-  if (isDemoMode()) throw new Error(DEMO_READ_ONLY_MESSAGE);
+  if (!current) return deny("sessionExpired");
+  if (!can(current.admin.role, permission)) return deny("forbidden");
+  if (isDemoMode()) return deny("demoReadOnly");
   return current;
 }
 
@@ -167,17 +172,18 @@ export async function rememberDevice(username: string, deviceId?: string | null)
 /** 已登录状态下再次确认密码（防止被盗会话直接改密、关两步验证或部署）同样要限流。 */
 const confirmLimiter = sharedLimiter("account:confirm", 5, 15 * 60 * 1000);
 
-/** 返回错误文案；密码正确时返回 null。 */
+/** 返回错误文案（管理员的语言）；密码正确时返回 null。 */
 export async function confirmCurrentPassword(
   admin: { id: number; password: string },
   password: string,
 ): Promise<string | null> {
   const key = String(admin.id);
   const wait = confirmLimiter.retryAfter(key);
-  if (wait > 0) return `尝试次数过多，请约 ${Math.ceil(wait / 60)} 分钟后再试`;
+  const { m, plural } = await getAdminI18n();
+  if (wait > 0) return plural(Math.ceil(wait / 60), m.admin.tooManyAttempts);
   if (!password || !(await bcrypt.compare(password.slice(0, 1024), admin.password))) {
     confirmLimiter.hit(key);
-    return "当前密码不正确";
+    return m.admin.password.wrongCurrent;
   }
   confirmLimiter.reset(key);
   return null;

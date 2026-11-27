@@ -4,6 +4,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ImportCandidate } from "@/lib/bulk-import";
 import { finishImport, importRemoteImage, importTutorial } from "@/lib/actions/tutorial-import";
+import { useAdminI18n } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
 
 type Category = { id: number; name: string; slug: string; label: string };
 type Row = ImportCandidate & { selected: boolean };
@@ -25,14 +27,16 @@ const MAX_MARKDOWN_BYTES = 2 * 1024 * 1024;
 const MAX_WXR_BYTES = 100 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-const dateFormat = new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" });
-const formatDate = (iso: string | null) => (iso ? dateFormat.format(new Date(iso)) : "—");
+type AdminI18n = ReturnType<typeof useAdminI18n>;
+type Text = AdminI18n["m"]["admin"]["bulkImport"];
+
 /** 选了什么：文件夹显示「文件夹名（N 个文件）」，一个文件显示文件名，多个显示个数。 */
-function describeFiles(files: FileList | null) {
+function describeFiles(files: FileList | null, { m, plural }: AdminI18n) {
   if (!files?.length) return "";
+  const t = m.admin.bulkImport;
   const folder = files[0].webkitRelativePath?.split("/")[0];
-  if (folder) return `${folder}（${files.length} 个文件）`;
-  return files.length === 1 ? files[0].name : `${files.length} 个文件`;
+  if (folder) return plural(files.length, t.folderFiles, { folder });
+  return files.length === 1 ? files[0].name : plural(files.length, t.files);
 }
 
 /**
@@ -52,6 +56,7 @@ function FilePicker({
   onFiles: (files: FileList | null) => Promise<void>;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "type" | "onChange" | "disabled">) {
   const [chosen, setChosen] = useState("");
+  const i18n = useAdminI18n();
   return (
     <div className="flex flex-wrap items-center gap-3">
       <input
@@ -63,7 +68,7 @@ function FilePicker({
         onChange={(event) => {
           const element = event.currentTarget;
           const files = element.files;
-          setChosen(describeFiles(files));
+          setChosen(describeFiles(files, i18n));
           // 清空以便再次选择同一个文件夹 / 文件时还能触发
           void onFiles(files).finally(() => (element.value = ""));
         }}
@@ -74,21 +79,21 @@ function FilePicker({
       >
         {button}
       </label>
-      <span className="min-w-0 truncate text-xs text-ink-3">{chosen || "还没有选择"}</span>
+      <span className="min-w-0 truncate text-xs text-ink-3">{chosen || i18n.m.admin.bulkImport.nothingChosen}</span>
     </div>
   );
 }
 
-async function uploadFile(file: File): Promise<{ url: string } | { error: string }> {
-  if (file.size > MAX_IMAGE_BYTES) return { error: "超过 5MB" };
+async function uploadFile(file: File, t: Text): Promise<{ url: string } | { error: string }> {
+  if (file.size > MAX_IMAGE_BYTES) return { error: t.imageTooLarge };
   const body = new FormData();
   body.append("file", file);
   try {
     const response = await fetch("/api/upload", { method: "POST", body });
     const data = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
-    return response.ok && data.url ? { url: data.url } : { error: data.error ?? `上传失败（${response.status}）` };
+    return response.ok && data.url ? { url: data.url } : { error: data.error ?? t.uploadFailedStatus.replace("{status}", String(response.status)) };
   } catch {
-    return { error: "上传失败（网络中断）" };
+    return { error: t.uploadFailedNetwork };
   }
 }
 
@@ -97,6 +102,10 @@ async function uploadFile(file: File): Promise<{ url: string } | { error: string
  * 解析库只在选好文件后才加载。
  */
 export default function BulkImport({ categories }: { categories: Category[] }) {
+  const i18n = useAdminI18n();
+  const { m, f, plural, date } = i18n;
+  const t = m.admin.bulkImport;
+  const formatDate = (iso: string | null) => (iso ? date(iso, { dateStyle: "medium", timeZone: undefined }) : "—");
   const ids = { folder: useId(), files: useId(), wxr: useId(), category: useId(), rules: useId() };
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -162,11 +171,11 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
       for (const file of Array.from(list)) files.set((file.webkitRelativePath || file.name).replace(/\\/g, "/"), file);
       const paths = [...files.keys()].filter(isImportableMarkdown).sort();
       if (paths.length === 0) {
-        setError("没有找到 Markdown 文件（.md / .markdown）");
+        setError(t.noMarkdown);
         return;
       }
       if (paths.length > MAX_MARKDOWN_FILES) {
-        setError(`Markdown 文件太多（${paths.length} 个），一次最多 ${MAX_MARKDOWN_FILES} 个，请分几批导入`);
+        setError(f(t.tooManyFiles, { n: paths.length, max: MAX_MARKDOWN_FILES }));
         return;
       }
       const items: Row[] = [];
@@ -174,18 +183,18 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
       for (const path of paths) {
         const file = files.get(path)!;
         if (file.size > MAX_MARKDOWN_BYTES) {
-          skip.push(`${path}（超过 2MB）`);
+          skip.push(f(t.skipTooLarge, { path }));
           continue;
         }
         const item = markdownFileToCandidate(path, await file.text(), file.lastModified);
         if (item.content) items.push({ ...item, selected: true });
-        else skip.push(`${path}（正文是空的）`);
+        else skip.push(f(t.skipEmpty, { path }));
       }
       setLoaded({ kind: "markdown", label, files });
       setRows(items);
       setSkipped(skip);
     } catch {
-      setError("解析失败，请确认选的是 Markdown 文件");
+      setError(t.markdownParseFailed);
     } finally {
       setParsing(false);
     }
@@ -195,7 +204,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
     if (!file) return;
     reset();
     if (file.size > MAX_WXR_BYTES) {
-      setError("文件太大（最多 100MB）；可以在 WordPress 导出时按时间分几次导出");
+      setError(t.wxrTooLarge);
       return;
     }
     setParsing(true);
@@ -203,19 +212,19 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
       const { parseWordPressExport } = await import("@/lib/bulk-import");
       const text = await file.text();
       if (!/<rss[\s>]/.test(text) || !/wordpress\.org\/export/.test(text)) {
-        setError("这不是 WordPress 的导出文件：请在 WordPress 后台「工具 → 导出」导出「文章」或「所有内容」");
+        setError(t.notWxr);
         return;
       }
       const { items, skipped: skip, siteUrl } = parseWordPressExport(text);
       if (items.length === 0) {
-        setError("导出文件里没有文章");
+        setError(t.wxrEmpty);
         return;
       }
-      setLoaded({ kind: "wordpress", label: siteUrl ? `WordPress（${siteUrl}）` : "WordPress", files: new Map() });
+      setLoaded({ kind: "wordpress", label: siteUrl ? `WordPress (${siteUrl})` : "WordPress", files: new Map() });
       setRows(items.map((item) => ({ ...item, selected: true })));
       setSkipped(skip);
     } catch {
-      setError("解析失败，请确认是 WordPress 导出的 XML 文件");
+      setError(t.wxrParseFailed);
     } finally {
       setParsing(false);
     }
@@ -226,7 +235,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
   const run = async () => {
     if (!loaded || selected.length === 0) return;
     if (!categoryId) {
-      setError("请选择默认分类");
+      setError(t.chooseCategory);
       return;
     }
     setError("");
@@ -253,20 +262,20 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
         let target = stored.get(cacheKey);
         if (!target) {
           if (local) {
-            const result = await uploadFile(loaded.files.get(local)!);
+            const result = await uploadFile(loaded.files.get(local)!, t);
             if ("url" in result) target = result.url;
-            else warnings.push(`图片 ${src}：${result.error}`);
+            else warnings.push(f(t.imageFailed, { src, error: result.error }));
           } else if (remote) {
             if (!downloadRemote) continue;
             try {
               const result = await importRemoteImage(remote);
               if ("url" in result) target = result.url;
-              else warnings.push(`图片 ${src} 没下载成功（${result.error}），保留原地址`);
+              else warnings.push(f(t.imageDownloadFailedReason, { src, error: result.error }));
             } catch {
-              warnings.push(`图片 ${src} 没下载成功，保留原地址`);
+              warnings.push(f(t.imageDownloadFailed, { src }));
             }
           } else if (!/^data:/i.test(src)) {
-            warnings.push(`图片 ${src} 在所选文件夹里没找到`);
+            warnings.push(f(t.imageMissing, { src }));
           }
           if (target) {
             stored.set(cacheKey, target);
@@ -296,8 +305,8 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
         );
       } catch (reason) {
         const message = reason instanceof Error && /body exceeded|too large|413/i.test(reason.message)
-          ? "正文太大（超过 1MB），请拆成几篇再导入"
-          : "请求失败（网络中断或登录已过期）";
+          ? t.bodyTooLarge
+          : t.requestFailed;
         done.push({ key: row.key, title: row.title, ok: false, error: message, warnings, oldPath: row.oldPath });
       }
       setResults([...done]);
@@ -329,55 +338,55 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
       {/* ---------- 第一步：选文件 ---------- */}
       {!running && !finished && (
         <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6">
-          <h2 className="text-base font-bold text-ink">1. 选择要导入的内容</h2>
+          <h2 className="text-base font-bold text-ink">{t.step1}</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-line bg-paper/60 p-4">
               <label htmlFor={ids.folder} className="text-sm font-semibold text-ink">
-                Markdown 文件夹
+                {t.folder}
               </label>
               <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">
-                Hexo 选 <code>source</code>，Hugo 选 <code>content</code>（连同 <code>static</code> 一起选上一级更好），Jekyll 选 <code>_posts</code> 所在目录，Obsidian 选整个库。文件夹里的图片会一起上传。
+                {rich(t.folderHint, { source: <code>source</code>, content: <code>content</code>, static: <code>static</code>, posts: <code>_posts</code> })}
               </p>
               <FilePicker
                 id={ids.folder}
-                button="选择文件夹"
+                button={t.chooseFolder}
                 multiple
                 disabled={parsing}
                 {...{ webkitdirectory: "", directory: "" }}
-                onFiles={(files) => loadMarkdown(files, "Markdown 文件夹")}
+                onFiles={(files) => loadMarkdown(files, t.folderLabel)}
               />
             </div>
             <div className="rounded-2xl border border-line bg-paper/60 p-4">
               <label htmlFor={ids.files} className="text-sm font-semibold text-ink">
-                几个 Markdown 文件
+                {t.filesTitle}
               </label>
-              <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">可以多选。本地图片找不到（只选了文件没选文件夹），外链图片照常下载。</p>
+              <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">{t.filesHint}</p>
               <FilePicker
                 id={ids.files}
-                button="选择文件"
+                button={t.chooseFiles}
                 multiple
                 accept=".md,.markdown,text/markdown"
                 disabled={parsing}
-                onFiles={(files) => loadMarkdown(files, "Markdown 文件")}
+                onFiles={(files) => loadMarkdown(files, t.filesLabel)}
               />
             </div>
             <div className="rounded-2xl border border-line bg-paper/60 p-4">
               <label htmlFor={ids.wxr} className="text-sm font-semibold text-ink">
-                WordPress 导出文件
+                {t.wxr}
               </label>
               <p className="mt-1 mb-3 text-xs leading-relaxed text-ink-3">
-                在 WordPress 后台「工具 → 导出」选「文章」，下载得到的 .xml 文件。图片会从原网站下载到本站。
+                {t.wxrHint}
               </p>
               <FilePicker
                 id={ids.wxr}
-                button="选择 .xml 文件"
+                button={t.chooseWxr}
                 accept=".xml,application/xml,text/xml"
                 disabled={parsing}
                 onFiles={(files) => loadWordPress(files?.[0])}
               />
             </div>
           </div>
-          {parsing && <p className="mt-4 text-sm text-ink-3">正在解析…</p>}
+          {parsing && <p className="mt-4 text-sm text-ink-3">{t.parsing}</p>}
           {error && (
             <p role="alert" className="mt-4 text-sm text-red-500">
               {error}
@@ -389,14 +398,14 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
       {/* ---------- 第二步：预览和选项 ---------- */}
       {loaded && rows.length > 0 && !running && !finished && (
         <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6">
-          <h2 className="text-base font-bold text-ink">2. 确认要导入的文章</h2>
+          <h2 className="text-base font-bold text-ink">{t.step2}</h2>
           <p className="mt-1 text-sm text-ink-3">
-            {loaded.label}：找到 {rows.length} 篇，已选 {selected.length} 篇
-            {skipped.length > 0 && `；跳过 ${skipped.length} 项`}
+            {f(t.found, { label: loaded.label, n: rows.length, selected: selected.length })}
+            {skipped.length > 0 && plural(skipped.length, t.skipped)}
           </p>
           {skipped.length > 0 && (
             <details className="mt-2 text-xs text-ink-3">
-              <summary className="cursor-pointer">查看跳过的内容</summary>
+              <summary className="cursor-pointer">{t.showSkipped}</summary>
               <ul className="mt-1 list-disc pl-5">
                 {skipped.slice(0, 50).map((item) => (
                   <li key={item}>{item}</li>
@@ -408,7 +417,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor={ids.category} className="mb-1.5 block text-sm font-medium text-ink-2">
-                默认分类
+                {t.defaultCategory}
               </label>
               <select
                 id={ids.category}
@@ -424,27 +433,27 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
               </select>
               <label className="mt-2 flex items-center gap-2 text-sm text-ink-2">
                 <input type="checkbox" checked={matchCategories} onChange={(event) => setMatchCategories(event.target.checked)} className="h-4 w-4" />
-                原分类和本站分类同名时放进对应分类
+                {t.matchCategories}
               </label>
             </div>
             <fieldset className="space-y-2 text-sm text-ink-2">
-              <legend className="mb-1.5 text-sm font-medium text-ink-2">导入后</legend>
+              <legend className="mb-1.5 text-sm font-medium text-ink-2">{t.afterImport}</legend>
               <label className="flex items-center gap-2">
                 <input type="radio" name="import-status" checked={!keepStatus} onChange={() => setKeepStatus(false)} className="h-4 w-4" />
-                全部存为草稿（推荐：检查排版后再发布）
+                {t.allDrafts}
               </label>
               <label className="flex items-center gap-2">
                 <input type="radio" name="import-status" checked={keepStatus} onChange={() => setKeepStatus(true)} className="h-4 w-4" />
-                保持原来的状态（原来已发布的直接发布）
+                {t.keepStatus}
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={downloadRemote} onChange={(event) => setDownloadRemote(event.target.checked)} className="h-4 w-4" />
-                把外链图片下载到本站（原网站关掉后图片也不会丢）
+                {t.downloadRemote}
               </label>
             </fieldset>
           </div>
           <p className="mt-3 text-xs text-ink-3">
-            发布时间、标签会保留；网址别名重复时自动加 -2、-3；导入的文章不会给订阅者发邮件。
+            {t.keepsNote}
           </p>
 
           <div className="mt-4 max-h-[28rem] overflow-auto rounded-2xl border border-line">
@@ -454,18 +463,18 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
                   <th className="w-10 px-3 py-2">
                     <input
                       type="checkbox"
-                      aria-label="全选"
+                      aria-label={t.selectAll}
                       checked={selected.length === rows.length}
                       onChange={(event) => setRows(rows.map((row) => ({ ...row, selected: event.target.checked })))}
                       className="h-4 w-4"
                     />
                   </th>
-                  <th className="px-3 py-2 font-medium">标题</th>
-                  <th className="px-3 py-2 font-medium">放进分类</th>
-                  <th className="px-3 py-2 font-medium">标签</th>
-                  <th className="px-3 py-2 font-medium">发布时间</th>
-                  <th className="px-3 py-2 font-medium">原状态</th>
-                  <th className="px-3 py-2 font-medium">图片</th>
+                  <th className="px-3 py-2 font-medium">{t.colTitle}</th>
+                  <th className="px-3 py-2 font-medium">{t.colCategory}</th>
+                  <th className="px-3 py-2 font-medium">{t.colTags}</th>
+                  <th className="px-3 py-2 font-medium">{t.colDate}</th>
+                  <th className="px-3 py-2 font-medium">{t.colStatus}</th>
+                  <th className="px-3 py-2 font-medium">{t.colImages}</th>
                 </tr>
               </thead>
               <tbody>
@@ -474,7 +483,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
                     <td className="px-3 py-2">
                       <input
                         type="checkbox"
-                        aria-label={`导入「${row.title}」`}
+                        aria-label={f(t.importRow, { title: row.title })}
                         checked={row.selected}
                         onChange={(event) => setRows(rows.map((item, i) => (i === index ? { ...item, selected: event.target.checked } : item)))}
                         className="h-4 w-4"
@@ -485,9 +494,9 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
                       <p className="truncate text-xs text-ink-3">{row.source}</p>
                     </td>
                     <td className="px-3 py-2 text-ink-2">{categoryName(categoryFor(row))}</td>
-                    <td className="max-w-[10rem] truncate px-3 py-2 text-xs text-ink-3">{row.tags.join("、") || "—"}</td>
+                    <td className="max-w-[10rem] truncate px-3 py-2 text-xs text-ink-3">{row.tags.join(t.tagSeparator) || "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-3">{formatDate(row.createdAt)}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-3">{row.published ? "已发布" : "草稿"}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-3">{row.published ? t.published : t.draft}</td>
                     <td className="px-3 py-2 text-xs text-ink-3">{row.images.length || "—"}</td>
                   </tr>
                 ))}
@@ -502,10 +511,10 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
               disabled={selected.length === 0}
               className="h-10 rounded-full bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              开始导入 {selected.length} 篇
+              {plural(selected.length, t.start)}
             </button>
             <button type="button" onClick={reset} className="text-sm text-ink-3 hover:text-ink">
-              重新选择
+              {t.rechoose}
             </button>
           </div>
         </section>
@@ -514,23 +523,25 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
       {/* ---------- 第三步：进度和结果 ---------- */}
       {(running || finished) && (
         <section className="rounded-3xl border border-line bg-surface p-5 sm:p-6">
-          <h2 className="text-base font-bold text-ink">{running ? "正在导入…" : "导入完成"}</h2>
+          <h2 className="text-base font-bold text-ink">{running ? t.running : t.finished}</h2>
           {running && (
             <div className="mt-3">
-              <progress value={progress.done} max={progress.total} aria-label="导入进度" className="h-2 w-full accent-[var(--color-accent)]" />
+              <progress value={progress.done} max={progress.total} aria-label={t.progress} className="h-2 w-full accent-[var(--color-accent)]" />
               <p className="mt-2 text-sm text-ink-3">
                 {progress.done} / {progress.total}：{progress.current}
               </p>
               <button type="button" onClick={() => (stop.current = true)} className="mt-2 text-sm text-red-500 hover:underline">
-                停止（当前这篇导完就停）
+                {t.stop}
               </button>
             </div>
           )}
           {finished && (
             <p role="status" className="mt-2 text-sm text-ink-2">
-              成功 {okCount} 篇{failCount > 0 && `，失败 ${failCount} 篇`}
-              {progress.done < progress.total && `，还有 ${progress.total - progress.done} 篇没有导入（已停止）`}。
-              {!keepStatus && okCount > 0 && " 导入的文章都是草稿，检查后在教程管理里发布。"}
+              {plural(okCount, t.resultOk)}
+              {failCount > 0 && plural(failCount, t.resultFailed)}
+              {progress.done < progress.total && plural(progress.total - progress.done, t.resultStopped)}
+              {t.resultEnd}
+              {!keepStatus && okCount > 0 && t.resultDrafts}
             </p>
           )}
 
@@ -565,10 +576,10 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
           {finished && rules && (
             <div className="mt-5">
               <label htmlFor={ids.rules} className="text-sm font-semibold text-ink">
-                旧地址跳转规则（Nginx）
+                {t.rules}
               </label>
               <p className="mt-1 mb-2 text-xs leading-relaxed text-ink-3">
-                新站沿用原来的域名时，把下面的规则放进 Nginx 配置的 server 块里（放在 location / 前面），旧链接会 301 跳到新地址，搜索引擎的收录和别人引用的链接都不会断。
+                {t.rulesHint}
               </p>
               <textarea id={ids.rules} readOnly value={rules} rows={Math.min(10, rules.split("\n").length)} className="w-full rounded-xl border border-line bg-paper p-3 font-mono text-xs text-ink-2" />
               <button
@@ -584,7 +595,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
                 }}
                 className="mt-2 h-8 rounded-full border border-line px-4 text-xs text-ink-2 hover:bg-paper hover:text-ink"
               >
-                {copied ? "已复制" : "复制规则"}
+                {copied ? t.copied : t.copyRules}
               </button>
             </div>
           )}
@@ -592,10 +603,10 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
           {finished && (
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/admin/tutorials" className="flex h-10 items-center rounded-full bg-btn px-6 text-sm font-semibold text-white hover:opacity-90">
-                去教程管理
+                {t.goTutorials}
               </Link>
               <button type="button" onClick={reset} className="text-sm text-ink-3 hover:text-ink">
-                继续导入其他文件
+                {t.importMore}
               </button>
             </div>
           )}

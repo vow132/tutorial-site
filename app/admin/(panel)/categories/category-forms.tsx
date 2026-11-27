@@ -8,6 +8,7 @@ import {
   deleteCategory,
   type CategoryFormState,
 } from "@/lib/actions/categories";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const inputCls =
   "h-10 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60";
@@ -57,16 +58,17 @@ function ParentSelect({
   options: ParentOption[];
   defaultValue?: number | null;
 }) {
+  const { m, f } = useAdminI18n();
   return (
     <select
       name="parentId"
       defaultValue={defaultValue ?? ""}
       className={inputCls}
     >
-      <option value="">无（作为一级分类）</option>
+      <option value="">{m.admin.categories.noParent}</option>
       {options.map((option) => (
         <option key={option.id} value={option.id}>
-          {`${"　".repeat(option.depth)}${option.name}（${option.depth + 1}级）`}
+          {`${"　".repeat(option.depth)}${f(m.admin.common.categoryOption, { name: option.name, n: option.depth + 1 })}`}
         </option>
       ))}
     </select>
@@ -84,6 +86,7 @@ export function CreateCategoryForm({
   );
   const availableParents = parentOptions.filter((option) => option.depth < 2);
   const formRef = useRef<HTMLFormElement>(null);
+  const t = useAdminI18n().m.admin.categories;
 
   // 手动提交（出错时保留输入，见 lib/form-submit.ts）；创建成功后再清空表单，方便接着添加。
   useEffect(() => {
@@ -93,12 +96,12 @@ export function CreateCategoryForm({
   return (
     <form ref={formRef} onSubmit={submitKeepingValues(action)} className="mt-4 space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Field label="分类名称">
+        <Field label={t.name}>
           <input
             name="name"
             required
             maxLength={60}
-            placeholder="如：前端开发"
+            placeholder={t.namePlaceholder}
             className={inputCls}
           />
         </Field>
@@ -107,18 +110,18 @@ export function CreateCategoryForm({
             name="slug"
             required
             maxLength={80}
-            placeholder="如：frontend"
+            placeholder={t.slugPlaceholder}
             className={inputCls}
           />
         </Field>
-        <Field label="父分类" hint="（可选）">
+        <Field label={t.parent} hint={t.optional}>
           <ParentSelect options={availableParents} />
         </Field>
         <div className="grid grid-cols-[1fr_auto] gap-3">
-          <Field label="图标" hint="（可选）">
-            <input name="icon" placeholder="如：🎨" className={inputCls} />
+          <Field label={t.icon} hint={t.optional}>
+            <input name="icon" placeholder={t.iconPlaceholder} className={inputCls} />
           </Field>
-          <Field label="主题色">
+          <Field label={t.color}>
             <input
               name="color"
               type="color"
@@ -130,19 +133,19 @@ export function CreateCategoryForm({
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Field label="分类描述" hint="（可选）">
+        <Field label={t.description} hint={t.optional}>
           <input
             name="description"
             maxLength={300}
-            placeholder="一句话描述"
+            placeholder={t.descriptionPlaceholder}
             className={inputCls}
           />
         </Field>
-        <Field label="跳转链接" hint="（可选，填写后点击分类会直接跳转）">
+        <Field label={t.link} hint={t.linkHintNew}>
           <input
             name="linkUrl"
             maxLength={500}
-            placeholder="/站内路径 或 https://example.com"
+            placeholder={t.linkPlaceholder}
             className={inputCls}
           />
         </Field>
@@ -154,7 +157,7 @@ export function CreateCategoryForm({
           disabled={pending}
           className="h-10 shrink-0 rounded-full bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? "创建中…" : "创建分类"}
+          {pending ? t.creating : t.create}
         </button>
         <Message state={state} />
       </div>
@@ -195,6 +198,8 @@ export function CategoryRow({
     {},
   );
 
+  const { m, f, plural } = useAdminI18n();
+  const t = m.admin.categories;
   const descendants = new Set(category.descendantIds);
   const subtreeHeight = Math.max(
     0,
@@ -218,7 +223,7 @@ export function CategoryRow({
         id={`edit-category-${category.id}`}
         type="checkbox"
         className="peer sr-only"
-        aria-label={`编辑${category.name}`}
+        aria-label={f(t.editLabel, { name: category.name })}
       />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
@@ -232,24 +237,24 @@ export function CategoryRow({
             <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">
               {category.name}
               <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-normal text-accent">
-                {category.depth + 1}级分类
+                {f(t.level, { n: category.depth + 1 })}
               </span>
               <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-normal text-ink-3">
-                {category.tutorials} 篇
+                {plural(category.tutorials, t.tutorials)}
               </span>
               {category.children > 0 && (
                 <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-normal text-ink-3">
-                  {category.children} 个子分类
+                  {plural(category.children, t.children)}
                 </span>
               )}
             </p>
             <p className="mt-1 truncate text-xs text-ink-3">
               /{category.slug}
-              {category.parentName ? ` · 父分类：${category.parentName}` : ""}
+              {category.parentName ? f(t.parentName, { name: category.parentName }) : ""}
             </p>
             {category.linkUrl && (
               <p className="mt-1 truncate text-xs text-accent">
-                跳转：{category.linkUrl}
+                {f(t.linkTo, { url: category.linkUrl })}
               </p>
             )}
           </div>
@@ -267,12 +272,12 @@ export function CategoryRow({
               }
             }}
           >
-            编辑
+            {m.admin.common.edit}
           </label>
           <form
             action={delAction}
             onSubmit={(event) => {
-              if (!confirm("确定删除该分类吗？")) event.preventDefault();
+              if (!confirm(t.deleteConfirm)) event.preventDefault();
             }}
           >
             <input type="hidden" name="id" value={category.id} />
@@ -280,7 +285,7 @@ export function CategoryRow({
               type="submit"
               className="rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-500/10"
             >
-              删除
+              {m.admin.common.delete}
             </button>
           </form>
         </div>
@@ -299,7 +304,7 @@ export function CategoryRow({
         >
           <input type="hidden" name="id" value={category.id} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Field label="分类名称">
+            <Field label={t.name}>
               <input
                 name="name"
                 required
@@ -317,13 +322,13 @@ export function CategoryRow({
                 className={inputCls}
               />
             </Field>
-            <Field label="父分类">
+            <Field label={t.parent}>
               <ParentSelect
                 options={availableParents}
                 defaultValue={category.parentId}
               />
             </Field>
-            <Field label="排序" hint="（越小越靠前）">
+            <Field label={t.order} hint={t.orderHint}>
               <input
                 name="order"
                 type="number"
@@ -332,15 +337,15 @@ export function CategoryRow({
               />
             </Field>
             <div className="grid grid-cols-[1fr_auto] gap-3">
-              <Field label="图标">
+              <Field label={t.icon}>
                 <input
                   name="icon"
                   defaultValue={category.icon ?? ""}
-                  placeholder="如：🎨"
+                  placeholder={t.iconPlaceholder}
                   className={inputCls}
                 />
               </Field>
-              <Field label="主题色">
+              <Field label={t.color}>
                 <input
                   name="color"
                   type="color"
@@ -352,21 +357,21 @@ export function CategoryRow({
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <Field label="分类描述">
+            <Field label={t.description}>
               <input
                 name="description"
                 maxLength={300}
                 defaultValue={category.description ?? ""}
-                placeholder="一句话描述"
+                placeholder={t.descriptionPlaceholder}
                 className={inputCls}
               />
             </Field>
-            <Field label="跳转链接" hint="（留空则进入分类教程页）">
+            <Field label={t.link} hint={t.linkHintEdit}>
               <input
                 name="linkUrl"
                 maxLength={500}
                 defaultValue={category.linkUrl ?? ""}
-                placeholder="/站内路径 或 https://example.com"
+                placeholder={t.linkPlaceholder}
                 className={inputCls}
               />
             </Field>
@@ -378,7 +383,7 @@ export function CategoryRow({
               disabled={pending}
               className="h-10 rounded-full bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
-              {pending ? "保存中…" : "保存修改"}
+              {pending ? m.admin.common.saving : t.saveChanges}
             </button>
             <Message state={state} />
           </div>

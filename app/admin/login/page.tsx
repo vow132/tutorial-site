@@ -10,8 +10,15 @@ import { getSettings } from "@/lib/settings";
 import { currentTurnstileSiteKey } from "@/lib/turnstile-store";
 import LoginForm from "./login-form";
 import PasskeyLogin from "./passkey-login";
+import LanguageSelect from "@/components/language-select";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { format } from "@/lib/i18n/format";
+import { rich } from "@/lib/i18n/rich";
 
-export const metadata: Metadata = { title: "管理员登录" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.login.metaTitle };
+}
 
 export default async function AdminLoginPage({
   searchParams,
@@ -37,6 +44,8 @@ export default async function AdminLoginPage({
   const demo = demoAccount();
   // 直接读库：npm run admin:reset 关掉人机验证后立即生效
   const turnstileSiteKey = await currentTurnstileSiteKey();
+  const { m, locale } = await getAdminI18n();
+  const t = m.admin.login;
 
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center px-4 pb-24 pt-20">
@@ -44,17 +53,18 @@ export default async function AdminLoginPage({
       <div className="mt-6 w-full rounded-3xl border border-line bg-surface p-8 shadow-lifted">
         <div className="text-center">
           <SiteLogo settings={settings} className="mx-auto h-12 w-12 rounded-2xl! text-lg" />
-          <h1 className="mt-4 text-xl font-bold text-ink">管理后台</h1>
-          <p className="mt-1 text-sm text-ink-3">登录以管理{settings.siteName}的内容</p>
+          <h1 className="mt-4 text-xl font-bold text-ink">{t.heading}</h1>
+          <p className="mt-1 text-sm text-ink-3">{format(t.intro, { site: settings.siteName })}</p>
         </div>
         {demo && (
           <p className="mt-5 rounded-2xl bg-accent-soft px-4 py-3 text-sm leading-relaxed text-accent-ink">
-            这是演示站，账号 <strong>{demo.username}</strong>、密码 <strong>{demo.password}</strong> 已经帮你填好。后台可以随便看，保存不了修改。
+            {rich(t.demo, { username: <strong>{demo.username}</strong>, password: <strong>{demo.password}</strong> })}
           </p>
         )}
         <LoginForm from={safeFrom} initial={demo ?? undefined} turnstileSiteKey={turnstileSiteKey} />
         {passkeyLogin && <PasskeyLogin from={safeFrom} />}
       </div>
+      <LanguageSelect value={locale} label={t.languageLabel} className="mt-6" />
     </div>
   );
 }

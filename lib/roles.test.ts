@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bylineOf, can, canEditTutorial, parseDisplayName, readRole, type Permission } from "./roles";
+import { messagesFor } from "./i18n/messages";
+
+const v = messagesFor("zh-CN").admin.validation;
 
 const ALL: Permission[] = ["dashboard", "account", "tutorials", "tutorials.others", "taxonomy", "about", "feedback", "import", "media", "site"];
 
@@ -37,9 +40,9 @@ test("bylines come only from the display name, never the login username", () => 
   assert.equal(bylineOf({ displayName: null }), null);
   assert.equal(bylineOf({ displayName: "   " }), null);
   assert.equal(bylineOf({ displayName: " 张三 " }), "张三");
-  assert.deepEqual(parseDisplayName("  李  四 "), { value: "李 四" });
-  assert.deepEqual(parseDisplayName(""), { value: null });
-  assert.deepEqual(parseDisplayName(undefined), { value: null });
-  assert.match((parseDisplayName("一".repeat(21)) as { error: string }).error, /最多 20 个字/);
-  assert.match((parseDisplayName("<b>x</b>") as { error: string }).error, /< 或 >/);
+  assert.deepEqual(parseDisplayName("  李  四 ", v), { value: "李 四" });
+  assert.deepEqual(parseDisplayName("", v), { value: null });
+  assert.deepEqual(parseDisplayName(undefined, v), { value: null });
+  assert.match((parseDisplayName("一".repeat(21), v) as { error: string }).error, /最多 20 个字/);
+  assert.match((parseDisplayName("<b>x</b>", v) as { error: string }).error, /< 或 >/);
 });

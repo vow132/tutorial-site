@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { alertForAudit, notifyInBackground } from "@/lib/alerts";
+import { alertForAudit, alertSite, notifyInBackground } from "@/lib/alerts";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 
 const RETENTION_DAYS = 365;
@@ -12,7 +12,8 @@ let writesSincePrune = 0;
  */
 export async function audit(
   action: string,
-  options: { actor?: string | null; detail?: string | null } = {},
+  /** alert：按情况决定要不要推送的动作（新设备登录、改了角色）由调用方指明 */
+  options: { actor?: string | null; detail?: string | null; alert?: boolean } = {},
 ) {
   try {
     const ip = await getClientIp();
@@ -25,7 +26,7 @@ export async function audit(
       },
     });
     // 新设备登录、改密码、关闭两步验证等需要实时推送（见 lib/alerts.ts）。
-    const alert = alertForAudit(action, { ...options, ip, userAgent: await getUserAgent() });
+    const alert = alertForAudit(action, { ...options, ip, userAgent: await getUserAgent() }, (await alertSite()).m);
     if (alert) await notifyInBackground(action, alert.title, alert.lines);
     if (++writesSincePrune >= PRUNE_EVERY) {
       writesSincePrune = 0;

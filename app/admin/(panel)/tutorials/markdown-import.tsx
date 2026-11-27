@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 import type { ImportedTutorial } from "@/lib/markdown-import";
+import { useAdminI18n } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
 
 /**
  * 「从 Markdown 导入」：选 .md 文件或直接粘贴，转换后填进表单（还没保存，可以接着改）。
@@ -14,6 +16,7 @@ export default function MarkdownImport({
   onImport: (values: ImportedTutorial) => void;
   hasContent: () => boolean;
 }) {
+  const t = useAdminI18n().m.admin.tutorials;
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,22 +26,22 @@ export default function MarkdownImport({
   const run = async (source: string) => {
     setError("");
     if (!source.trim()) {
-      setError("内容是空的");
+      setError(t.mdEmpty);
       return;
     }
-    if (hasContent() && !confirm("导入会替换当前的正文；文件里有标题、摘要、标签时也会替换。继续吗？")) return;
+    if (hasContent() && !confirm(t.mdReplaceConfirm)) return;
     setBusy(true);
     try {
       const { markdownToTutorial } = await import("@/lib/markdown-import");
       const imported = markdownToTutorial(source);
       if (!imported.content) {
-        setError("没有解析出正文");
+        setError(t.mdNoContent);
         return;
       }
       onImport(imported);
       setText("");
     } catch {
-      setError("解析失败，请确认是 Markdown 文本");
+      setError(t.mdParseFailed);
     } finally {
       setBusy(false);
     }
@@ -46,15 +49,14 @@ export default function MarkdownImport({
 
   return (
     <details className="markdown-import mb-5 rounded-2xl border border-line bg-surface px-5 py-3">
-      <summary className="cursor-pointer select-none text-sm font-medium text-ink-2 hover:text-ink">从 Markdown 导入</summary>
+      <summary className="cursor-pointer select-none text-sm font-medium text-ink-2 hover:text-ink">{t.mdImport}</summary>
       <div className="mt-3 space-y-3 pb-1 text-sm">
         <p className="text-xs text-ink-3">
-          支持开头的 front matter（title、slug、excerpt/description、tags）、代码块语言、表格，以及 GitHub 风格的提示框
-          <code className="mx-1">{"> [!TIP]"}</code>。外链图片不会下载到本站，必要时请重新上传。
+          {rich(t.mdImportHint, { tip: <code className="mx-1">{"> [!TIP]"}</code> })}
         </p>
         <div>
           <label htmlFor={fileId} className="mb-1 block text-xs text-ink-2">
-            选择文件
+            {t.mdChooseFile}
           </label>
           <input
             id={fileId}
@@ -66,7 +68,7 @@ export default function MarkdownImport({
               event.currentTarget.value = "";
               if (!file) return;
               if (file.size > 2 * 1024 * 1024) {
-                setError("文件太大（最多 2MB）");
+                setError(t.mdTooLarge);
                 return;
               }
               await run(await file.text());
@@ -76,7 +78,7 @@ export default function MarkdownImport({
         </div>
         <div>
           <label htmlFor={textId} className="mb-1 block text-xs text-ink-2">
-            或者粘贴 Markdown
+            {t.mdPaste}
           </label>
           <textarea
             id={textId}
@@ -93,7 +95,7 @@ export default function MarkdownImport({
             onClick={() => run(text)}
             className="h-9 rounded-full border border-line px-4 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:opacity-50"
           >
-            {busy ? "导入中…" : "导入粘贴的内容"}
+            {busy ? t.mdImporting : t.mdImportPasted}
           </button>
           {error && (
             <span role="alert" className="text-xs text-red-500 dark:text-red-400">

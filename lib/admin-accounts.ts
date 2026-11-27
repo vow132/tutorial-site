@@ -17,23 +17,24 @@ async function isOwner(tx: Prisma.TransactionClient, id: number) {
   return !!row && readRole(row.role) === "owner";
 }
 
-export const LOST_OWNER_MESSAGE = "你的站长权限刚被取消，这次操作没有执行";
+/** 不能执行的原因（文字按后台语言：m.admin.users.errors） */
+export type AccountProblem = "lostOwner" | "notFound" | "ownRole" | "lastOwner" | "deleteSelf";
 
 /** 改别人的角色和署名。返回改之前的角色（写日志用）。 */
 export async function changeAccount(
   db: Db,
   input: { actorId: number; targetId: number; role: Role; displayName: string | null },
-): Promise<{ error: string } | { previousRole: Role }> {
+): Promise<{ error: AccountProblem } | { previousRole: Role }> {
   return db.$transaction(async (tx) => {
-    if (!(await isOwner(tx, input.actorId))) return { error: LOST_OWNER_MESSAGE };
+    if (!(await isOwner(tx, input.actorId))) return { error: "lostOwner" as const };
     const target = await tx.admin.findUnique({ where: { id: input.targetId }, select: { role: true } });
-    if (!target) return { error: "这个账号不存在或已被删除" };
+    if (!target) return { error: "notFound" as const };
     const previousRole = readRole(target.role);
     if (previousRole !== input.role && input.targetId === input.actorId) {
-      return { error: "不能修改自己的角色（防止把自己降级后没人能管理网站）" };
+      return { error: "ownRole" as const };
     }
     if (previousRole === "owner" && input.role !== "owner" && (await tx.admin.count({ where: { role: "owner" } })) <= 1) {
-      return { error: "至少要保留一个站长" };
+      return { error: "lastOwner" as const };
     }
     await tx.admin.update({ where: { id: input.targetId }, data: { role: input.role, displayName: input.displayName } });
     return { previousRole };
@@ -44,13 +45,13 @@ export async function changeAccount(
 export async function removeAccount(
   db: Db,
   input: { actorId: number; targetId: number },
-): Promise<{ error: string } | { moved: number }> {
-  if (input.targetId === input.actorId) return { error: "不能删除自己的账号" };
+): Promise<{ error: AccountProblem } | { moved: number }> {
+  if (input.targetId === input.actorId) return { error: "deleteSelf" };
   return db.$transaction(async (tx) => {
-    if (!(await isOwner(tx, input.actorId))) return { error: LOST_OWNER_MESSAGE };
+    if (!(await isOwner(tx, input.actorId))) return { error: "lostOwner" as const };
     const moved = await tx.tutorial.updateMany({ where: { authorId: input.targetId }, data: { authorId: input.actorId } });
     const deleted = await tx.admin.deleteMany({ where: { id: input.targetId } });
-    if (!deleted.count) return { error: "这个账号不存在或已被删除" };
+    if (!deleted.count) return { error: "notFound" as const };
     return { moved: moved.count };
   });
 }

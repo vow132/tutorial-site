@@ -9,10 +9,17 @@ import ThemeToggle from "@/components/theme-toggle";
 import LabelButton from "@/components/label-button";
 import { SITE_REPOSITORY_URL } from "@/lib/site-update-types";
 import { can, type Permission } from "@/lib/roles";
+import LanguageSelect from "@/components/language-select";
+import { useAdminI18n } from "@/lib/i18n/client";
+import type { Messages } from "@/lib/i18n/messages/types";
+import { rich } from "@/lib/i18n/rich";
+
+type NavKey = keyof Omit<Messages["admin"]["nav"], "ariaLabel" | "viewSite" | "logout" | "changelog" | "version" | "openMenu" | "closeMenu" | "menu" | "title" | "language">;
 
 type AdminItem = {
   href: string;
-  label: string;
+  /** 文字在字典 m.admin.nav 里的键 */
+  label: NavKey;
   icon: ReactNode;
   /** 看得到这一项需要的权限（和页面里 requireAdminPage 的权限一致） */
   permission: Permission;
@@ -21,55 +28,55 @@ type AdminItem = {
 const items: AdminItem[] = [
   {
     href: "/admin",
-    label: "仪表盘",
+    label: "dashboard",
     permission: "dashboard",
     icon: <path d="M3 3h7v7H3zM11 3h7v4h-7zM11 10h7v7h-7zM3 13h7v4H3z" />,
   },
   {
     href: "/admin/tutorials",
-    label: "教程管理",
+    label: "tutorials",
     permission: "tutorials",
     icon: <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v15.5H6.5A2.5 2.5 0 0 0 4 20zM4 17.5V4.5M20 17.5V20H6.5" />,
   },
   {
     href: "/admin/categories",
-    label: "分类管理",
+    label: "categories",
     permission: "taxonomy",
     icon: <path d="M3.5 3.5h6v6h-6zM11.5 3.5h6v6h-6zM3.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z" />,
   },
   {
     href: "/admin/tags",
-    label: "标签管理",
+    label: "tags",
     permission: "taxonomy",
     icon: <path d="M3 3h7.5l8 8-7.5 7.5-8-8zM7 7h.01" />,
   },
   {
     href: "/admin/series",
-    label: "教程系列",
+    label: "series",
     permission: "taxonomy",
     icon: <path d="M4 4h11v3H4zM4 9.5h11v3H4zM4 15h11v3H4zM17.5 5.5v11" />,
   },
   {
     href: "/admin/media",
-    label: "图片库",
+    label: "media",
     permission: "media",
     icon: <path d="M3 4h16v14H3zM3 14l4.5-4.5 4 4 2.5-2.5L19 16M14.5 8.5h.01" />,
   },
   {
     href: "/admin/feedback",
-    label: "读者留言",
+    label: "feedback",
     permission: "feedback",
     icon: <path d="M3.5 4.5h15v10h-9l-4 3.5v-3.5h-2zM7 8.5h8M7 11.5h5" />,
   },
   {
     href: "/admin/subscribers",
-    label: "邮件订阅",
+    label: "subscribers",
     permission: "site",
     icon: <path d="M3 5h16v12H3zM3 5l8 6.5L19 5" />,
   },
   {
     href: "/admin/about",
-    label: "关于页面",
+    label: "about",
     permission: "about",
     icon: (
       <>
@@ -80,7 +87,7 @@ const items: AdminItem[] = [
   },
   {
     href: "/admin/settings",
-    label: "站点设置",
+    label: "settings",
     permission: "site",
     icon: (
       <>
@@ -91,7 +98,7 @@ const items: AdminItem[] = [
   },
   {
     href: "/admin/users",
-    label: "账号管理",
+    label: "users",
     permission: "site",
     icon: (
       <>
@@ -102,7 +109,7 @@ const items: AdminItem[] = [
   },
   {
     href: "/admin/account",
-    label: "账号安全",
+    label: "account",
     permission: "account",
     icon: (
       <>
@@ -114,7 +121,7 @@ const items: AdminItem[] = [
   },
   {
     href: "/admin/audit",
-    label: "安全日志",
+    label: "audit",
     permission: "site",
     icon: <path d="M11 2.5 4 5v5.5c0 4.2 3 7.4 7 9 4-1.6 7-4.8 7-9V5zM8 11l2 2 4-4" />,
   },
@@ -135,9 +142,11 @@ function SidebarLinks({
   role: string;
   onNavigate?: () => void;
 }) {
+  const { m, locale } = useAdminI18n();
+  const t = m.admin.nav;
   return (
     <>
-      <nav className="space-y-1" aria-label="后台导航">
+      <nav className="space-y-1" aria-label={t.ariaLabel}>
         {items.filter((item) => can(role, item.permission)).map((item) => (
           <Link
             key={item.href}
@@ -161,7 +170,7 @@ function SidebarLinks({
             >
               {item.icon}
             </svg>
-            {item.label}
+            {t[item.label]}
           </Link>
         ))}
       </nav>
@@ -188,7 +197,7 @@ function SidebarLinks({
           >
             <path d="M9 4H4v14h14v-5M13 3h6v6M19 3l-8 8" />
           </svg>
-          查看网站
+          {t.viewSite}
         </Link>
         {/* 演示模式下也能退出登录（components/demo-guard.tsx 放行带 data-demo-allow 的表单） */}
         <form action={logout} data-demo-allow="">
@@ -208,7 +217,7 @@ function SidebarLinks({
             >
               <path d="M14 4h4v14h-4M10 7l-4 4 4 4M6 11h9" />
             </svg>
-            退出登录
+            {t.logout}
           </button>
         </form>
         <a
@@ -216,10 +225,11 @@ function SidebarLinks({
           target="_blank"
           rel="noopener noreferrer"
           className="block px-4 pt-2 text-xs text-ink-3 transition-colors hover:text-ink"
-          title="查看更新日志"
+          title={t.changelog}
         >
-          程序版本 <span className="admin-version font-mono">{version}</span>
+          {rich(t.version, { version: <span className="admin-version font-mono">{version}</span> })}
         </a>
+        <LanguageSelect value={locale} label={t.language} className="px-4 pt-2" />
       </div>
     </>
   );
@@ -227,6 +237,8 @@ function SidebarLinks({
 
 export default function AdminSidebar({ version, role }: { version: string; role: string }) {
   const pathname = usePathname();
+  const { m } = useAdminI18n();
+  const t = m.admin.nav;
   const toggleId = useId();
   const drawerId = useId();
   const toggleRef = useRef<HTMLInputElement>(null);
@@ -300,16 +312,16 @@ export default function AdminSidebar({ version, role }: { version: string; role:
               Admin Panel
             </p>
             <p className="truncate text-sm font-semibold text-ink">
-              {currentItem.label}
+              {t[currentItem.label]}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+            <ThemeToggle label={m.reader.theme.toggle} />
             <LabelButton
               ref={triggerRef}
               htmlFor={toggleId}
               tabIndex={0}
-              aria-label="打开后台菜单"
+              aria-label={t.openMenu}
               aria-controls={drawerId}
               aria-expanded="false"
               onKeyDown={(event) => {
@@ -343,7 +355,7 @@ export default function AdminSidebar({ version, role }: { version: string; role:
           <LabelButton
             htmlFor={toggleId}
             tabIndex={0}
-            aria-label="关闭后台菜单"
+            aria-label={t.closeMenu}
             className="admin-mobile-drawer-backdrop absolute inset-0 cursor-pointer bg-scrim/45 opacity-0 backdrop-blur-[2px] transition-opacity duration-300"
           />
 
@@ -351,7 +363,7 @@ export default function AdminSidebar({ version, role }: { version: string; role:
             id={drawerId}
             role="dialog"
             aria-modal="true"
-            aria-label="后台菜单"
+            aria-label={t.menu}
             className="admin-mobile-drawer-panel absolute inset-y-0 left-0 flex w-[min(86vw,20rem)] flex-col border-r border-line bg-surface shadow-2xl transition-transform duration-300 ease-out"
           >
             <div className="flex items-center justify-between border-b border-line px-5 py-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -359,14 +371,14 @@ export default function AdminSidebar({ version, role }: { version: string; role:
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-ink-3">
                   Admin Panel
                 </p>
-                <p className="mt-1 text-lg font-bold text-ink">后台管理</p>
+                <p className="mt-1 text-lg font-bold text-ink">{t.title}</p>
               </div>
               <div className="flex items-center gap-2">
-                <ThemeToggle />
+                <ThemeToggle label={m.reader.theme.toggle} />
                 <LabelButton
                   htmlFor={toggleId}
                   tabIndex={0}
-                  aria-label="关闭后台菜单"
+                  aria-label={t.closeMenu}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
@@ -405,8 +417,8 @@ export default function AdminSidebar({ version, role }: { version: string; role:
 
       <aside className="sticky top-6 hidden h-fit w-52 shrink-0 rounded-3xl border border-line bg-surface p-3 md:block">
         <div className="mb-3 flex items-center justify-between border-b border-line px-1 pb-3">
-          <span className="text-sm font-semibold text-ink">后台管理</span>
-          <ThemeToggle />
+          <span className="text-sm font-semibold text-ink">{t.title}</span>
+          <ThemeToggle label={m.reader.theme.toggle} />
         </div>
         <SidebarLinks pathname={pathname} version={version} role={role} />
       </aside>

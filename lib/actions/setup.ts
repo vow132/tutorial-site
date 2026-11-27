@@ -13,8 +13,10 @@ import { sharedLimiter } from "@/lib/rate-limit";
 import { revalidatePublic } from "@/lib/revalidate-public";
 import { USERNAME_PATTERN } from "@/lib/roles";
 import { removeSampleData } from "@/lib/sample-data-remove";
-import { defaultSettings, SETTINGS_KEY } from "@/lib/settings";
+import { isDefaultText, SETTINGS_KEY } from "@/lib/settings";
 import { setupCodeMatches } from "@/lib/setup-code.mjs";
+import { getSetupLocale, i18nFor } from "@/lib/i18n/server";
+import { readLocale } from "@/lib/i18n/locales";
 
 export type SetupState = { error?: string };
 
@@ -31,16 +33,21 @@ const limiters = {
  */
 export async function completeSetup(_prev: SetupState, formData: FormData): Promise<SetupState> {
   if ((await prisma.admin.count()) > 0) redirect("/admin/login");
+  // 提示用安装页当前的语言；表单里选的语言就是网站语言
+  const setupLocale = await getSetupLocale();
+  const locale = readLocale(formData.get("locale"), setupLocale);
+  const { m } = i18nFor(setupLocale);
+  const t = m.admin.setup;
 
   const ip = await getClientIp();
   if ((ip && limiters.ip.retryAfter(ip) > 0) || limiters.global.retryAfter("all") > 0) {
-    return { error: "尝试次数过多，请一小时后再试" };
+    return { error: t.tooMany };
   }
   if (!setupCodeMatches(formData.get("code"))) {
     if (ip) limiters.ip.hit(ip);
     limiters.global.hit("all");
     await audit("setup.failed", { detail: "安装码不正确" });
-    return { error: "安装码不对。请看服务器的启动日志，或在服务器上运行 npm run setup:code" };
+    return { error: t.wrongCode };
   }
 
   const siteName = String(formData.get("siteName") ?? "").replace(/\s+/g, " ").trim();
@@ -48,12 +55,12 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
   const keepSamples = formData.get("keepSamples") === "on";
-  if (!siteName) return { error: "请填写站点名称" };
-  if (Array.from(siteName).length > 30) return { error: "站点名称最多 30 个字" };
-  if (!USERNAME_PATTERN.test(username)) return { error: "用户名要 3-32 位字母、数字、下划线或连字符" };
-  const problem = passwordProblem(password, username);
+  if (!siteName) return { error: t.siteNameRequired };
+  if (Array.from(siteName).length > 30) return { error: t.siteNameTooLong };
+  if (!USERNAME_PATTERN.test(username)) return { error: t.badUsername };
+  const problem = passwordProblem(password, username, m.admin.password);
   if (problem) return { error: problem };
-  if (password !== confirm) return { error: "两次输入的密码不一样" };
+  if (password !== confirm) return { error: t.passwordMismatch };
 
   const hash = await bcrypt.hash(password, 12);
   // 两个人同时提交时只有一个能建成（另一个看到已经有账号了，回到登录页）
@@ -71,9 +78,10 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
   } catch {
     stored = {};
   }
-  const next: Record<string, unknown> = { ...stored, siteName };
-  if (!stored.siteTitle || stored.siteTitle === defaultSettings.siteTitle) next.siteTitle = siteName;
-  if (!stored.logoText || stored.logoText === defaultSettings.logoText) next.logoText = Array.from(siteName)[0];
+  // 网站语言：其他还没设置过的文字（首页标语、页脚……）都用这个语言的默认值
+  const next: Record<string, unknown> = { ...stored, siteName, locale };
+  if (typeof stored.siteTitle !== "string" || isDefaultText("siteTitle", stored.siteTitle)) next.siteTitle = siteName;
+  if (typeof stored.logoText !== "string" || isDefaultText("logoText", stored.logoText)) next.logoText = Array.from(siteName)[0];
   await prisma.setting.upsert({
     where: { key: SETTINGS_KEY },
     update: { value: JSON.stringify(next) },

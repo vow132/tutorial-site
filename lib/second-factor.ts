@@ -55,5 +55,3 @@ export async function verifySecondFactor(admin: AdminFactor, input: string): Pro
   return { ok: true, method: "recovery", remaining };
 }
 
-export const LOCKED_TOTP_MESSAGE =
-  "两步验证密钥无法解密（服务器上的 AUTH_SECRET 或 DATA_ENCRYPTION_KEY 可能被更换过）。请用恢复码登录，或在服务器上运行 npm run admin:reset";

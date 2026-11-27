@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { I18n } from "@/lib/i18n/core";
 import { listUploads, pickCleanable, previewName, RECENT_MS } from "@/lib/media-files";
 import { uploadNamesIn, uploadStem } from "@/lib/upload-refs.mjs";
 
@@ -11,7 +12,19 @@ export { formatBytes, moveUploadsToTrash, UPLOADS_DIR } from "@/lib/media-files"
 
 export const MEDIA_PAGE_SIZE = 48;
 
+/** 引用它的地方。label：教程和历史版本是教程标题，设置是 Setting 的 key（显示文字用 referenceLabel() 按后台语言取） */
 export type MediaReference = { kind: "tutorial" | "revision" | "setting"; label: string; href: string | null };
+
+export function referenceLabel(reference: MediaReference, { m, f }: I18n): string {
+  const t = m.admin.media;
+  if (reference.kind === "revision") return f(t.revisionRef, { title: reference.label });
+  if (reference.kind === "setting") {
+    if (reference.label === "site") return t.siteSettings;
+    if (reference.label === "about") return t.aboutPage;
+    return f(t.settingRef, { key: reference.label });
+  }
+  return reference.label;
+}
 
 export type MediaFile = {
   /** 原图文件名（响应式小图并在原图里） */
@@ -27,10 +40,7 @@ export type MediaFile = {
   references: MediaReference[];
 };
 
-const SETTING_LABELS: Record<string, { label: string; href: string }> = {
-  site: { label: "站点设置", href: "/admin/settings" },
-  about: { label: "关于页面", href: "/admin/about" },
-};
+const SETTING_PAGES: Record<string, string> = { site: "/admin/settings", about: "/admin/about" };
 
 /** 原图标识（stem）→ 引用它的地方。扫一遍教程（正文、封面、缩略图）、历史版本和设置。 */
 export async function collectReferences(): Promise<Map<string, MediaReference[]>> {
@@ -50,11 +60,10 @@ export async function collectReferences(): Promise<Map<string, MediaReference[]>
   ]);
   for (const t of tutorials) add([t.content, t.cover, t.thumbnail], { kind: "tutorial", label: t.title, href: `/admin/tutorials/${t.id}` });
   for (const r of revisions) {
-    add([r.content], { kind: "revision", label: `${r.tutorial.title}（历史版本）`, href: `/admin/tutorials/${r.tutorial.id}/revisions` });
+    add([r.content], { kind: "revision", label: r.tutorial.title, href: `/admin/tutorials/${r.tutorial.id}/revisions` });
   }
   for (const s of settings) {
-    const known = SETTING_LABELS[s.key];
-    add([s.value], { kind: "setting", label: known?.label ?? `设置：${s.key}`, href: known?.href ?? null });
+    add([s.value], { kind: "setting", label: s.key, href: SETTING_PAGES[s.key] ?? null });
   }
   return map;
 }

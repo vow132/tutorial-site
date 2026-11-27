@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DIRECT, INTERNAL, describeSource, referrerSource } from "./referrer";
+import { messagesFor } from "./i18n/messages";
+
+const labels = messagesFor("zh-CN").admin.referrer;
 import { cleanFeedbackMessage, readRate } from "./feedback";
 import { normalizeSearchQuery } from "./search-query";
 
@@ -18,13 +21,13 @@ test("referrers are reduced to a bare host; this site and empty referrers are la
 });
 
 test("known sources get friendly names and a kind", () => {
-  assert.deepEqual(describeSource("baidu.com"), { label: "百度", kind: "search" });
-  assert.deepEqual(describeSource("google.com.hk"), { label: "谷歌", kind: "search" });
-  assert.deepEqual(describeSource("mp.weixin.qq.com"), { label: "微信", kind: "social" });
-  assert.deepEqual(describeSource("com.tencent.mm"), { label: "微信", kind: "social" });
-  assert.deepEqual(describeSource("juejin.cn"), { label: "掘金", kind: "social" });
-  assert.deepEqual(describeSource(DIRECT), { label: "直接访问 / 书签", kind: "direct" });
-  assert.deepEqual(describeSource("someblog.dev"), { label: "someblog.dev", kind: "site" });
+  assert.deepEqual(describeSource("baidu.com", labels), { label: "百度", kind: "search" });
+  assert.deepEqual(describeSource("google.com.hk", labels), { label: "谷歌", kind: "search" });
+  assert.deepEqual(describeSource("mp.weixin.qq.com", labels), { label: "微信", kind: "social" });
+  assert.deepEqual(describeSource("com.tencent.mm", labels), { label: "微信", kind: "social" });
+  assert.deepEqual(describeSource("juejin.cn", labels), { label: "掘金", kind: "social" });
+  assert.deepEqual(describeSource(DIRECT, labels), { label: "直接访问 / 书签", kind: "direct" });
+  assert.deepEqual(describeSource("someblog.dev", labels), { label: "someblog.dev", kind: "site" });
 });
 
 test("read rates need enough views", () => {

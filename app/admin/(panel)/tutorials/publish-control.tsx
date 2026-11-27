@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 /** datetime-local 需要的本地时间格式：2026-11-20T09:30 */
 function toLocalInput(date: Date) {
@@ -14,6 +15,7 @@ function toLocalInput(date: Date) {
  * 服务器时区设成什么都不影响。
  */
 export default function PublishControl({ published, publishAt }: { published: boolean; publishAt: string | null }) {
+  const t = useAdminI18n().m.admin.tutorials;
   const [mode, setMode] = useState<"now" | "draft" | "schedule">(publishAt ? "schedule" : published ? "now" : "draft");
   const [local, setLocal] = useState(() =>
     toLocalInput(publishAt ? new Date(publishAt) : new Date(Date.now() + 60 * 60 * 1000)),
@@ -39,16 +41,16 @@ export default function PublishControl({ published, publishAt }: { published: bo
 
   return (
     <fieldset className="flex flex-wrap items-center gap-x-5 gap-y-2">
-      <legend className="sr-only">发布方式</legend>
+      <legend className="sr-only">{t.publishMode}</legend>
       {mode === "now" && <input type="hidden" name="published" value="on" />}
       {mode === "schedule" && <input type="hidden" name="publishAt" value={iso} />}
-      {option("now", "立即发布")}
-      {option("draft", "存为草稿")}
-      {option("schedule", "定时发布")}
+      {option("now", t.publishNow)}
+      {option("draft", t.saveDraft)}
+      {option("schedule", t.schedule)}
       {mode === "schedule" && (
         <input
           type="datetime-local"
-          aria-label="发布时间"
+          aria-label={t.publishTime}
           value={local}
           min={toLocalInput(new Date())}
           onChange={(event) => setLocal(event.target.value)}

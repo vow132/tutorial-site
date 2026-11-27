@@ -15,9 +15,10 @@ import { audit } from "@/lib/audit";
 import { getClientIp } from "@/lib/client-ip";
 import { passwordProblem } from "@/lib/password-policy";
 import { sharedLimiter, type RateLimiter } from "@/lib/rate-limit";
-import { LOCKED_TOTP_MESSAGE, verifySecondFactor } from "@/lib/second-factor";
+import { verifySecondFactor } from "@/lib/second-factor";
 import { isDemoMode } from "@/lib/demo";
 import { verifyHuman } from "@/lib/turnstile-store";
+import { getAdminI18n } from "@/lib/i18n/server";
 
 export type LoginState = { error?: string; needsTotp?: boolean };
 
@@ -49,9 +50,11 @@ export async function login(
   const totp = String(formData.get("totp") ?? "").trim();
   const showTotp = formData.has("totp");
   const from = safeAdminFrom(String(formData.get("from") ?? ""));
+  const { m, plural } = await getAdminI18n();
+  const t = m.admin.login;
 
   if (!username || !password) {
-    return { error: "请输入用户名和密码", needsTotp: showTotp };
+    return { error: t.missingCredentials, needsTotp: showTotp };
   }
 
   const ip = await getClientIp();
@@ -67,29 +70,30 @@ export async function login(
   const wait = Math.max(...buckets.map(([limiter, key]) => limiter.retryAfter(key)));
   if (wait > 0) {
     return {
-      error: `尝试次数过多，请约 ${Math.ceil(wait / 60)} 分钟后再试`,
+      error: plural(Math.ceil(wait / 60), m.admin.tooManyAttempts),
       needsTotp: showTotp,
     };
   }
 
   // 开启了人机验证时先核对令牌（每次提交都要，两步验证那一步也一样）；没通过不算一次密码错误
   const human = await verifyHuman(formData.get("turnstileToken"), "login");
-  if (!human.ok) return { error: human.error, needsTotp: showTotp };
+  if (!human.ok) return { error: t.humanCheckFailed, needsTotp: showTotp };
 
   const fail = async (action: string) => {
     for (const [limiter, key] of buckets) limiter.hit(key);
-    await audit(action, { actor: username, detail: device ? "受信任设备" : "陌生设备" });
+    await audit(action, { actor: username, detail: device ? m.admin.auditDetail.trustedDevice : m.admin.auditDetail.unknownDevice });
     // 这一次失败让某个计数器触发了锁定：记一条日志并推送告警（每次锁定只会触发一次）。
     const locked = buckets.filter(([limiter, key]) => limiter.retryAfter(key) > 0).map(([limiter]) => limiter);
     if (locked.length > 0) {
+      const d = m.admin.auditDetail;
       const scope = locked
         .map((limiter) =>
-          limiter === limiters.device ? "这台受信任设备"
-          : limiter === limiters.account ? "该用户名"
-          : limiter === limiters.ip ? "该 IP"
-          : "所有陌生设备（全站）",
+          limiter === limiters.device ? d.lockDevice
+          : limiter === limiters.account ? d.lockAccount
+          : limiter === limiters.ip ? d.lockIp
+          : d.lockGlobal,
         )
-        .join("、");
+        .join(d.listSeparator);
       await audit("login.locked", { actor: username, detail: scope });
     }
   };
@@ -98,7 +102,7 @@ export async function login(
   const valid = await bcrypt.compare(password, admin?.password ?? DUMMY_HASH);
   if (!admin || !valid) {
     await fail("login.failed");
-    return { error: "用户名或密码错误", needsTotp: showTotp };
+    return { error: t.wrongCredentials, needsTotp: showTotp };
   }
 
   let recoveryCodesLeft: number | null = null;
@@ -109,7 +113,7 @@ export async function login(
     if (!factor.ok) {
       await fail("login.totp_failed");
       return {
-        error: factor.reason === "locked" ? LOCKED_TOTP_MESSAGE : "验证码或恢复码不正确，或已被使用",
+        error: factor.reason === "locked" ? t.totpLocked : t.wrongSecondFactor,
         needsTotp: true,
       };
     }
@@ -124,15 +128,16 @@ export async function login(
   await rememberDevice(admin.username, device);
   await audit("login.success", {
     actor: admin.username,
-    detail: device ? "受信任设备" : "新设备",
+    detail: device ? m.admin.auditDetail.trustedDevice : m.admin.auditDetail.newDevice,
+    alert: !device,
   });
   if (recoveryCodesLeft !== null) {
-    await audit("login.recovery_code", { actor: admin.username, detail: `剩余 ${recoveryCodesLeft} 个` });
+    await audit("login.recovery_code", { actor: admin.username, detail: plural(recoveryCodesLeft, m.admin.auditDetail.recoveryLeft) });
   }
 
   // 仍在使用默认/弱密码时，直接带去改密码页面。
   // 演示站的密码本来就是公开的（lib/demo.ts），不用提示改密码
-  redirect(!isDemoMode() && passwordProblem(password, admin.username) ? "/admin/account?weak=1" : from);
+  redirect(!isDemoMode() && passwordProblem(password, admin.username, m.admin.password) ? "/admin/account?weak=1" : from);
 }
 
 export async function logout() {

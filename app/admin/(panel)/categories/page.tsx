@@ -11,13 +11,19 @@ import {
   CategoryRow,
   type ParentOption,
 } from "./category-forms";
+import { getAdminI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "分类管理" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.categories.metaTitle };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
   await requireAdminPage("taxonomy");
+  const { m, plural } = await getAdminI18n();
+  const t = m.admin.categories;
   const categories = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
     include: { _count: { select: { tutorials: true } } },
@@ -32,14 +38,12 @@ export default async function AdminCategoriesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-ink">分类管理</h1>
-      <p className="mt-1 text-sm text-ink-3">共 {categories.length} 个分类</p>
+      <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+      <p className="mt-1 text-sm text-ink-3">{plural(categories.length, t.count)}</p>
 
       <div className="mt-6 rounded-3xl border border-line bg-surface p-6">
-        <h2 className="text-sm font-bold text-ink">新建分类</h2>
-        <p className="mt-1 text-xs text-ink-3">
-          最多三级；选择父分类即可创建二级或三级分类。
-        </p>
+        <h2 className="text-sm font-bold text-ink">{t.newHeading}</h2>
+        <p className="mt-1 text-xs text-ink-3">{t.newHint}</p>
         <CreateCategoryForm parentOptions={parentOptions} />
       </div>
 

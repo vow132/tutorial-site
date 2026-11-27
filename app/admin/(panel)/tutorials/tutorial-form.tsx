@@ -11,6 +11,7 @@ import { snapshot, useDraft, type DraftValues } from "./use-draft";
 import MarkdownImport from "./markdown-import";
 import type { ImportedTutorial } from "@/lib/markdown-import";
 import PublishControl from "./publish-control";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const RichTextEditor = dynamic(
   () => import("@/components/editor/rich-text-editor"),
@@ -91,12 +92,16 @@ function toDraft(initial: Initial | undefined): DraftValues {
   };
 }
 
-function ago(iso: string) {
-  const minutes = Math.round((Date.now() - Date.parse(iso)) / 60000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分钟前`;
-  const hours = Math.round(minutes / 60);
-  return hours < 48 ? `${hours} 小时前` : `${Math.round(hours / 24)} 天前`;
+function useAgo() {
+  const { m, plural } = useAdminI18n();
+  const t = m.admin.tutorials;
+  return (iso: string) => {
+    const minutes = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    if (minutes < 1) return t.justNow;
+    if (minutes < 60) return plural(minutes, t.minutesAgo);
+    const hours = Math.round(minutes / 60);
+    return hours < 48 ? plural(hours, t.hoursAgo) : plural(Math.round(hours / 24), t.daysAgo);
+  };
 }
 
 /**
@@ -113,6 +118,9 @@ export default function TutorialForm({
   const draft = useDraft(formRef, draftKey, toDraft(initial), serverUpdatedAt);
   const [restored, setRestored] = useState<Initial | null>(null);
   const [version, setVersion] = useState(0);
+  const { m, f } = useAdminI18n();
+  const t = m.admin.tutorials;
+  const ago = useAgo();
 
   /** 导入 Markdown：在表单当前的值（含没保存的修改，如已选的分类）上替换正文和文件里给出的字段。 */
   const applyImport = (imported: ImportedTutorial) => {
@@ -140,7 +148,7 @@ export default function TutorialForm({
           className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 text-sm text-amber-800 dark:text-amber-200"
         >
           <span className="flex-1">
-            发现 {ago(draft.pending.savedAt)}自动保存在本浏览器的草稿，比{initial ? "已保存的版本" : "空白表单"}新。
+            {f(initial ? t.draftFound : t.draftFoundNew, { ago: ago(draft.pending.savedAt) })}
           </span>
           <button
             type="button"
@@ -153,14 +161,14 @@ export default function TutorialForm({
             }}
             className="h-9 rounded-lg bg-btn px-4 text-xs font-semibold text-white"
           >
-            恢复草稿
+            {t.restoreDraft}
           </button>
           <button
             type="button"
             onClick={draft.discard}
             className="h-9 rounded-lg border border-amber-500/40 px-4 text-xs font-medium"
           >
-            丢弃
+            {t.discardDraft}
           </button>
         </div>
       )}
@@ -192,6 +200,8 @@ function TutorialFields({
     action,
     {}
   );
+  const { m, f, date } = useAdminI18n();
+  const t = m.admin.tutorials;
 
   return (
     // 不用 action={formAction}：保存失败（如 Slug 重复）时 React 会重置表单，
@@ -200,32 +210,32 @@ function TutorialFields({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className="mb-1.5 block text-sm font-medium text-ink-2">
-            标题 <span className="text-red-400">*</span>
+            {t.title} <span className="text-red-400">*</span>
           </label>
           <input
             name="title"
             required
             defaultValue={initial?.title}
-            placeholder="例如：CSS Flexbox 布局完全指南"
+            placeholder={t.titlePlaceholder}
             className={inputCls}
           />
         </div>
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-2">
-            Slug（URL 别名）
+            {t.slug}
           </label>
           <input
             name="slug"
             defaultValue={initial?.slug}
-            placeholder="留空则根据标题生成"
+            placeholder={t.slugPlaceholder}
             className={inputCls}
           />
         </div>
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-2">
-            分类 <span className="text-red-400">*</span>
+            {t.category} <span className="text-red-400">*</span>
           </label>
           <select
             name="categoryId"
@@ -234,7 +244,7 @@ function TutorialFields({
             className={inputCls}
           >
             <option value="" disabled>
-              选择分类
+              {t.chooseCategory}
             </option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
@@ -246,26 +256,26 @@ function TutorialFields({
 
         <div>
           <label htmlFor="tutorial-series" className="mb-1.5 block text-sm font-medium text-ink-2">
-            所属系列
+            {t.series}
             <Link href="/admin/series" className="ml-2 text-xs font-normal text-accent-ink hover:underline">
-              管理系列
+              {t.manageSeries}
             </Link>
           </label>
           <select id="tutorial-series" name="seriesId" defaultValue={initial?.seriesId ?? ""} className={inputCls}>
-            <option value="">不属于任何系列</option>
+            <option value="">{t.noSeries}</option>
             {series.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.title}
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-ink-3">新加入的教程排在系列末尾，顺序可在「系列」页面调整。</p>
+          <p className="mt-1 text-xs text-ink-3">{t.seriesHint}</p>
         </div>
 
         {authors && authors.length > 1 && (
           <div>
             <label htmlFor="tutorial-author" className="mb-1.5 block text-sm font-medium text-ink-2">
-              作者
+              {t.author}
             </label>
             <select id="tutorial-author" name="authorId" defaultValue={authorId ?? ""} className={inputCls}>
               {authors.map((item) => (
@@ -274,19 +284,19 @@ function TutorialFields({
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-ink-3">文章页显示作者的署名；作者只能修改自己的教程。</p>
+            <p className="mt-1 text-xs text-ink-3">{t.authorHint}</p>
           </div>
         )}
 
         <div className="md:col-span-2">
           <label className="mb-1.5 block text-sm font-medium text-ink-2">
-            摘要（展示在卡片与搜索结果中）
+            {t.excerpt}
           </label>
           <textarea
             name="excerpt"
             rows={2}
             defaultValue={initial?.excerpt ?? ""}
-            placeholder="一两句话概括这篇教程讲什么…"
+            placeholder={t.excerptPlaceholder}
             className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60"
           />
         </div>
@@ -298,10 +308,8 @@ function TutorialFields({
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          正文 <span className="text-red-400">*</span>
-          <span className="ml-2 text-xs font-normal text-ink-3">
-            支持拖拽图片、粘贴截图
-          </span>
+          {t.content} <span className="text-red-400">*</span>
+          <span className="ml-2 text-xs font-normal text-ink-3">{t.contentHint}</span>
         </label>
         <RichTextEditor name="content" initialContent={initial?.content ?? ""} mediaLibrary={mediaLibrary} />
       </div>
@@ -317,21 +325,21 @@ function TutorialFields({
         <div className="flex items-center gap-3">
           {savedAt && (
             <span className="hidden text-xs text-ink-3 sm:inline" aria-live="polite">
-              草稿已自动保存在本浏览器 {new Date(savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+              {f(t.draftSaved, { time: date(savedAt, { hour: "2-digit", minute: "2-digit", timeZone: undefined }) })}
             </span>
           )}
           <Link
             href="/admin/tutorials"
             className="rounded-full px-5 py-2.5 text-sm font-medium text-ink-2 transition-colors hover:text-ink"
           >
-            取消
+            {m.admin.common.cancel}
           </Link>
           <button
             type="submit"
             disabled={pending}
             className="rounded-full bg-btn px-7 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {pending ? "保存中…" : "保存教程"}
+            {pending ? m.admin.common.saving : t.submit}
           </button>
         </div>
       </div>

@@ -3,7 +3,6 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getAlertConfig } from "@/lib/alerts";
-import { ALERT_CHANNELS } from "@/lib/alert-channels.mjs";
 import { describeBackup, getBackupStatus } from "@/lib/backup-status";
 import { helpfulSummary, readRate } from "@/lib/feedback";
 import { getSearchStats } from "@/lib/search-stats";
@@ -13,9 +12,14 @@ import LaunchChecklist from "./launch-checklist";
 import { getLaunchChecklist } from "@/lib/launch-checklist";
 import { SearchInsights, TrafficSources } from "./reader-insights";
 import ViewTrend from "./view-trend";
-import { can, canEditTutorial, readRole, ROLES } from "@/lib/roles";
+import { can, canEditTutorial, readRole } from "@/lib/roles";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { rich } from "@/lib/i18n/rich";
 
-export const metadata: Metadata = { title: "仪表盘" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.dashboard.metaTitle };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +32,10 @@ export default async function AdminDashboard({
   const { sampleCleared, forbidden, welcome } = await searchParams;
   // 上线检查清单、备份、告警、一键更新是站长的事；编辑、作者只看内容和阅读数据
   const isOwner = can(admin.role, "site");
-  const checklist = isOwner ? await getLaunchChecklist(admin.id) : [];
+  const i18n = await getAdminI18n();
+  const { m, f, plural, num, date } = i18n;
+  const t = m.admin.dashboard;
+  const checklist = isOwner ? await getLaunchChecklist(admin.id, i18n) : [];
   const [
     tutorialCount,
     publishedCount,
@@ -75,29 +82,29 @@ export default async function AdminDashboard({
     ]);
 
   // 作者看得到全站的热门教程，但只有自己的能点进编辑页（别人的链接到前台文章），别人已下线的不显示
-  const top = hot.filter((t) => t.published || canEditTutorial(admin, t));
+  const top = hot.filter((item) => item.published || canEditTutorial(admin, item));
   const current = trend.slice(-30);
   const recentTotal = current.reduce((sum, day) => sum + day.views, 0);
   const previousTotal = trend.slice(0, -30).reduce((sum, day) => sum + day.views, 0);
   const change = previousTotal > 0 ? Math.round(((recentTotal - previousTotal) / previousTotal) * 100) : null;
 
-  const { text: backupText, stale: backupStale } = describeBackup(backup);
-  const alertLabel = ALERT_CHANNELS.find((item) => item.value === alertConfig.channel)?.label;
+  const { text: backupText, stale: backupStale } = describeBackup(backup, i18n);
+  const alertLabel = m.admin.alertChannels[alertConfig.channel];
 
   const stats = [
-    { label: "教程总数", value: tutorialCount, color: "var(--chart-indigo)" },
-    { label: "已发布", value: publishedCount, color: "var(--chart-green)" },
-    { label: "草稿", value: draftCount, color: "var(--chart-amber)" },
-    { label: "分类", value: categoryCount, color: "var(--chart-sky)" },
-    { label: "总阅读量", value: viewAgg._sum.views ?? 0, color: "var(--chart-pink)" },
+    { label: t.statTotal, value: tutorialCount, color: "var(--chart-indigo)" },
+    { label: t.statPublished, value: publishedCount, color: "var(--chart-green)" },
+    { label: t.statDrafts, value: draftCount, color: "var(--chart-amber)" },
+    { label: t.statCategories, value: categoryCount, color: "var(--chart-sky)" },
+    { label: t.statViews, value: viewAgg._sum.views ?? 0, color: "var(--chart-pink)" },
   ];
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-ink">仪表盘</h1>
-          <p className="mt-1 text-sm text-ink-3">内容数据一览</p>
+          <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+          <p className="mt-1 text-sm text-ink-3">{t.intro}</p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <Link
@@ -107,7 +114,7 @@ export default async function AdminDashboard({
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
               <path d="M7 1v12M1 7h12" />
             </svg>
-            写教程
+            {t.newTutorial}
           </Link>
           {isOwner && <GitHubUpdate />}
         </div>
@@ -115,21 +122,21 @@ export default async function AdminDashboard({
 
       {welcome !== undefined && isOwner && (
         <p role="status" className="mt-6 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
-          安装完成，欢迎！下面的「上线检查清单」列出了上线前还要做的几件事（换 Logo 和主题色、开两步验证、配置备份等），做完会自动打勾。
+          {t.welcome}
         </p>
       )}
       {forbidden !== undefined && (
         <p role="alert" className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-          你的账号（{ROLES[readRole(admin.role)].label}）没有打开那个页面的权限，需要的话请找站长调整。
+          {f(t.forbidden, { role: m.admin.roles[readRole(admin.role)].label })}
         </p>
       )}
 
       {sampleCleared !== undefined && (
         <p role="status" className="mt-6 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
-          已清除 {Number(sampleCleared) || 0} 篇示例教程和没用到的示例分类、标签
+          {plural(Number(sampleCleared) || 0, t.sampleCleared)}
         </p>
       )}
-      {isOwner && <LaunchChecklist items={checklist} />}
+      {isOwner && <LaunchChecklist items={checklist} t={m.admin.checklist} />}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
@@ -140,7 +147,7 @@ export default async function AdminDashboard({
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: s.color }}
               />
-              <span className="text-2xl font-extrabold text-ink">{s.value}</span>
+              <span className="text-2xl font-extrabold text-ink">{num(s.value)}</span>
             </p>
           </div>
         ))}
@@ -154,13 +161,13 @@ export default async function AdminDashboard({
             backupStale ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-surface"
           }`}
         >
-          <p className="text-xs text-ink-2">上次数据库备份</p>
+          <p className="text-xs text-ink-2">{t.lastBackup}</p>
           <p className={`mt-1.5 text-sm font-semibold ${backupStale ? "text-amber-700 dark:text-amber-300" : "text-ink"}`}>
             {backupText}
           </p>
           {backupStale && (
             <p className="mt-1.5 text-xs text-ink-3">
-              超过 2 天没有新备份。请在服务器 crontab 里每天执行 <code>npm run backup</code>，并同步到异地。
+              {rich(t.backupStale, { command: <code>npm run backup</code> })}
             </p>
           )}
         </div>
@@ -169,12 +176,12 @@ export default async function AdminDashboard({
             alertConfig.channel === "off" ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-surface"
           }`}
         >
-          <p className="text-xs text-ink-2">安全告警</p>
+          <p className="text-xs text-ink-2">{t.alerts}</p>
           <p className="mt-1.5 text-sm font-semibold text-ink">
-            {alertConfig.channel === "off" ? "未开启" : `已开启 · ${alertLabel}`}
+            {alertConfig.channel === "off" ? t.alertsOff : f(t.alertsOn, { channel: alertLabel })}
           </p>
           <Link href="/admin/account#alerts" className="mt-1.5 inline-block text-xs text-accent-ink hover:underline">
-            {alertConfig.channel === "off" ? "去设置，新设备登录等情况会推送到手机 →" : "修改告警设置 →"}
+            {alertConfig.channel === "off" ? t.alertsSetup : t.alertsEdit}
           </Link>
         </div>
       </div>
@@ -186,27 +193,27 @@ export default async function AdminDashboard({
           className="mt-4 flex items-center justify-between gap-3 rounded-3xl border border-accent/40 bg-accent-soft/60 px-5 py-4 text-sm transition-colors hover:bg-accent-soft"
         >
           <span className="text-ink">
-            有 <span className="font-semibold">{unreadMessages}</span> 条未读的读者留言
+            {plural(unreadMessages, t.unreadMessages)}
           </span>
-          <span className="text-accent-ink">去看看 →</span>
+          <span className="text-accent-ink">{t.goSee}</span>
         </Link>
       )}
 
       <section aria-labelledby="trend-heading" className="mt-10">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 id="trend-heading" className="text-lg font-bold text-ink">近 30 天阅读</h2>
+          <h2 id="trend-heading" className="text-lg font-bold text-ink">{t.trendHeading}</h2>
           <p className="text-sm text-ink-2">
-            共 <span className="font-semibold text-ink">{recentTotal.toLocaleString("zh-CN")}</span> 次
+            <span className="font-semibold text-ink">{plural(recentTotal, t.trendTotal)}</span>
             {change !== null && (
               <span className="ml-2 text-ink-3">
-                比前 30 天 {change >= 0 ? "↑" : "↓"} {Math.abs(change)}%
+                {f(t.trendChange, { arrow: change >= 0 ? "↑" : "↓", n: Math.abs(change) })}
               </span>
             )}
           </p>
         </div>
         <div className="mt-4 rounded-3xl border border-line bg-surface p-4 sm:p-5">
           {recentTotal === 0 ? (
-            <p className="py-12 text-center text-sm text-ink-3">最近 30 天还没有阅读记录（从这次更新开始按天统计）</p>
+            <p className="py-12 text-center text-sm text-ink-3">{t.trendEmpty}</p>
           ) : (
             <ViewTrend data={current} />
           )}
@@ -214,44 +221,44 @@ export default async function AdminDashboard({
       </section>
 
       <section aria-labelledby="top-heading" className="mt-10">
-        <h2 id="top-heading" className="text-lg font-bold text-ink">近 30 天热门教程</h2>
+        <h2 id="top-heading" className="text-lg font-bold text-ink">{t.topHeading}</h2>
         <div className="mt-4 overflow-x-auto rounded-3xl border border-line bg-surface">
           {top.length === 0 ? (
-            <p className="py-12 text-center text-sm text-ink-3">暂无数据</p>
+            <p className="py-12 text-center text-sm text-ink-3">{t.noData}</p>
           ) : (
             <table className="w-full min-w-[680px] table-fixed text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs text-ink-3">
                   <th scope="col" className="w-12 py-3 pl-6 font-medium">#</th>
-                  <th scope="col" className="py-3 pr-4 font-medium">教程</th>
-                  <th scope="col" className="w-24 py-3 pr-4 text-right font-medium">近 30 天</th>
-                  <th scope="col" className="w-20 py-3 pr-4 text-right font-medium">累计</th>
-                  <th scope="col" className="w-20 py-3 pr-4 text-right font-medium" title="读到文末并停留 10 秒以上的比例；近 30 天阅读少于 10 次时不显示">
-                    读完率
+                  <th scope="col" className="py-3 pr-4 font-medium">{t.colTutorial}</th>
+                  <th scope="col" className="w-24 py-3 pr-4 text-right font-medium">{t.colRecent}</th>
+                  <th scope="col" className="w-20 py-3 pr-4 text-right font-medium">{t.colTotal}</th>
+                  <th scope="col" className="w-20 py-3 pr-4 text-right font-medium" title={t.colCompletionHint}>
+                    {t.colCompletion}
                   </th>
-                  <th scope="col" className="w-44 py-3 pr-6 text-right font-medium">读者反馈</th>
+                  <th scope="col" className="w-44 py-3 pr-6 text-right font-medium">{t.colFeedback}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {top.map((t, index) => (
-                  <tr key={t.id}>
+                {top.map((item, index) => (
+                  <tr key={item.id}>
                     <td className="py-3 pl-6 text-ink-3 tabular-nums">{index + 1}</td>
                     <td className="py-3 pr-4">
                       <Link
-                        href={canEditTutorial(admin, t) ? `/admin/tutorials/${t.id}` : `/tutorials/${t.slug}`}
+                        href={canEditTutorial(admin, item) ? `/admin/tutorials/${item.id}` : `/tutorials/${item.slug}`}
                         prefetch={false}
                         className="block truncate font-medium text-ink hover:text-accent-ink"
                       >
-                        {t.title}
+                        {item.title}
                       </Link>
-                      {!t.published && <span className="text-xs text-amber-600 dark:text-amber-400">已下线</span>}
+                      {!item.published && <span className="text-xs text-amber-600 dark:text-amber-400">{t.offline}</span>}
                     </td>
-                    <td className="py-3 pr-4 text-right font-semibold text-ink tabular-nums">{t.recentViews.toLocaleString("zh-CN")}</td>
-                    <td className="py-3 pr-4 text-right text-ink-2 tabular-nums">{t.totalViews.toLocaleString("zh-CN")}</td>
+                    <td className="py-3 pr-4 text-right font-semibold text-ink tabular-nums">{num(item.recentViews)}</td>
+                    <td className="py-3 pr-4 text-right text-ink-2 tabular-nums">{num(item.totalViews)}</td>
                     <td className="py-3 pr-4 text-right text-ink-2 tabular-nums">
-                      {readRate(t.recentViews, t.recentReads) === null ? "—" : `${readRate(t.recentViews, t.recentReads)}%`}
+                      {readRate(item.recentViews, item.recentReads) === null ? "—" : `${readRate(item.recentViews, item.recentReads)}%`}
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-6 text-right text-xs text-ink-2">{helpfulSummary(t.helpfulYes, t.helpfulNo).text}</td>
+                    <td className="whitespace-nowrap py-3 pr-6 text-right text-xs text-ink-2">{helpfulSummary(item.helpfulYes, item.helpfulNo, i18n).text}</td>
                   </tr>
                 ))}
               </tbody>
@@ -261,50 +268,49 @@ export default async function AdminDashboard({
       </section>
 
       <section aria-labelledby="sources-heading" className="mt-10">
-        <h2 id="sources-heading" className="text-lg font-bold text-ink">近 30 天阅读来源</h2>
+        <h2 id="sources-heading" className="text-lg font-bold text-ink">{t.sourcesHeading}</h2>
         <div className="mt-4 rounded-3xl border border-line bg-surface p-5">
-          <TrafficSources sources={sources} />
+          <TrafficSources sources={sources} i18n={i18n} />
         </div>
       </section>
 
       <section aria-labelledby="search-heading" className="mt-10">
-        <h2 id="search-heading" className="text-lg font-bold text-ink">近 30 天读者在搜什么</h2>
+        <h2 id="search-heading" className="text-lg font-bold text-ink">{t.searchHeading}</h2>
         <div className="mt-4">
-          <SearchInsights top={topSearches} missing={missingSearches} />
+          <SearchInsights top={topSearches} missing={missingSearches} i18n={i18n} />
         </div>
       </section>
 
-      <h2 className="mt-10 text-lg font-bold text-ink">最近更新</h2>
+      <h2 className="mt-10 text-lg font-bold text-ink">{t.recentHeading}</h2>
       <div className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface">
         {recent.length === 0 ? (
           <p className="py-16 text-center text-sm text-ink-3">
-            还没有教程，点击右上角「写教程」开始创作
+            {t.recentEmpty}
           </p>
         ) : (
           <ul className="divide-y divide-line">
-            {recent.map((t) => (
-              <li key={t.id}>
+            {recent.map((item) => (
+              <li key={item.id}>
                 <Link
-                  href={`/admin/tutorials/${t.id}`}
+                  href={`/admin/tutorials/${item.id}`}
                   className="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-paper"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">
-                      {t.title}
+                      {item.title}
                     </p>
                     <p className="mt-0.5 text-xs text-ink-3">
-                      {t.category.name} · 更新于{" "}
-                      {t.updatedAt.toLocaleDateString("zh-CN")}
+                      {f(t.updatedAt, { category: item.category.name, date: date(item.updatedAt) })}
                     </p>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                      t.published
+                      item.published
                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
                     }`}
                   >
-                    {t.published ? "已发布" : "草稿"}
+                    {item.published ? t.published : t.draft}
                   </span>
                 </Link>
               </li>

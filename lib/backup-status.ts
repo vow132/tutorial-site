@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
+import type { I18n } from "@/lib/i18n/core";
 
 /** scripts/backup.mjs 生成的文件名（设置了 BACKUP_PASSPHRASE 时带 .enc）。 */
 const BACKUP_FILE = /^tutorial-\d{8}-\d{6}\.db\.gz(\.enc)?$/;
@@ -54,22 +55,26 @@ export function shouldRemindBackup({
   return stale && !remindedRecently;
 }
 
-function formatAge(ms: number) {
+function formatAge(ms: number, { m, plural }: I18n) {
+  const t = m.admin.backup;
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `${Math.max(1, minutes)} 分钟前`;
+  if (minutes < 60) return plural(Math.max(1, minutes), t.minutesAgo);
   const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours} 小时前`;
-  return `${Math.floor(hours / 24)} 天前`;
+  if (hours < 48) return plural(hours, t.hoursAgo);
+  return plural(Math.floor(hours / 24), t.daysAgo);
 }
 
 /** 仪表盘展示用：「3 小时前（1.2 MB，共保留 14 份）」以及是否已过期。 */
-export function describeBackup(status: BackupStatus, now = Date.now()) {
-  if (!status.latest) return { text: "还没有备份", stale: true };
+export function describeBackup(status: BackupStatus, i18n: I18n, now = Date.now()) {
+  const t = i18n.m.admin.backup;
+  if (!status.latest) return { text: t.none, stale: true };
   const age = now - status.latest.at.getTime();
   return {
-    text: `${formatAge(age)}（${(status.latest.size / 1024 / 1024).toFixed(1)} MB${
-      status.latest.name.endsWith(".enc") ? "，已加密" : ""
-    }，共保留 ${status.count} 份）`,
+    text: i18n.plural(status.count, t.summary, {
+      age: formatAge(age, i18n),
+      size: (status.latest.size / 1024 / 1024).toFixed(1),
+      encrypted: status.latest.name.endsWith(".enc") ? t.encrypted : "",
+    }),
     stale: age >= BACKUP_STALE_MS,
   };
 }

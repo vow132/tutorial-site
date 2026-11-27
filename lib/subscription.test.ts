@@ -39,9 +39,9 @@ test("mail settings are validated and read back safely", () => {
   const base = { ...emptyMailConfig, enabled: true, host: "smtp.example.com", port: 465, fromEmail: "noreply@example.com" };
   assert.equal(validateMailConfig(base), null);
   assert.equal(validateMailConfig({ ...emptyMailConfig }), null);
-  assert.match(validateMailConfig({ ...base, host: "smtp example" })!, /SMTP/);
-  assert.match(validateMailConfig({ ...base, port: 70000 })!, /端口/);
-  assert.match(validateMailConfig({ ...base, fromEmail: "nope" })!, /发件人/);
+  assert.match(validateMailConfig({ ...base, host: "smtp example" })!, /host/);
+  assert.match(validateMailConfig({ ...base, port: 70000 })!, /port/);
+  assert.match(validateMailConfig({ ...base, fromEmail: "nope" })!, /fromEmail/);
   assert.deepEqual(readMailConfig({ host: "h", port: "x", enabled: "yes" }), { ...emptyMailConfig, host: "h" });
 });
 

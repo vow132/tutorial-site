@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/admin-auth";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS } from "@/lib/public-data";
@@ -47,13 +48,17 @@ async function orderedIds(seriesId: number) {
 
 export async function createSeries(_prev: SeriesFormState, formData: FormData): Promise<SeriesFormState> {
   const admin = await requireAuth("taxonomy");
-  const parsed = parseSeriesInput({
-    title: formData.get("title"),
-    slug: formData.get("slug"),
-    description: formData.get("description"),
-  });
+  const { m } = await getAdminI18n();
+  const parsed = parseSeriesInput(
+    {
+      title: formData.get("title"),
+      slug: formData.get("slug"),
+      description: formData.get("description"),
+    },
+    m.admin.validation,
+  );
   if ("error" in parsed) return { error: parsed.error };
-  if (await prisma.series.findUnique({ where: { slug: parsed.data.slug } })) return { error: "网址别名已被其他系列占用" };
+  if (await prisma.series.findUnique({ where: { slug: parsed.data.slug } })) return { error: m.admin.series.slugTaken };
   const created = await prisma.series.create({ data: parsed.data });
   await audit("series.create", { actor: admin.username, detail: `#${created.id} ${created.title}` });
   revalidatePath("/admin/series");
@@ -62,21 +67,25 @@ export async function createSeries(_prev: SeriesFormState, formData: FormData): 
 
 export async function updateSeries(id: number, _prev: SeriesFormState, formData: FormData): Promise<SeriesFormState> {
   const admin = await requireAuth("taxonomy");
-  const parsed = parseSeriesInput({
-    title: formData.get("title"),
-    slug: formData.get("slug"),
-    description: formData.get("description"),
-  });
+  const { m } = await getAdminI18n();
+  const parsed = parseSeriesInput(
+    {
+      title: formData.get("title"),
+      slug: formData.get("slug"),
+      description: formData.get("description"),
+    },
+    m.admin.validation,
+  );
   if ("error" in parsed) return { error: parsed.error };
   const before = await prisma.series.findUnique({ where: { id } });
-  if (!before) return { error: "系列不存在或已被删除" };
+  if (!before) return { error: m.admin.series.gone };
   const conflict = await prisma.series.findFirst({ where: { slug: parsed.data.slug, NOT: { id } } });
-  if (conflict) return { error: "网址别名已被其他系列占用" };
+  if (conflict) return { error: m.admin.series.slugTaken };
   await prisma.series.update({ where: { id }, data: parsed.data });
   await audit("series.update", { actor: admin.username, detail: `#${id} ${parsed.data.title}` });
   revalidateSeries([before.slug, parsed.data.slug], await memberSlugs(id));
   revalidatePath(`/admin/series/${id}`);
-  return { success: "已保存" };
+  return { success: m.admin.common.saved };
 }
 
 /** 删除系列：教程本身保留，只是不再属于任何系列。 */
@@ -90,7 +99,8 @@ export async function deleteSeries(formData: FormData) {
     prisma.tutorial.updateMany({ where: { seriesId: id }, data: { seriesId: null, seriesOrder: 0 } }),
     prisma.series.delete({ where: { id } }),
   ]);
-  await audit("series.delete", { actor: admin.username, detail: `${series.title}（${slugs.length} 篇教程）` });
+  const { plural, m } = await getAdminI18n();
+  await audit("series.delete", { actor: admin.username, detail: plural(slugs.length, m.admin.auditDetail.withTutorials, { title: series.title }) });
   revalidateSeries([series.slug], slugs);
   redirect("/admin/series");
 }
@@ -161,18 +171,19 @@ export async function moveInSeries(formData: FormData) {
  */
 export async function setSeriesChapter(_prev: ChapterFormState, formData: FormData): Promise<ChapterFormState> {
   await requireAuth("taxonomy");
+  const { m } = await getAdminI18n();
   const tutorialId = Number(formData.get("tutorialId"));
-  const parsed = parseChapterInput(formData.get("chapter"));
+  const parsed = parseChapterInput(formData.get("chapter"), m.admin.validation);
   if ("error" in parsed) return { error: parsed.error };
   const tutorial = tutorialId
     ? await prisma.tutorial.findUnique({ where: { id: tutorialId }, select: { seriesId: true, series: { select: { slug: true } } } })
     : null;
-  if (!tutorial?.seriesId) return { error: "这篇教程已经不在系列里了" };
+  if (!tutorial?.seriesId) return { error: m.admin.series.notInSeries };
   await prisma.$executeRaw`UPDATE "Tutorial" SET "seriesChapter" = ${parsed.value} WHERE "id" = ${tutorialId}`;
   revalidateSeries([tutorial.series?.slug], await memberSlugs(tutorial.seriesId));
   revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
   revalidatePath(`/admin/series/${tutorial.seriesId}`);
-  return { success: "已保存" };
+  return { success: m.admin.common.saved };
 }
 
 /** 按给定顺序重新编号为 1..n。用原生 SQL：调整顺序不算修改教程内容，不刷新 updatedAt。 */

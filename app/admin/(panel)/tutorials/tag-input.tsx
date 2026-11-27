@@ -2,12 +2,15 @@
 
 import { useId, useState } from "react";
 import { MAX_TAGS_PER_TUTORIAL, normalizeTagName, tagSlug } from "@/lib/tags";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 /**
  * 标签输入：回车或逗号确认成标签，退格删除最后一个；输入时按已有标签给出建议。
  * 确认后的标签放在隐藏字段 tags 里；输入框里还没确认的文字以 tagsPending 一起提交，服务端合并。
  */
 export default function TagInput({ initial, suggestions }: { initial: string[]; suggestions: string[] }) {
+  const { m, f } = useAdminI18n();
+  const t = m.admin.tutorials;
   const [tags, setTags] = useState(initial);
   const [text, setText] = useState("");
   const listId = useId();
@@ -30,10 +33,8 @@ export default function TagInput({ initial, suggestions }: { initial: string[]; 
   return (
     <div>
       <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-ink-2">
-        标签
-        <span className="ml-2 text-xs font-normal text-ink-3">
-          回车或逗号分隔，最多 {MAX_TAGS_PER_TUTORIAL} 个；会生成标签页，方便读者和搜索引擎找到同主题的教程
-        </span>
+        {t.tags}
+        <span className="ml-2 text-xs font-normal text-ink-3">{f(t.tagsHint, { n: MAX_TAGS_PER_TUTORIAL })}</span>
       </label>
       <input type="hidden" name="tags" value={tags.join(",")} />
       <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 focus-within:border-accent">
@@ -44,7 +45,7 @@ export default function TagInput({ initial, suggestions }: { initial: string[]; 
               type="button"
               onClick={() => setTags(tags.filter((item) => item !== tag))}
               className="ml-0.5 rounded-full px-1 text-ink-3 transition-colors hover:text-red-500"
-              aria-label={`移除标签 ${tag}`}
+              aria-label={f(t.removeTag, { tag })}
             >
               ×
             </button>
@@ -56,7 +57,7 @@ export default function TagInput({ initial, suggestions }: { initial: string[]; 
           value={text}
           list={listId}
           disabled={tags.length >= MAX_TAGS_PER_TUTORIAL}
-          placeholder={tags.length >= MAX_TAGS_PER_TUTORIAL ? "已达上限" : tags.length ? "继续添加…" : "例如：Flexbox、布局"}
+          placeholder={tags.length >= MAX_TAGS_PER_TUTORIAL ? t.tagsFull : tags.length ? t.tagsMore : t.tagsPlaceholder}
           onChange={(event) => {
             const value = event.target.value;
             if (/[,，、;；]/.test(value)) commit(value);

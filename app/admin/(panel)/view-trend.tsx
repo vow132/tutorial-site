@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { DailyViews } from "@/lib/view-stats";
+import { useAdminI18n } from "@/lib/i18n/client";
+import { INTL_LOCALE, type Locale } from "@/lib/i18n/locales";
 
 const HEIGHT = 200;
 const PAD = { top: 18, right: 14, bottom: 26, left: 44 };
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 /** 1/2/5×10ⁿ 的刻度间距，让纵轴有 3–5 条网格线。 */
 function tickStep(max: number) {
@@ -15,22 +16,15 @@ function tickStep(max: number) {
   return (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
 }
 
-function compact(value: number) {
-  if (value < 10_000) return value.toLocaleString("zh-CN");
-  const wan = value / 10_000;
-  return `${Number.isInteger(wan) ? wan : wan.toFixed(1)}万`;
+/** 纵轴刻度：一万以上用各语言的简写（1.2万 / 12K / 12 тыс.） */
+function compact(locale: Locale, value: number) {
+  return value.toLocaleString(INTL_LOCALE[locale], value < 10_000 ? undefined : { notation: "compact", maximumFractionDigits: 1 });
 }
 
-function shortDay(day: string) {
-  const [, month, date] = day.split("-");
-  return `${Number(month)}/${Number(date)}`;
-}
-
-function longDay(day: string) {
-  const [, month, date] = day.split("-");
-  const weekday = WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()];
-  return `${Number(month)}月${Number(date)}日 周${weekday}`;
-}
+/** day 是北京时间的日期字符串（YYYY-MM-DD），按 UTC 解析和格式化，不受浏览器时区影响 */
+const asDate = (day: string) => `${day}T00:00:00Z`;
+const SHORT_DAY: Intl.DateTimeFormatOptions = { month: "numeric", day: "numeric", timeZone: "UTC" };
+const LONG_DAY: Intl.DateTimeFormatOptions = { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" };
 
 /**
  * 最近 30 天每天的阅读量：单条折线 + 浅色面积，悬停或用方向键查看某一天，
@@ -40,6 +34,10 @@ export default function ViewTrend({ data }: { data: DailyViews[] }) {
   const wrapper = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [active, setActive] = useState<number | null>(null);
+  const { m, locale, plural, date, num } = useAdminI18n();
+  const t = m.admin.trend;
+  const shortDay = (day: string) => date(asDate(day), SHORT_DAY);
+  const longDay = (day: string) => date(asDate(day), LONG_DAY);
 
   useEffect(() => {
     const element = wrapper.current;
@@ -88,7 +86,7 @@ export default function ViewTrend({ data }: { data: DailyViews[] }) {
         className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent/50 rounded-2xl"
         tabIndex={0}
         role="group"
-        aria-label={`最近 ${data.length} 天每日阅读量折线图，左右方向键逐日查看`}
+        aria-label={plural(data.length, t.chartLabel)}
         onKeyDown={onKeyDown}
         onFocus={() => setActive((current) => current ?? last)}
         onBlur={() => setActive(null)}
@@ -98,7 +96,7 @@ export default function ViewTrend({ data }: { data: DailyViews[] }) {
             <g key={tick}>
               <line x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} stroke="var(--color-line)" strokeWidth="1" />
               <text x={PAD.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" className="fill-ink-3 text-[11px] tabular-nums">
-                {compact(tick)}
+                {compact(locale, tick)}
               </text>
             </g>
           ))}
@@ -110,7 +108,7 @@ export default function ViewTrend({ data }: { data: DailyViews[] }) {
               textAnchor={index === last ? "end" : index === 0 ? "start" : "middle"}
               className="fill-ink-3 text-[11px] tabular-nums"
             >
-              {index === last ? "今天" : shortDay(data[index].day)}
+              {index === last ? t.today : shortDay(data[index].day)}
             </text>
           ))}
           <path d={area} fill="var(--chart-trend)" fillOpacity="0.1" />
@@ -125,7 +123,7 @@ export default function ViewTrend({ data }: { data: DailyViews[] }) {
                 textAnchor="end"
                 className="fill-ink text-xs font-semibold tabular-nums"
               >
-                {data[last].views.toLocaleString("zh-CN")}
+                {num(data[last].views)}
               </text>
             </>
           )}
@@ -151,29 +149,29 @@ export default function ViewTrend({ data }: { data: DailyViews[] }) {
             className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-capsule"
             style={{ left: Math.min(width - 70, Math.max(70, x(active))) }}
           >
-            <p className="text-sm font-bold text-ink tabular-nums">{point.views.toLocaleString("zh-CN")} 次阅读</p>
+            <p className="text-sm font-bold text-ink tabular-nums">{plural(point.views, t.views)}</p>
             <p className="mt-0.5 text-ink-3">{longDay(point.day)}</p>
           </div>
         )}
         <p className="sr-only" aria-live="polite">
-          {point ? `${longDay(point.day)}，${point.views} 次阅读` : ""}
+          {point ? t.pointSummary.replace("{day}", longDay(point.day)).replace("{views}", plural(point.views, t.views)) : ""}
         </p>
       </div>
       <details className="mt-2 text-xs text-ink-3">
-        <summary className="cursor-pointer select-none hover:text-ink-2">查看每日数据</summary>
+        <summary className="cursor-pointer select-none hover:text-ink-2">{t.showTable}</summary>
         <div className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-line">
           <table className="w-full text-left tabular-nums">
             <thead className="sticky top-0 bg-surface">
               <tr className="text-ink-2">
-                <th scope="col" className="px-3 py-1.5 font-medium">日期</th>
-                <th scope="col" className="px-3 py-1.5 text-right font-medium">阅读量</th>
+                <th scope="col" className="px-3 py-1.5 font-medium">{t.colDate}</th>
+                <th scope="col" className="px-3 py-1.5 text-right font-medium">{t.colViews}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {[...data].reverse().map((row) => (
                 <tr key={row.day}>
                   <td className="px-3 py-1.5">{longDay(row.day)}</td>
-                  <td className="px-3 py-1.5 text-right text-ink">{row.views.toLocaleString("zh-CN")}</td>
+                  <td className="px-3 py-1.5 text-right text-ink">{num(row.views)}</td>
                 </tr>
               ))}
             </tbody>

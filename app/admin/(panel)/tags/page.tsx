@@ -4,12 +4,18 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { tagPath } from "@/lib/tags";
 import { DeleteTagButton, RenameTagForm } from "./tag-row-actions";
+import { getAdminI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "标签管理" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.tags.metaTitle };
+}
 export const dynamic = "force-dynamic";
 
 export default async function AdminTagsPage({ searchParams }: { searchParams: Promise<{ merged?: string }> }) {
   await requireAdminPage("taxonomy");
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.tags;
   const { merged } = await searchParams;
   const [tags, published] = await Promise.all([
     prisma.tag.findMany({
@@ -26,29 +32,26 @@ export default async function AdminTagsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-ink">标签管理</h1>
-      <p className="mt-1 text-sm text-ink-3">
-        标签在编辑教程时填写，这里可以改名或删除。改成和另一个标签相同的名字会把两个标签合并。
-        只有一篇已发布教程的标签页不会被搜索引擎收录。
-      </p>
+      <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+      <p className="mt-1 text-sm text-ink-3">{t.intro}</p>
       {merged && (
         <p role="status" className="mt-4 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
-          已合并到「{merged}」
+          {f(t.merged, { name: merged })}
         </p>
       )}
 
       {tags.length === 0 ? (
         <div className="mt-8 rounded-3xl border border-dashed border-line bg-surface/60 py-16 text-center text-sm text-ink-3">
-          还没有标签。编辑教程时在「标签」里填写即可。
+          {t.empty}
         </div>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-xs text-ink-3">
               <tr>
-                <th className="px-4 py-3 font-medium">名称</th>
-                <th className="px-4 py-3 font-medium">教程数（已发布 / 全部）</th>
-                <th className="px-4 py-3 font-medium">前台</th>
+                <th className="px-4 py-3 font-medium">{t.colName}</th>
+                <th className="px-4 py-3 font-medium">{t.colCount}</th>
+                <th className="px-4 py-3 font-medium">{t.colPublic}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -74,7 +77,7 @@ export default async function AdminTagsPage({ searchParams }: { searchParams: Pr
                           /tags/{tag.slug}
                         </Link>
                       ) : (
-                        <span className="text-xs text-ink-3">未使用</span>
+                        <span className="text-xs text-ink-3">{t.unused}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">

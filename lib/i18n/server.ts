@@ -1,8 +1,9 @@
 import { cookies, headers } from "next/headers";
 import { getSettings } from "@/lib/settings";
-import { messagesFor, type Messages } from "./messages";
 import { ADMIN_LOCALE_COOKIE, isLocale, matchAcceptLanguage, type Locale } from "./locales";
-import { formatDateTime, formatNumber, plural, format, type Plural, type Vars } from "./format";
+import { i18nFor, type I18n } from "./core";
+
+export { i18nFor, type I18n };
 
 /*
  * 服务端取当前语言和文案：
@@ -11,26 +12,6 @@ import { formatDateTime, formatNumber, plural, format, type Plural, type Vars } 
  *   Server Action、接口里用）；
  * - 首次安装页：Cookie → 浏览器语言 → 网站语言（还没设置过网站语言）。
  */
-
-export type I18n = {
-  locale: Locale;
-  m: Messages;
-  f: (template: string, vars?: Vars) => string;
-  plural: (count: number, forms: Plural, vars?: Vars) => string;
-  date: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
-  num: (value: number) => string;
-};
-
-export function i18nFor(locale: Locale): I18n {
-  return {
-    locale,
-    m: messagesFor(locale),
-    f: format,
-    plural: (count, forms, vars) => plural(locale, count, forms, vars),
-    date: (value, options) => formatDateTime(locale, value, options),
-    num: (value) => formatNumber(locale, value),
-  };
-}
 
 export async function getSiteLocale(): Promise<Locale> {
   return (await getSettings()).locale;

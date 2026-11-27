@@ -2,6 +2,10 @@
  * 教程系列的纯函数：表单校验、URL、系列内的位置（后台、前台、测试共用）。
  */
 import { tagSlug } from "@/lib/tags";
+import { format } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages/types";
+
+type Text = Messages["admin"]["validation"];
 
 export const MAX_SERIES_TITLE = 60;
 export const MAX_SERIES_DESCRIPTION = 300;
@@ -11,16 +15,16 @@ export const MIN_INDEXABLE_SERIES_TUTORIALS = 2;
 export const seriesPath = (slug: string) => `/series/${encodeURIComponent(slug)}`;
 
 /** 校验后台填写的系列信息；别名留空时按标题生成（规则与标签相同：小写、保留中文）。 */
-export function parseSeriesInput(input: { title: unknown; slug: unknown; description: unknown }):
+export function parseSeriesInput(input: { title: unknown; slug: unknown; description: unknown }, t: Text):
   | { data: { title: string; slug: string; description: string | null } }
   | { error: string } {
   const title = String(input.title ?? "").replace(/\s+/g, " ").trim();
   const description = String(input.description ?? "").trim();
-  if (!title) return { error: "请输入系列名称" };
-  if (Array.from(title).length > MAX_SERIES_TITLE) return { error: `系列名称最多 ${MAX_SERIES_TITLE} 个字` };
-  if (Array.from(description).length > MAX_SERIES_DESCRIPTION) return { error: `系列简介最多 ${MAX_SERIES_DESCRIPTION} 个字` };
+  if (!title) return { error: t.seriesTitleRequired };
+  if (Array.from(title).length > MAX_SERIES_TITLE) return { error: format(t.seriesTitleTooLong, { max: MAX_SERIES_TITLE }) };
+  if (Array.from(description).length > MAX_SERIES_DESCRIPTION) return { error: format(t.seriesDescriptionTooLong, { max: MAX_SERIES_DESCRIPTION }) };
   const slug = tagSlug(String(input.slug ?? "").trim() || title);
-  if (!slug) return { error: "网址别名需要包含文字或数字" };
+  if (!slug) return { error: t.slugNoText };
   return { data: { title, slug, description: description || null } };
 }
 
@@ -39,10 +43,10 @@ export function seriesPosition<T extends { id: number }>(tutorials: T[], id: num
 export const MAX_CHAPTER_TITLE = 30;
 
 /** 后台填写的章节名：空表示不分章；最多 MAX_CHAPTER_TITLE 个字。 */
-export function parseChapterInput(raw: unknown): { value: string | null } | { error: string } {
+export function parseChapterInput(raw: unknown, t: Text): { value: string | null } | { error: string } {
   const value = String(raw ?? "").replace(/\s+/g, " ").trim();
   if (!value) return { value: null };
-  if (Array.from(value).length > MAX_CHAPTER_TITLE) return { error: `章节名最多 ${MAX_CHAPTER_TITLE} 个字` };
+  if (Array.from(value).length > MAX_CHAPTER_TITLE) return { error: format(t.chapterTooLong, { max: MAX_CHAPTER_TITLE }) };
   return { value };
 }
 

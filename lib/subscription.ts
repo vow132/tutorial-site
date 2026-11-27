@@ -51,12 +51,15 @@ export function mailConfigComplete(config: MailConfig) {
   return Boolean(config.host && config.port && config.fromEmail);
 }
 
-export function validateMailConfig(config: MailConfig): string | null {
+/** 发信配置哪一项不对（文字按后台语言：m.admin.subscribers.invalid） */
+export type MailConfigProblem = "host" | "port" | "fromEmail" | "fromName";
+
+export function validateMailConfig(config: MailConfig): MailConfigProblem | null {
   if (!config.enabled && !config.host) return null;
-  if (!/^[a-z0-9.-]+$/i.test(config.host)) return "SMTP 服务器请填写域名或 IP，例如 smtpdm.aliyun.com";
-  if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) return "端口不对（常见是 465 或 587）";
-  if (!normalizeEmail(config.fromEmail)) return "发件人邮箱格式不对";
-  if (config.fromName.length > 40) return "发件人名称最多 40 个字";
+  if (!/^[a-z0-9.-]+$/i.test(config.host)) return "host";
+  if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535) return "port";
+  if (!normalizeEmail(config.fromEmail)) return "fromEmail";
+  if (config.fromName.length > 40) return "fromName";
   return null;
 }
 
