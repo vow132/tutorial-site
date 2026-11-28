@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { isTurnstileKey, maskKey } from "@/lib/turnstile";
 import { checkTurnstileToken, loadTurnstile, saveTurnstile } from "@/lib/turnstile-store";
+import { getAdminI18n } from "@/lib/i18n/server";
 
 export type TurnstileFormState = { error?: string; success?: string };
 
@@ -16,24 +17,24 @@ export type TurnstileFormState = { error?: string; success?: string };
  */
 export async function saveTurnstileSettings(_prev: TurnstileFormState, formData: FormData): Promise<TurnstileFormState> {
   const admin = await requireAuth();
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.turnstileErrors;
   const current = await loadTurnstile();
   const enabled = formData.get("enabled") === "on";
   const siteKey = String(formData.get("siteKey") ?? "").trim();
   const newSecret = String(formData.get("secret") ?? "").trim();
   const secret = newSecret || current.secret;
 
-  if (siteKey && !isTurnstileKey(siteKey)) return { error: "Site Key 格式不对：在 Cloudflare 后台 Turnstile 页面复制，形如 0x4AAAAAAA…" };
-  if (newSecret && !isTurnstileKey(newSecret)) return { error: "Secret Key 格式不对：在 Cloudflare 后台 Turnstile 页面复制，形如 0x4AAAAAAA…" };
+  if (siteKey && !isTurnstileKey(siteKey)) return { error: t.siteKey };
+  if (newSecret && !isTurnstileKey(newSecret)) return { error: t.secret };
 
   if (enabled) {
-    if (!siteKey || !secret) return { error: "开启前请填好 Site Key 和 Secret Key" };
+    if (!siteKey || !secret) return { error: t.keysRequired };
     const verdict = await checkTurnstileToken(secret, formData.get("turnstileToken"), "settings");
     if (!verdict.ok) {
       return {
         error:
-          verdict.reason === "missing token"
-            ? "请先完成下面的人机验证（证明这组密钥能用），再保存"
-            : `验证没通过，没有保存：${verdict.reason}。请检查 Site Key 和 Secret Key 是否是同一个小组件的、小组件的域名里有没有本站，以及服务器能否访问 challenges.cloudflare.com`,
+          verdict.reason === "missing token" ? t.tryFirst : f(t.failed, { reason: verdict.reason }),
       };
     }
   }
@@ -41,10 +42,12 @@ export async function saveTurnstileSettings(_prev: TurnstileFormState, formData:
   await saveTurnstile({ enabled, siteKey, secret });
   await audit("turnstile.settings", {
     actor: admin.username,
-    detail: `${enabled ? "开启" : "关闭"}人机验证；Site Key ${siteKey ? maskKey(siteKey) : "未填写"}${newSecret ? "；更换了 Secret Key" : ""}`,
+    detail: [enabled ? t.auditOn : t.auditOff, f(t.auditKey, { key: siteKey ? maskKey(siteKey) : t.auditEmpty }), newSecret ? t.auditSecret : ""]
+      .filter(Boolean)
+      .join("; "),
   });
   // 前台的订阅框、留言框要不要显示小组件跟着变
   revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidatePath("/", "layout");
-  return { success: enabled ? "已开启：后台登录、邮件订阅和读者留言都要先过人机验证" : "已保存（人机验证未开启）" };
+  return { success: enabled ? t.savedOn : t.savedOff };
 }

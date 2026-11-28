@@ -215,7 +215,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
         setError(t.notWxr);
         return;
       }
-      const { items, skipped: skip, siteUrl } = parseWordPressExport(text);
+      const { items, skipped: skip, siteUrl } = parseWordPressExport(text, t);
       if (items.length === 0) {
         setError(t.wxrEmpty);
         return;

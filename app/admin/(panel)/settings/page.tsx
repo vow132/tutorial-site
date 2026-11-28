@@ -5,13 +5,18 @@ import { prisma } from "@/lib/prisma";
 import { loadTurnstile } from "@/lib/turnstile-store";
 import SettingsForm from "./settings-form";
 import TurnstileForm from "./turnstile-form";
+import { getAdminI18n, getSiteI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "站点设置" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.settings.metaTitle };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
   await requireAdminPage();
+  const t = (await getAdminI18n()).m.admin.settings;
   const [settings, seriesRows, turnstile] = await Promise.all([
     getSettings(),
     prisma.series.findMany({
@@ -24,17 +29,15 @@ export default async function AdminSettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-ink">站点设置</h1>
-      <p className="mt-1 text-sm text-ink-3">
-        网站名称、标题、首页文案与底部栏目，保存后前台即时生效
-      </p>
+      <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+      <p className="mt-1 text-sm text-ink-3">{t.intro}</p>
       <div className="mt-6">
-        <SettingsForm settings={settings} series={series} />
+        <SettingsForm settings={settings} series={series} defaults={(await getSiteI18n()).m.defaults} />
       </div>
       {/* 人机验证单独保存：Secret Key 加密存在另一条设置里，开启前要先试一次（lib/actions/turnstile.ts） */}
       <section aria-labelledby="turnstile-heading" className="mt-6 rounded-3xl border border-line bg-surface p-6">
         <h2 id="turnstile-heading" className="text-base font-bold text-ink">
-          人机验证（Cloudflare Turnstile）
+          {t.turnstileHeading}
         </h2>
         <div className="mt-4">
           <TurnstileForm

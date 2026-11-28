@@ -13,17 +13,20 @@ import { CALLOUT_TYPES } from "@/lib/callouts";
 import { Callout } from "./callout";
 import { ArticleTable } from "./table";
 import { CODE_LANGUAGES } from "@/lib/code-languages";
+import { useAdminI18n } from "@/lib/i18n/client";
 
-async function uploadImage(file: File): Promise<string> {
+type EditorText = ReturnType<typeof useAdminI18n>["m"]["admin"]["editor"];
+
+async function uploadImage(file: File, e: EditorText): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch("/api/upload", { method: "POST", body: form });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "上传失败");
+  if (!res.ok) throw new Error(data.error ?? e.uploadFailed);
   return data.url as string;
 }
 
-function insertFiles(editor: Editor, files: File[], pos?: number) {
+function insertFiles(editor: Editor, files: File[], e: EditorText, pos?: number) {
   for (const file of files) {
     // 先插入占位文本（含唯一标识），上传完成后替换为图片
     const placeholderId = `upload-${Date.now()}-${Math.random()
@@ -37,7 +40,7 @@ function insertFiles(editor: Editor, files: File[], pos?: number) {
         content: [
           {
             type: "text",
-            text: `⏳ 图片上传中…（${file.name}）#${placeholderId}`,
+            text: `${e.uploading.replace("{name}", file.name)} #${placeholderId}`,
           },
         ],
       })
@@ -61,7 +64,7 @@ function insertFiles(editor: Editor, files: File[], pos?: number) {
       editor.chain().insertContentAt({ from, to }, content as never).run();
     };
 
-    uploadImage(file)
+    uploadImage(file, e)
       .then((url) => {
         replacePlaceholder({
           type: "image",
@@ -70,7 +73,7 @@ function insertFiles(editor: Editor, files: File[], pos?: number) {
         });
       })
       .catch((err) => {
-        replacePlaceholder(`❌ 上传失败：${err.message ?? file.name}`);
+        replacePlaceholder(e.uploadError.replace("{reason}", err.message ?? file.name));
       });
   }
 }
@@ -87,17 +90,17 @@ function Divider() {
 }
 
 // 正文可选文字颜色（null 表示恢复默认色）
-const TEXT_COLORS: { label: string; value: string | null }[] = [
-  { label: "默认", value: null },
-  { label: "红色", value: "#e5484d" },
-  { label: "橙色", value: "#f76b15" },
-  { label: "黄色", value: "#eab308" },
-  { label: "绿色", value: "#30a46c" },
-  { label: "青色", value: "#12a594" },
-  { label: "蓝色", value: "#3b82f6" },
-  { label: "紫色", value: "#8b5cf6" },
-  { label: "粉色", value: "#e93d82" },
-  { label: "灰色", value: "#8b8d98" },
+const TEXT_COLORS: { label: keyof EditorText["colors"]; value: string | null }[] = [
+  { label: "default", value: null },
+  { label: "red", value: "#e5484d" },
+  { label: "orange", value: "#f76b15" },
+  { label: "yellow", value: "#eab308" },
+  { label: "green", value: "#30a46c" },
+  { label: "teal", value: "#12a594" },
+  { label: "blue", value: "#3b82f6" },
+  { label: "purple", value: "#8b5cf6" },
+  { label: "pink", value: "#e93d82" },
+  { label: "gray", value: "#8b8d98" },
 ];
 
 export default function RichTextEditor({
@@ -111,6 +114,10 @@ export default function RichTextEditor({
   mediaLibrary?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const e = useAdminI18n().m.admin.editor;
+  // useEditor 只初始化一次：占位文字、拖入上传的提示从 ref 读，切换后台语言后也是新的
+  const textRef = useRef(e);
+  textRef.current = e;
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
@@ -135,7 +142,7 @@ export default function RichTextEditor({
       Callout,
       ArticleTable,
       Placeholder.configure({
-        placeholder: "开始撰写正文… 支持直接拖拽或粘贴图片",
+        placeholder: () => textRef.current.placeholder,
       }),
     ],
     content: initialContent,
@@ -159,7 +166,7 @@ export default function RichTextEditor({
         const pos =
           view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ??
           view.state.selection.to;
-        if (editorRef.current) insertFiles(editorRef.current, files, pos);
+        if (editorRef.current) insertFiles(editorRef.current, files, textRef.current, pos);
         return true;
       },
       handlePaste: (_view, event) => {
@@ -168,7 +175,7 @@ export default function RichTextEditor({
         );
         if (files.length === 0) return false;
         event.preventDefault();
-        if (editorRef.current) insertFiles(editorRef.current, files);
+        if (editorRef.current) insertFiles(editorRef.current, files, textRef.current);
         return true;
       },
     },
@@ -238,7 +245,7 @@ export default function RichTextEditor({
 
   const setLink = () => {
     const prev = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("链接地址：", prev ?? "https://");
+    const url = window.prompt(e.linkPrompt, prev ?? "https://");
     if (url === null) return;
     if (url === "" || url === "https://") {
       editor.chain().focus().unsetLink().run();
@@ -252,11 +259,11 @@ export default function RichTextEditor({
   // alt 文本：读屏软件朗读、图片加载失败时显示，也是搜索引擎理解图片的主要依据。
   const editImageAlt = () => {
     if (!editor.isActive("image")) {
-      window.alert("请先点击选中正文中的一张图片，再设置图片说明。");
+      window.alert(e.selectImageFirst);
       return;
     }
     const prev = (editor.getAttributes("image").alt as string | undefined) ?? "";
-    const alt = window.prompt("图片说明（简要描述图片内容，供读屏软件和搜索引擎使用）：", prev);
+    const alt = window.prompt(e.altPrompt, prev);
     if (alt === null) return;
     editor
       .chain()
@@ -303,7 +310,7 @@ export default function RichTextEditor({
       >
         <button
           type="button"
-          title="撤销"
+          title={e.undo}
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
           className={btn(false, !editor.can().undo())}
@@ -312,7 +319,7 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="重做"
+          title={e.redo}
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
           className={btn(false, !editor.can().redo())}
@@ -322,7 +329,7 @@ export default function RichTextEditor({
         <Divider />
         <button
           type="button"
-          title="标题 2"
+          title={e.heading2}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           className={btn(editor.isActive("heading", { level: 2 }))}
         >
@@ -330,7 +337,7 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="标题 3"
+          title={e.heading3}
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           className={btn(editor.isActive("heading", { level: 3 }))}
         >
@@ -339,7 +346,7 @@ export default function RichTextEditor({
         <Divider />
         <button
           type="button"
-          title="加粗"
+          title={e.bold}
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={`${btn(editor.isActive("bold"))} font-bold`}
         >
@@ -347,7 +354,7 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="斜体"
+          title={e.italic}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={`${btn(editor.isActive("italic"))} italic`}
         >
@@ -355,7 +362,7 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="下划线"
+          title={e.underline}
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           className={`${btn(editor.isActive("underline"))} underline`}
         >
@@ -363,7 +370,7 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="删除线"
+          title={e.strike}
           onClick={() => editor.chain().focus().toggleStrike().run()}
           className={`${btn(editor.isActive("strike"))} line-through`}
         >
@@ -371,7 +378,7 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="行内代码"
+          title={e.inlineCode}
           onClick={() => editor.chain().focus().toggleCode().run()}
           className={`${btn(editor.isActive("code"))} font-mono text-xs`}
         >
@@ -380,79 +387,79 @@ export default function RichTextEditor({
         <Divider />
         <button
           type="button"
-          title="无序列表"
+          title={e.bulletList}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={btn(editor.isActive("bulletList"))}
         >
-          • 列表
+          {e.bulletListShort}
         </button>
         <button
           type="button"
-          title="有序列表"
+          title={e.orderedList}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={btn(editor.isActive("orderedList"))}
         >
-          1. 列表
+          {e.orderedListShort}
         </button>
         <button
           type="button"
-          title="引用"
+          title={e.quote}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           className={btn(editor.isActive("blockquote"))}
         >
-          ❝ 引用
+          {e.quoteShort}
         </button>
         <button
           type="button"
-          title="代码块"
+          title={e.codeBlock}
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           className={btn(editor.isActive("codeBlock"))}
         >
-          代码块
+          {e.codeBlock}
         </button>
         {/* 代码块语言：光标在代码块里时出现 */}
         {editor.isActive("codeBlock") && (
           <select
-            aria-label="代码语言"
+            aria-label={e.codeLanguage}
             value={(editor.getAttributes("codeBlock").language as string | null) ?? ""}
             onChange={(event) =>
               editor.chain().focus().updateAttributes("codeBlock", { language: event.target.value || null }).run()
             }
             className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink-2 outline-none focus:border-accent"
           >
-            <option value="">自动识别语言</option>
+            <option value="">{e.autoLanguage}</option>
             {Object.entries(CODE_LANGUAGES).map(([value, label]) => (
               <option key={value} value={value}>
-                {label}
+                {value === "plaintext" ? e.plaintext : label}
               </option>
             ))}
           </select>
         )}
         <button
           type="button"
-          title="插入表格（3×3，首行为表头）"
+          title={e.insertTable}
           onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3 }).run()}
           disabled={editor.isActive("table")}
           className={btn(false, editor.isActive("table"))}
         >
-          ▦ 表格
+          {e.table}
         </button>
         {editor.isActive("table") && (
           <>
-            <button type="button" title="在下方加一行" onClick={() => editor.chain().focus().addRowAfter().run()} className={btn(false)}>
-              +行
+            <button type="button" title={e.addRow} onClick={() => editor.chain().focus().addRowAfter().run()} className={btn(false)}>
+              {e.addRowShort}
             </button>
-            <button type="button" title="在右侧加一列" onClick={() => editor.chain().focus().addColumnAfter().run()} className={btn(false)}>
-              +列
+            <button type="button" title={e.addColumn} onClick={() => editor.chain().focus().addColumnAfter().run()} className={btn(false)}>
+              {e.addColumnShort}
             </button>
-            <button type="button" title="删除当前行" onClick={() => editor.chain().focus().deleteRow().run()} className={btn(false)}>
-              −行
+            <button type="button" title={e.deleteRow} onClick={() => editor.chain().focus().deleteRow().run()} className={btn(false)}>
+              {e.deleteRowShort}
             </button>
-            <button type="button" title="删除当前列" onClick={() => editor.chain().focus().deleteColumn().run()} className={btn(false)}>
-              −列
+            <button type="button" title={e.deleteColumn} onClick={() => editor.chain().focus().deleteColumn().run()} className={btn(false)}>
+              {e.deleteColumnShort}
             </button>
-            <button type="button" title="删除整个表格" onClick={() => editor.chain().focus().deleteTable().run()} className={`${btn(false)} text-red-500`}>
-              删表格
+            <button type="button" title={e.deleteTable} onClick={() => editor.chain().focus().deleteTable().run()} className={`${btn(false)} text-red-500`}>
+              {e.deleteTableShort}
             </button>
           </>
         )}
@@ -460,13 +467,13 @@ export default function RichTextEditor({
         <div ref={calloutRef} className="relative">
           <button
             type="button"
-            title="提示框"
+            title={e.callout}
             aria-haspopup="menu"
             aria-expanded={calloutOpen}
             onClick={() => setCalloutOpen((v) => !v)}
             className={btn(calloutOpen || editor.isActive("callout"))}
           >
-            💡 提示框
+            {e.calloutShort}
           </button>
           {calloutOpen && (
             <div role="menu" className="absolute left-0 top-full z-20 mt-1 w-max rounded-xl border border-line bg-surface p-1 shadow-lg">
@@ -484,7 +491,7 @@ export default function RichTextEditor({
                   }`}
                 >
                   <span aria-hidden="true">{item.icon}</span>
-                  {item.label}
+                  {e.calloutTypes[item.value]}
                 </button>
               ))}
               {editor.isActive("callout") && (
@@ -497,7 +504,7 @@ export default function RichTextEditor({
                   }}
                   className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-3 py-1.5 text-left text-sm text-ink-3 transition-colors hover:bg-paper"
                 >
-                  取消提示框
+                  {e.removeCallout}
                 </button>
               )}
             </div>
@@ -507,7 +514,7 @@ export default function RichTextEditor({
         <div ref={colorRef} className="relative">
           <button
             type="button"
-            title="文字颜色"
+            title={e.textColor}
             onClick={() => setColorOpen((v) => !v)}
             className={btn(colorOpen || !!currentColor)}
           >
@@ -526,7 +533,8 @@ export default function RichTextEditor({
                     <button
                       key={c.label}
                       type="button"
-                      title={c.label}
+                      title={e.colors[c.label]}
+                      aria-label={e.colors[c.label]}
                       onClick={() => {
                         const chain = editor.chain().focus();
                         if (c.value === null) chain.unsetColor().run();
@@ -551,7 +559,7 @@ export default function RichTextEditor({
                   className="h-6 w-6 shrink-0 rounded-lg border border-line"
                   style={{ backgroundColor: hexCurrent ?? "#000000" }}
                 />
-                <span>自定义颜色</span>
+                <span>{e.customColor}</span>
                 <input
                   type="color"
                   value={hexCurrent ?? "#000000"}
@@ -567,7 +575,7 @@ export default function RichTextEditor({
         <Divider />
         <button
           type="button"
-          title="插入链接"
+          title={e.insertLink}
           onClick={setLink}
           className={btn(editor.isActive("link"))}
         >
@@ -575,28 +583,28 @@ export default function RichTextEditor({
         </button>
         <button
           type="button"
-          title="插入图片（也可直接拖入）"
+          title={e.insertImage}
           onClick={pickImage}
           className={btn(false)}
         >
-          🖼 图片
+          {e.image}
         </button>
         {mediaLibrary && (
-          <button type="button" title="从上传过的图片里挑一张插入" onClick={() => setPickerOpen(true)} className={btn(false)}>
-            图片库
+          <button type="button" title={e.mediaLibraryHint} onClick={() => setPickerOpen(true)} className={btn(false)}>
+            {e.mediaLibrary}
           </button>
         )}
         <button
           type="button"
-          title="图片说明（先选中一张图片）"
+          title={e.imageAltHint}
           onClick={editImageAlt}
           className={btn(false)}
         >
-          图片说明
+          {e.imageAlt}
         </button>
         <button
           type="button"
-          title="分割线"
+          title={e.divider}
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
           className={btn(false)}
         >
@@ -610,7 +618,7 @@ export default function RichTextEditor({
         {dragging && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-accent-soft/60">
             <p className="rounded-full bg-surface px-5 py-2 text-sm font-medium text-accent shadow">
-              松开鼠标插入图片
+              {e.dropHint}
             </p>
           </div>
         )}
@@ -633,10 +641,10 @@ export default function RichTextEditor({
         accept="image/png,image/jpeg,image/gif,image/webp"
         multiple
         hidden
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          if (files.length) insertFiles(editor, files);
-          e.target.value = "";
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (files.length) insertFiles(editor, files, e);
+          event.target.value = "";
         }}
       />
 

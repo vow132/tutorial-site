@@ -2,16 +2,13 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { SITE_REPOSITORY_URL, type SiteUpdateStatus } from "@/lib/site-update-types";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const ENDPOINT = "/api/admin/site-update";
 type DisplayStatus = Omit<SiteUpdateStatus, "state"> & { state: SiteUpdateStatus["state"] | "checking" };
 const initialStatus: DisplayStatus = {
-  state: "checking", message: "正在检测仓库更新…", canUpdate: false,
+  state: "checking", message: "", code: "checking", canUpdate: false,
   currentRevision: null, latestRevision: null, checkedAt: null,
-};
-const labels = {
-  checking: "检测更新中", current: "已是最新版本", available: "有新版本",
-  updating: "正在更新", error: "更新未完成", unavailable: "暂无法更新",
 };
 const colors = {
   checking: "bg-ink-3", current: "bg-live", available: "bg-yellow-400",
@@ -20,6 +17,17 @@ const colors = {
 
 export default function GitHubUpdate() {
   const [status, setStatus] = useState<DisplayStatus>(initialStatus);
+  const { m, f } = useAdminI18n();
+  const t = m.admin.update;
+  const labels = t.labels;
+  // 服务器给的是状态代码（code）和更新进程的阶段（job.phase），按后台语言显示；没有代码的（更新进程写的失败原因等）显示原文
+  const describe = (value: DisplayStatus) => {
+    if (value.state === "updating" && value.job?.phase && t.phases[value.job.phase]) return t.phases[value.job.phase];
+    if (value.code) return f(t.messages[value.code], { rev: value.vars?.rev ?? "", hint: value.vars?.hint ? t.messages[value.vars.hint] : "" });
+    return value.message;
+  };
+  const textRef = useRef(t.messages);
+  textRef.current = t.messages;
   const [expanded, setExpanded] = useState(false);
   // 部署前必须再次输入管理员密码；确认框打开时弹层保持展开。
   const [confirming, setConfirming] = useState(false);
@@ -47,7 +55,7 @@ export default function GitHubUpdate() {
     try {
       const response = await fetch(ENDPOINT, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "检测失败，请稍后重试。" );
+      if (!response.ok) throw new Error(result.error || textRef.current.checkFailed);
       if (!alive.current) return;
       const next = result as SiteUpdateStatus;
       if (next.state === "updating") {
@@ -65,12 +73,12 @@ export default function GitHubUpdate() {
       if (statusRef.current.state === "updating") {
         restartStarted.current ??= Date.now();
         if (Date.now() - restartStarted.current < 10 * 60_000) {
-          acceptStatus({ ...statusRef.current, message: "服务正在切换版本，恢复连接后会自动刷新…" });
+          acceptStatus({ ...statusRef.current, code: undefined, job: undefined, message: textRef.current.switching });
           return;
         }
       }
-      acceptStatus({ ...statusRef.current, state: "error", canUpdate: false,
-        message: error instanceof Error ? error.message : "无法连接服务器，请稍后重试。" });
+      acceptStatus({ ...statusRef.current, state: "error", canUpdate: false, code: undefined,
+        message: error instanceof Error ? error.message : textRef.current.cannotConnect });
     } finally { inFlight.current = false; }
   }, [acceptStatus]);
 
@@ -115,7 +123,7 @@ export default function GitHubUpdate() {
     if (posting.current || !statusRef.current.canUpdate || !password) return;
     posting.current = true;
     const previous = statusRef.current;
-    acceptStatus({ ...previous, state: "updating", canUpdate: false, message: "正在提交更新任务…" });
+    acceptStatus({ ...previous, state: "updating", canUpdate: false, code: undefined, job: undefined, message: t.messages.submitting });
     try {
       const response = await fetch(ENDPOINT, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -126,18 +134,18 @@ export default function GitHubUpdate() {
       if (response.status === 403) {
         // 密码错误或被限流：恢复原状态，留在确认框里重试。
         acceptStatus(previous);
-        setConfirmError(result.error || "密码验证失败。");
+        setConfirmError(result.error || t.passwordFailed);
         return;
       }
       setConfirming(false);
       setPassword("");
-      if (!response.ok) throw new Error(result.error || "无法启动更新，请稍后重试。" );
+      if (!response.ok) throw new Error(result.error || t.messages.startFailed);
       jobId.current = result.job?.jobId ?? null;
       acceptStatus(result as SiteUpdateStatus);
     } catch (error) {
       setConfirming(false);
-      acceptStatus({ ...statusRef.current, state: "error", canUpdate: false,
-        message: error instanceof Error ? error.message : "无法启动更新，请稍后重试。" });
+      acceptStatus({ ...statusRef.current, state: "error", canUpdate: false, code: undefined,
+        message: error instanceof Error ? error.message : t.messages.startFailed });
     } finally {
       posting.current = false;
       // A lost POST response can still have launched the detached job.
@@ -147,7 +155,8 @@ export default function GitHubUpdate() {
 
   const busy = status.state === "updating" || status.state === "checking";
   const open = expanded || confirming;
-  const actionLabel = status.canUpdate ? "更新网站到仓库最新版本" : `查看更新状态：${labels[status.state]}`;
+  const actionLabel = status.canUpdate ? t.actionUpdate : f(t.actionStatus, { label: labels[status.state] });
+  const message = describe(status);
 
   return (
     <div
@@ -158,7 +167,7 @@ export default function GitHubUpdate() {
     >
       <a
         href={SITE_REPOSITORY_URL} target="_blank" rel="noopener noreferrer"
-        aria-label="打开 GitHub 仓库 vow132/tutorial-site（新窗口）"
+        aria-label={t.openRepo}
         className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-surface text-ink-2 transition-colors hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -168,7 +177,7 @@ export default function GitHubUpdate() {
       <button
         type="button" onClick={requestUpdate} aria-label={actionLabel}
         aria-describedby={descriptionId} aria-expanded={open} aria-busy={busy}
-        aria-disabled={busy} title={`${labels[status.state]}：${status.message}`}
+        aria-disabled={busy} title={`${labels[status.state]}: ${message}`}
         className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       >
         <span className={`h-3 w-3 rounded-full ring-2 ring-surface ${colors[status.state]}`} aria-hidden="true" />
@@ -179,14 +188,17 @@ export default function GitHubUpdate() {
       >
         <div className="rounded-2xl border border-line bg-surface p-4 shadow-capsule">
           <p className="text-sm font-semibold text-ink">{labels[status.state]}</p>
-          <p className="mt-1.5 text-xs leading-relaxed text-ink-2" role="status" aria-live="polite">{status.message}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-ink-2" role="status" aria-live="polite">{message}</p>
           {status.currentRevision && (
-            <p className="mt-2 text-xs text-ink-2">当前 {status.currentRevision.slice(0, 7)}{status.latestRevision && status.latestRevision !== status.currentRevision ? ` · 仓库 ${status.latestRevision.slice(0, 7)}` : ""}</p>
+            <p className="mt-2 text-xs text-ink-2">
+              {f(t.revision, { rev: status.currentRevision.slice(0, 7) })}
+              {status.latestRevision && status.latestRevision !== status.currentRevision ? f(t.repoRevision, { rev: status.latestRevision.slice(0, 7) }) : ""}
+            </p>
           )}
           {confirming && status.canUpdate && (
             <form onSubmit={(event) => void update(event)} className="mt-3 space-y-2">
               <label htmlFor={`${descriptionId}-password`} className="block text-xs font-medium text-ink-2">
-                输入管理员密码确认部署
+                {t.password}
               </label>
               <input
                 id={`${descriptionId}-password`} type="password" required autoFocus
@@ -196,16 +208,16 @@ export default function GitHubUpdate() {
               />
               {confirmError && <p className="text-xs text-red-500 dark:text-red-400">{confirmError}</p>}
               <div className="flex gap-2">
-                <button type="submit" className="rounded-lg bg-btn px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">确认更新</button>
-                <button type="button" onClick={() => setConfirming(false)} className="rounded-lg px-3 py-1.5 text-xs text-ink-2 hover:bg-paper">取消</button>
+                <button type="submit" className="rounded-lg bg-btn px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">{t.confirm}</button>
+                <button type="button" onClick={() => setConfirming(false)} className="rounded-lg px-3 py-1.5 text-xs text-ink-2 hover:bg-paper">{m.admin.common.cancel}</button>
               </div>
             </form>
           )}
           {status.state === "error" && (
-            <button type="button" onClick={() => void check()} className="mt-3 rounded-lg px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent">重新检测</button>
+            <button type="button" onClick={() => void check()} className="mt-3 rounded-lg px-2 py-1 text-xs font-medium text-accent hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent">{t.retry}</button>
           )}
           {open && !confirming && (
-            <button type="button" onClick={() => setExpanded(false)} className="mt-3 ml-2 rounded-lg px-2 py-1 text-xs text-ink-2 hover:bg-paper focus-visible:outline-2 focus-visible:outline-accent">收起</button>
+            <button type="button" onClick={() => setExpanded(false)} className="mt-3 ml-2 rounded-lg px-2 py-1 text-xs text-ink-2 hover:bg-paper focus-visible:outline-2 focus-visible:outline-accent">{t.collapse}</button>
           )}
         </div>
       </div>

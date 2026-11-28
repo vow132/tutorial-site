@@ -48,11 +48,11 @@ export function aiCrawlerRule(): { userAgent: string[]; disallow: string } {
 /** 选中这么多字以上才附来源：复制一个词、一行命令不打扰 */
 export const COPY_ATTRIBUTION_MIN_LENGTH = 50;
 
-/** 复制的文字后面附上的来源（纯文本和 HTML 两种）。 */
-export function copyAttribution(title: string, url: string) {
+/** 复制的文字后面附上的来源（纯文本和 HTML 两种）。label 是网站语言的「来源：」（m.reader.article.copySource）。 */
+export function copyAttribution(title: string, url: string, label = "来源：") {
   const escape = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   return {
-    text: `\n\n来源：${title} ${url}`,
-    html: `<p>来源：<a href="${escape(url)}">${escape(title)}</a> ${escape(url)}</p>`,
+    text: `\n\n${label}${title} ${url}`,
+    html: `<p>${escape(label)}<a href="${escape(url)}">${escape(title)}</a> ${escape(url)}</p>`,
   };
 }

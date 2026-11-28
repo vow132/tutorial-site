@@ -4,6 +4,7 @@ import { useState } from "react";
 import { contrastRatio } from "@/lib/color";
 import { accentVariables } from "@/lib/brand";
 import { DEFAULT_ACCENT } from "@/lib/settings-extras";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const PRESETS = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#8b5cf6", "#17181c"];
 
@@ -12,26 +13,28 @@ export default function AccentField({ initial, logoText }: { initial: string; lo
   const [color, setColor] = useState(initial || DEFAULT_ACCENT);
   const valid = /^#[0-9a-f]{6}$/i.test(color);
   const vars = valid ? accentVariables(color.toLowerCase()) : null;
+  const { m, f } = useAdminI18n();
+  const t = m.admin.settingsFields;
 
   return (
     <div>
       <span className="mb-1.5 block text-sm font-medium text-ink-2">
-        主题色
-        <span className="ml-2 text-xs font-normal text-ink-3">链接、按钮高亮、Logo 底色；文字会自动加深或提亮到看得清</span>
+        {t.accent}
+        <span className="ml-2 text-xs font-normal text-ink-3">{t.accentHint}</span>
       </span>
       <div className="flex flex-wrap items-center gap-3">
         <input
           type="color"
           value={valid ? color : DEFAULT_ACCENT}
           onChange={(event) => setColor(event.target.value)}
-          aria-label="选择主题色"
+          aria-label={t.accentPick}
           className="h-10 w-14 cursor-pointer rounded-lg border border-line bg-surface p-1"
         />
         <input
           name="brand.accentColor"
           value={color}
           onChange={(event) => setColor(event.target.value.trim())}
-          aria-label="主题色色值"
+          aria-label={t.accentValue}
           className="h-10 w-28 rounded-xl border border-line bg-surface px-3 font-mono text-sm outline-none focus:border-accent"
         />
         <div className="flex gap-1.5">
@@ -40,7 +43,7 @@ export default function AccentField({ initial, logoText }: { initial: string; lo
               key={preset}
               type="button"
               onClick={() => setColor(preset)}
-              aria-label={`使用 ${preset}`}
+              aria-label={f(t.accentPreset, { color: preset })}
               className={`h-7 w-7 rounded-full border ${color.toLowerCase() === preset ? "border-ink" : "border-line"}`}
               style={{ backgroundColor: preset }}
             />
@@ -48,16 +51,16 @@ export default function AccentField({ initial, logoText }: { initial: string; lo
         </div>
       </div>
       {vars && (
-        <div className="mt-3 flex flex-wrap items-center gap-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm" aria-label="主题色预览">
+        <div className="mt-3 flex flex-wrap items-center gap-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm" aria-label={t.accentPreview}>
           <span className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: vars.light.brand }}>
             {logoText}
           </span>
-          <span style={{ color: vars.light.accentInk }}>链接文字示例</span>
+          <span style={{ color: vars.light.accentInk }}>{t.accentLink}</span>
           <span className="rounded-full px-2.5 py-0.5 text-xs" style={{ backgroundColor: vars.light.accentSoft, color: vars.light.accentInk }}>
-            选中项
+            {t.accentSelected}
           </span>
           {contrastRatio(color, "#ffffff") < 3 && (
-            <span className="text-xs text-ink-3">颜色较浅：小字会自动用加深的版本</span>
+            <span className="text-xs text-ink-3">{t.accentLight}</span>
           )}
         </div>
       )}

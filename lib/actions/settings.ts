@@ -19,8 +19,9 @@ import { parseAssetHost } from "@/lib/asset-url";
 import { parseCommentsInput } from "@/lib/comments";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
-import { fetchRemoteImage, RemoteImageError } from "@/lib/remote-image";
+import { isDemoMode } from "@/lib/demo";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { fetchRemoteImage, RemoteImageError, remoteImageMessage } from "@/lib/remote-image";
 import { SITE_URL } from "@/lib/site-url";
 
 export type SettingsFormState = { error?: string; success?: string };
@@ -31,6 +32,8 @@ export async function updateSettings(
   formData: FormData
 ): Promise<SettingsFormState> {
   const admin = await requireAuth();
+  const { m, f } = await getAdminI18n();
+  const e = m.admin.settingsErrors;
 
   const text = (key: string) => String(formData.get(key) ?? "").trim();
 
@@ -55,21 +58,21 @@ export async function updateSettings(
       }
     }
   } catch {
-    return { error: "底部栏目数据格式有误" };
+    return { error: e.footerColumns };
   }
 
   const verification: SearchVerification = {};
   for (const engine of SEARCH_ENGINES) {
     const code = normalizeVerificationCode(text(`verification.${engine.key}`));
     if (code === null) {
-      return { error: `${engine.label}的验证码格式不对：请填写验证码，或粘贴平台给的整段 meta 标签` };
+      return { error: f(e.verification, { engine: m.admin.searchEngines[engine.key] }) };
     }
     if (code) verification[engine.key] = code;
   }
 
   const securityContact = normalizeSecurityContact(text("securityContact"));
   if (securityContact === null) {
-    return { error: "安全联系方式请填写邮箱，或 https:// 开头的网址" };
+    return { error: e.securityContact };
   }
 
   const support = parseSupportInput({
@@ -79,10 +82,10 @@ export async function updateSettings(
     sponsorText: text("support.sponsorText"),
     sponsorUrl: text("support.sponsorUrl"),
     sponsorImage: text("support.sponsorImage"),
-  });
+  }, e);
   if ("error" in support) return { error: support.error };
   for (const image of [support.data.wechatQr, support.data.alipayQr, support.data.sponsorImage]) {
-    if (image && !(await uploadedImage(image))) return { error: "赞助与打赏里的图片文件已不存在，请重新上传" };
+    if (image && !(await uploadedImage(image))) return { error: e.supportMissing };
   }
 
   const brand = parseBrandInput({
@@ -91,22 +94,22 @@ export async function updateSettings(
     shareImage: text("brand.shareImage"),
     accentColor: text("brand.accentColor"),
     mascot: formData.get("brand.mascot") === "on",
-  });
+  }, e);
   if ("error" in brand) return { error: brand.error };
   for (const image of [brand.data.logoImage, brand.data.favicon, brand.data.shareImage]) {
-    if (image && !(await uploadedImage(image))) return { error: "品牌里的图片文件已不存在，请重新上传" };
+    if (image && !(await uploadedImage(image))) return { error: e.brandMissing };
   }
 
   let navLinksRaw: unknown;
   try {
     navLinksRaw = JSON.parse(text("navLinks.links") || "[]");
   } catch {
-    return { error: "导航链接数据格式有误" };
+    return { error: e.navFormat };
   }
-  const navLinks = parseNavLinksInput({ position: text("navLinks.position"), links: navLinksRaw });
+  const navLinks = parseNavLinksInput({ position: text("navLinks.position"), links: navLinksRaw }, e);
   if ("error" in navLinks) return { error: navLinks.error };
 
-  const assetHost = parseAssetHost(text("assetHost"));
+  const assetHost = parseAssetHost(text("assetHost"), e);
   if ("error" in assetHost) return { error: assetHost.error };
 
   const comments = parseCommentsInput({
@@ -118,7 +121,7 @@ export async function updateSettings(
     category: text("comments.category"),
     categoryId: text("comments.categoryId"),
     cdn: text("comments.cdn"),
-  });
+  }, e);
   if ("error" in comments) return { error: comments.error };
 
   const startHere = parseStartHereInput({
@@ -162,7 +165,7 @@ export async function updateSettings(
     },
   };
 
-  if (!settings.siteTitle) return { error: "网站标题不能为空" };
+  if (!settings.siteTitle) return { error: e.siteTitle };
   if (locale !== previous.locale) switchDefaultTexts(settings, previous.locale);
 
   await prisma.setting.upsert({
@@ -176,7 +179,7 @@ export async function updateSettings(
   revalidatePath("/", "layout");
   // robots.txt 是单独的路由，不在根布局下面（「拒绝 AI 训练爬虫」开关要马上生效）
   revalidatePath("/robots.txt");
-  return { success: "设置已保存，前台已生效" };
+  return { success: e.saved };
 }
 
 /** 换网站语言：还是旧语言默认值的文字（站长没改过）换成新语言的默认值，页脚栏目和「从这里开始」同理 */
@@ -198,30 +201,29 @@ export type AssetHostTestResult = { ok: boolean; message: string };
  * 用防 SSRF 的下载（lib/remote-image.ts）：只连公网地址，不能借这里探测服务器内网。
  */
 export async function testAssetHost(raw: string): Promise<AssetHostTestResult> {
-  if (isDemoMode()) return { ok: false, message: DEMO_READ_ONLY_MESSAGE };
+  const { m, f } = await getAdminI18n();
+  const e = m.admin.settingsErrors;
+  if (isDemoMode()) return { ok: false, message: m.admin.demoReadOnly };
   await requireAuth();
-  const parsed = parseAssetHost(raw);
+  const parsed = parseAssetHost(raw, e);
   if ("error" in parsed) return { ok: false, message: parsed.error };
-  if (!parsed.value) return { ok: false, message: "先填写图片加速地址" };
+  if (!parsed.value) return { ok: false, message: e.assetHostEmpty };
 
   const dir = path.join(process.cwd(), "public", "uploads");
   const sample = (await readdir(dir).catch(() => [] as string[])).find((name) => /^[\w-]+\.(?:webp|png|jpe?g|gif)$/i.test(name));
-  if (!sample) return { ok: false, message: "还没有上传过图片：先在后台上传一张图片再测试" };
+  if (!sample) return { ok: false, message: e.noUploads };
   const url = `${parsed.value}/uploads/${sample}`;
   try {
     const [remote, local] = await Promise.all([fetchRemoteImage(url, { timeoutMs: 15_000 }), readFile(path.join(dir, sample))]);
     if (!remote.equals(local)) {
       return {
         ok: true,
-        message: `能取到图片，但和本站的文件不完全一样（CDN 可能做了压缩或格式转换）。确认 ${url} 显示正常的话就可以用。`,
+        message: f(e.assetDiffers, { url }),
       };
     }
-    return { ok: true, message: `可以用：通过加速地址取到的 ${sample} 和本站完全一致。保存设置后前台生效。` };
+    return { ok: true, message: f(e.assetOk, { name: sample }) };
   } catch (error) {
-    const reason = error instanceof RemoteImageError ? error.message : "连接失败";
-    return {
-      ok: false,
-      message: `通过 ${url} 取图失败（${reason}）。请检查：回源地址是不是本站（${SITE_URL}）；开了防盗链的话把本站域名加进白名单。`,
-    };
+    const reason = error instanceof RemoteImageError ? remoteImageMessage(error, m) : e.connectFailed;
+    return { ok: false, message: f(e.assetFailed, { url, reason, site: SITE_URL }) };
   }
 }

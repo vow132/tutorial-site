@@ -6,12 +6,15 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import { processArticle, uploadedImage } from "@/lib/article";
 import { prisma } from "@/lib/prisma";
 import { canEditTutorial } from "@/lib/roles";
+import { getAdminI18n, getSiteI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "预览" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.preview.metaTitle };
+}
 export const dynamic = "force-dynamic";
 
-const formatDate = (date: Date) =>
-  date.toLocaleString("zh-CN", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Shanghai" });
+const DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: "long", timeStyle: "short" };
 
 /**
  * 后台预览：按前台文章页的排版显示已保存的内容，草稿、定时发布的教程也能看。
@@ -19,6 +22,9 @@ const formatDate = (date: Date) =>
  */
 export default async function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdminPage("tutorials");
+  const { m, f, date } = await getAdminI18n();
+  const t = m.admin.preview;
+  const formatDate = (value: Date) => date(value, DATE_TIME);
   const { id } = await params;
   const tutorial = await prisma.tutorial.findUnique({
     where: { id: Number(id) || 0 },
@@ -30,30 +36,31 @@ export default async function PreviewPage({ params }: { params: Promise<{ id: st
   if (!tutorial) notFound();
   if (!canEditTutorial(admin, tutorial)) redirect("/admin/tutorials?forbidden=1");
   const [{ html }, cover] = await Promise.all([
-    processArticle(tutorial.content),
+    // 正文按前台的样子排版（复制按钮等文字用网站语言）
+    processArticle(tutorial.content, (await getSiteI18n()).m.site.articleHtml),
     tutorial.cover ? uploadedImage(tutorial.cover) : null,
   ]);
   const status = tutorial.published
-    ? "已发布"
+    ? t.published
     : tutorial.publishAt
-      ? `定时发布：${formatDate(tutorial.publishAt)}`
-      : "草稿（前台看不到）";
+      ? f(t.scheduled, { time: formatDate(tutorial.publishAt) })
+      : t.draft;
 
   return (
     <div className="min-h-screen bg-paper">
       <div className="sticky top-0 z-40 border-b border-amber-500/30 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2">
           <span>
-            <strong>预览模式</strong> · {status} · 显示的是最后一次保存的内容
+            <strong>{t.mode}</strong> · {status} · {t.note}
           </span>
           <span className="flex gap-3">
             {tutorial.published && (
               <Link href={`/tutorials/${tutorial.slug}`} prefetch={false} className="underline">
-                打开前台页面
+                {t.openPublic}
               </Link>
             )}
             <Link href={`/admin/tutorials/${tutorial.id}`} className="underline">
-              返回编辑
+              {t.backToEdit}
             </Link>
           </span>
         </div>
@@ -65,7 +72,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ id: st
           {tutorial.category.name}
         </span>
         <h1 className="mt-4 text-3xl font-extrabold leading-tight text-ink md:text-4xl">{tutorial.title}</h1>
-        <p className="mt-4 text-xs text-ink-3">最后保存于 {formatDate(tutorial.updatedAt)}</p>
+        <p className="mt-4 text-xs text-ink-3">{f(t.savedAt, { time: formatDate(tutorial.updatedAt) })}</p>
         {tutorial.tags.length > 0 && (
           <p className="mt-3 flex flex-wrap gap-2 text-xs text-ink-2">
             {tutorial.tags.map(({ tag }) => (

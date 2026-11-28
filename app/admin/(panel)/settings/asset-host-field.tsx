@@ -2,18 +2,20 @@
 
 import { useRef, useState, useTransition } from "react";
 import { testAssetHost, type AssetHostTestResult } from "@/lib/actions/settings";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 /** 站点设置「图片加速」：地址随设置表单一起保存；「测试」通过这个地址取一张本站图片看能不能用。 */
 export default function AssetHostField({ initial }: { initial: string }) {
   const input = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<AssetHostTestResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const t = useAdminI18n().m.admin.settingsFields;
 
   return (
     <div>
       <label htmlFor="asset-host" className="mb-1.5 block text-sm font-medium text-ink-2">
-        图片加速地址
-        <span className="ml-2 text-xs font-normal text-ink-3">留空不加速</span>
+        {t.assetHost}
+        <span className="ml-2 text-xs font-normal text-ink-3">{t.assetHostHint}</span>
       </label>
       <div className="flex flex-wrap gap-2">
         <input
@@ -30,7 +32,7 @@ export default function AssetHostField({ initial }: { initial: string }) {
           onClick={() => startTransition(async () => setResult(await testAssetHost(input.current?.value ?? "")))}
           className="h-10 rounded-xl border border-line px-4 text-sm text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:opacity-50"
         >
-          {pending ? "测试中…" : "测试"}
+          {pending ? t.testing : t.test}
         </button>
       </div>
       {result && (

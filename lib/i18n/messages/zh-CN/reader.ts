@@ -31,6 +31,7 @@ export const reader = {
     zoomImage: "查看大图",
     closeImage: "关闭大图",
     backToTop: "回到顶部",
+    copySource: "来源：",
   },
   toc: {
     title: "本页目录",

@@ -488,6 +488,25 @@ html[data-mascot="off"] .site-mascot { display: none !important; }
 .tiptap-shell .ProseMirror [data-callout="danger"] { --callout: #ef4444; --callout-ink: #b91c1c; }
 .article-body [data-callout="danger"]::before,
 .tiptap-shell .ProseMirror [data-callout="danger"]::before { content: "⛔ 警告"; }
+/* 提示框标签跟随所在区域的语言（前台是网站语言，后台编辑器是管理员的语言） */
+.article-body [data-callout]:lang(en)::before,
+.tiptap-shell .ProseMirror [data-callout]:lang(en)::before { content: "💡 Tip"; }
+.article-body [data-callout="warning"]:lang(en)::before,
+.tiptap-shell .ProseMirror [data-callout="warning"]:lang(en)::before { content: "⚠️ Note"; }
+.article-body [data-callout="danger"]:lang(en)::before,
+.tiptap-shell .ProseMirror [data-callout="danger"]:lang(en)::before { content: "⛔ Warning"; }
+.article-body [data-callout]:lang(ru)::before,
+.tiptap-shell .ProseMirror [data-callout]:lang(ru)::before { content: "💡 Совет"; }
+.article-body [data-callout="warning"]:lang(ru)::before,
+.tiptap-shell .ProseMirror [data-callout="warning"]:lang(ru)::before { content: "⚠️ Внимание"; }
+.article-body [data-callout="danger"]:lang(ru)::before,
+.tiptap-shell .ProseMirror [data-callout="danger"]:lang(ru)::before { content: "⛔ Осторожно"; }
+.article-body [data-callout]:lang(ja)::before,
+.tiptap-shell .ProseMirror [data-callout]:lang(ja)::before { content: "💡 ヒント"; }
+.article-body [data-callout="warning"]:lang(ja)::before,
+.tiptap-shell .ProseMirror [data-callout="warning"]:lang(ja)::before { content: "⚠️ 注意"; }
+.article-body [data-callout="danger"]:lang(ja)::before,
+.tiptap-shell .ProseMirror [data-callout="danger"]:lang(ja)::before { content: "⛔ 警告"; }
 :root[data-theme="dark"] .article-body [data-callout],
 :root[data-theme="dark"] .tiptap-shell .ProseMirror [data-callout] { --callout-ink: #a5b4fc; }
 :root[data-theme="dark"] .article-body [data-callout="warning"],

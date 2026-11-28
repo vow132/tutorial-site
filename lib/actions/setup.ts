@@ -17,6 +17,7 @@ import { isDefaultText, SETTINGS_KEY } from "@/lib/settings";
 import { setupCodeMatches } from "@/lib/setup-code.mjs";
 import { getSetupLocale, i18nFor } from "@/lib/i18n/server";
 import { readLocale } from "@/lib/i18n/locales";
+import { format } from "@/lib/i18n/format";
 
 export type SetupState = { error?: string };
 
@@ -36,7 +37,8 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
   // 提示用安装页当前的语言；表单里选的语言就是网站语言
   const setupLocale = await getSetupLocale();
   const locale = readLocale(formData.get("locale"), setupLocale);
-  const { m } = i18nFor(setupLocale);
+  const i18n = i18nFor(setupLocale);
+  const { m } = i18n;
   const t = m.admin.setup;
 
   const ip = await getClientIp();
@@ -46,7 +48,7 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
   if (!setupCodeMatches(formData.get("code"))) {
     if (ip) limiters.ip.hit(ip);
     limiters.global.hit("all");
-    await audit("setup.failed", { detail: "安装码不正确" });
+    await audit("setup.failed", { detail: m.admin.auditDetail.setupWrongCode });
     return { error: t.wrongCode };
   }
 
@@ -88,7 +90,7 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
     create: { key: SETTINGS_KEY, value: JSON.stringify(next) },
   });
 
-  const removed = keepSamples ? null : await removeSampleData();
+  const removed = keepSamples ? null : await removeSampleData(i18n);
   // 部署时还没有账号，种子数据里的示例教程没有作者：交给新站长
   await prisma.tutorial.updateMany({ where: { authorId: null }, data: { authorId: created.id } });
 
@@ -96,7 +98,7 @@ export async function completeSetup(_prev: SetupState, formData: FormData): Prom
   await rememberDevice(created.username);
   await audit("setup.complete", {
     actor: created.username,
-    detail: `站名「${siteName}」${removed ? `，删除了${removed.summary}` : ""}`,
+    detail: `${format(m.admin.auditDetail.setupDone, { site: siteName })}${removed ? format(m.admin.auditDetail.setupRemoved, { summary: removed.summary }) : ""}`,
   });
   revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidateTag(CACHE_TAGS.categories, { expire: 0 });

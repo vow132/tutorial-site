@@ -113,7 +113,7 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
       if (inCode(selection.anchorNode) || inCode(selection.focusNode)) return;
       const copied = document.createElement("div");
       for (let i = 0; i < selection.rangeCount; i++) copied.append(selection.getRangeAt(i).cloneContents());
-      const source = copyAttribution(attribution.title, attribution.url);
+      const source = copyAttribution(attribution.title, attribution.url, t.copySource);
       event.clipboardData.setData("text/plain", text + source.text);
       event.clipboardData.setData("text/html", copied.innerHTML + source.html);
       event.preventDefault();

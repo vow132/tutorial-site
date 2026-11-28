@@ -10,19 +10,23 @@
  */
 
 import type { Locale } from "@/lib/i18n/locales";
+import { textOrKey } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages/types";
+
+type Errors = Messages["admin"]["settingsErrors"];
 
 export const COMMENT_PROVIDERS = {
-  none: { label: "关闭" },
+  none: { label: "Off" },
   waline: { label: "Waline" },
   twikoo: { label: "Twikoo" },
   artalk: { label: "Artalk" },
-  giscus: { label: "Giscus（GitHub Discussions）" },
+  giscus: { label: "Giscus (GitHub Discussions)" },
 } as const;
 export type CommentProvider = keyof typeof COMMENT_PROVIDERS;
 
 /** Waline / Twikoo 的前端脚本从哪个公共 CDN 加载（Artalk 用它自己服务端提供的脚本，Giscus 用 giscus.app）。 */
 export const COMMENT_CDNS = {
-  npmmirror: { label: "npmmirror（国内快）", origin: "https://registry.npmmirror.com" },
+  npmmirror: { label: "npmmirror", origin: "https://registry.npmmirror.com" },
   unpkg: { label: "unpkg", origin: "https://unpkg.com" },
   jsdelivr: { label: "jsDelivr", origin: "https://cdn.jsdelivr.net" },
 } as const;
@@ -63,17 +67,17 @@ const REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 const GITHUB_ID = /^[A-Za-z0-9_=-]{4,64}$/;
 
 /** 服务端地址：只收 https 的纯地址（不带查询串、片段、账号密码），去掉末尾的 /。 */
-export function parseCommentServer(raw: string): { value: string } | { error: string } {
+export function parseCommentServer(raw: string, t?: Errors): { value: string } | { error: string } {
   const value = raw.trim().replace(/\/+$/, "");
-  if (!value) return { error: "请填写评论服务的地址" };
+  if (!value) return { error: textOrKey(t, "commentServerRequired") };
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return { error: "评论服务地址格式不对，应类似 https://comments.example.com" };
+    return { error: textOrKey(t, "commentServerInvalid") };
   }
-  if (url.protocol !== "https:") return { error: "评论服务地址要用 https（浏览器会拦下 https 页面里的 http 请求）" };
-  if (url.username || url.password || url.search || url.hash) return { error: "评论服务地址只填网址本身，不要带账号、? 或 #" };
+  if (url.protocol !== "https:") return { error: textOrKey(t, "commentServerHttps") };
+  if (url.username || url.password || url.search || url.hash) return { error: textOrKey(t, "commentServerExtra") };
   return { value: `${url.origin}${url.pathname.replace(/\/+$/, "")}` };
 }
 
@@ -100,32 +104,28 @@ export function readComments(raw: unknown): CommentsSettings {
 }
 
 /** 后台表单提交的值 → 设置。只保留所选服务用得到的字段。 */
-export function parseCommentsInput(input: Record<keyof CommentsSettings, string>): { data: CommentsSettings } | { error: string } {
+export function parseCommentsInput(input: Record<keyof CommentsSettings, string>, t?: Errors): { data: CommentsSettings } | { error: string } {
   const provider = input.provider in COMMENT_PROVIDERS ? (input.provider as CommentProvider) : null;
-  if (!provider) return { error: "请选择评论服务" };
+  if (!provider) return { error: textOrKey(t, "commentProvider") };
   const cdn = input.cdn in COMMENT_CDNS ? (input.cdn as CommentCdn) : "npmmirror";
   const data: CommentsSettings = { ...defaultComments, provider, cdn };
   if (provider === "none") return { data };
 
   if (provider === "giscus") {
     const repo = input.repo.trim();
-    if (!REPO.test(repo)) return { error: "Giscus 仓库请填 用户名/仓库名，例如 octocat/blog-comments" };
-    for (const [value, label] of [
-      [input.repoId.trim(), "仓库 ID（data-repo-id）"],
-      [input.categoryId.trim(), "分类 ID（data-category-id）"],
-    ] as const) {
-      if (!GITHUB_ID.test(value)) return { error: `Giscus 的${label}格式不对，请从 giscus.app 生成的代码里复制` };
-    }
+    if (!REPO.test(repo)) return { error: textOrKey(t, "giscusRepo") };
+    if (!GITHUB_ID.test(input.repoId.trim())) return { error: textOrKey(t, "giscusRepoId") };
+    if (!GITHUB_ID.test(input.categoryId.trim())) return { error: textOrKey(t, "giscusCategoryId") };
     const category = input.category.trim();
-    if (!category || category.length > 50 || /["<>]/.test(category)) return { error: "请填写 Giscus 的分类名（data-category）" };
+    if (!category || category.length > 50 || /["<>]/.test(category)) return { error: textOrKey(t, "giscusCategory") };
     return { data: { ...data, repo, repoId: input.repoId.trim(), category, categoryId: input.categoryId.trim() } };
   }
 
-  const server = parseCommentServer(input.server);
+  const server = parseCommentServer(input.server, t);
   if ("error" in server) return { error: server.error };
   if (provider === "artalk") {
     const site = input.site.trim();
-    if (!site || site.length > 50 || /["<>]/.test(site)) return { error: "请填写 Artalk 后台里的站点名" };
+    if (!site || site.length > 50 || /["<>]/.test(site)) return { error: textOrKey(t, "artalkSite") };
     return { data: { ...data, server: server.value, site } };
   }
   return { data: { ...data, server: server.value } };

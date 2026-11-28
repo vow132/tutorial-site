@@ -18,6 +18,14 @@ export function format(template: string, vars?: Vars): string {
   return template.replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
 }
 
+/**
+ * 纯函数校验里取错误文字：传了文案 t 就按它格式化；没传（只关心结果、不显示错误的调用方）返回键名。
+ */
+export function textOrKey<T extends Record<string, unknown>>(t: T | undefined, key: keyof T & string, vars?: Vars): string {
+  const template = t?.[key];
+  return typeof template === "string" ? format(template, vars) : key;
+}
+
 const rules = new Map<Locale, Intl.PluralRules>();
 
 /** 按数量取文案（{n} 换成格式化后的数字），其余占位符照常替换 */
