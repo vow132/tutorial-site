@@ -8,6 +8,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { databaseFile } from "./site-update.mjs";
+import { cliText, siteLocaleOfFile } from "../lib/script-i18n.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "package.json"));
@@ -18,18 +19,20 @@ try {
   config({ path: path.join(root, ".env"), quiet: true });
 } catch { /* dotenv 不可用时只使用 shell 环境变量 */ }
 
+const Database = require("better-sqlite3");
+const source = databaseFile(process.env.DATABASE_URL, root);
+// 输出跟网站语言：中文站点中文，其余英文
+const say = cliText(siteLocaleOfFile(Database, source));
 const target = process.argv[2];
 if (!target) {
-  console.error("用法：node scripts/db-snapshot.mjs <目标文件>");
+  console.error(say("用法：node scripts/db-snapshot.mjs <目标文件>", "Usage: node scripts/db-snapshot.mjs <target file>"));
   process.exit(1);
 }
 
-const Database = require("better-sqlite3");
-const source = databaseFile(process.env.DATABASE_URL, root);
 const db = new Database(source, { readonly: true, fileMustExist: true, timeout: 10_000 });
 try {
   await db.backup(path.resolve(target));
 } finally {
   db.close();
 }
-console.log(`数据库快照：${source} → ${path.resolve(target)}`);
+console.log(say(`数据库快照：${source} → ${path.resolve(target)}`, `Database snapshot: ${source} → ${path.resolve(target)}`));
