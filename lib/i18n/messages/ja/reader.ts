@@ -3,6 +3,7 @@ import type { Messages } from "../types";
 
 export const reader: Messages["reader"] = {
   theme: { toggle: "テーマを切り替え" },
+  language: { label: "表示言語 · Language" },
   error: {
     title: "エラーが発生しました",
     siteMessage: "現在サイトを表示できません。しばらくしてから再度お試しください。繰り返し発生する場合はサイト管理者にご連絡ください。",

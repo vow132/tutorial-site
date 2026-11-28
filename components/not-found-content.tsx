@@ -1,7 +1,7 @@
 import IntentLink from "./intent-link";
 import Mascot from "@/components/mascot";
 import { getPublishedTutorialPage } from "@/lib/public-data";
-import { getSiteI18n } from "@/lib/i18n/server";
+import { getReaderI18n } from "@/lib/i18n/reader-server";
 
 async function latestTutorials() {
   try {
@@ -18,7 +18,7 @@ async function latestTutorials() {
  * 给出搜索框和最新教程，让访客从失效链接进来也能继续找内容。
  */
 export default async function NotFoundContent() {
-  const [latest, { m }] = await Promise.all([latestTutorials(), getSiteI18n()]);
+  const [latest, { m }] = await Promise.all([latestTutorials(), getReaderI18n()]);
   const t = m.site.notFound;
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-24 text-center">

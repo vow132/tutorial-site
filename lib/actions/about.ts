@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { requireAuth } from "@/lib/admin-auth";
 import { ABOUT_KEY } from "@/lib/about";
 import { getAdminI18n, getSiteI18n } from "@/lib/i18n/server";
@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
+import { revalidateSitePath } from "@/lib/revalidate-public";
 
 export type AboutFormState = { error?: string; success?: string };
 
@@ -28,6 +29,6 @@ export async function updateAbout(_prev: AboutFormState, formData: FormData): Pr
   });
   await audit("about.update", { actor: admin.username });
   revalidateTag(CACHE_TAGS.about, { expire: 0 });
-  revalidatePath("/about");
+  revalidateSitePath("/about");
   return { success: content && content !== "<p></p>" ? t.saved : t.cleared };
 }

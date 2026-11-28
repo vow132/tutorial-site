@@ -8,6 +8,7 @@ import { absoluteUrl } from "@/lib/site-url";
 import { confirmEmail, mailConfigComplete, normalizeEmail, signSubscriberToken } from "@/lib/subscription";
 import { verifyHuman } from "@/lib/turnstile-store";
 import { getSiteI18n } from "@/lib/i18n/server";
+import { getRequestReaderI18n } from "@/lib/i18n/reader-server";
 
 const HOUR_MS = 60 * 60 * 1000;
 /** 同一个地址 10 分钟内不重发确认邮件 */
@@ -36,7 +37,8 @@ export async function POST(request: Request) {
     return new Response(null, { status: 400 });
   }
   const email = normalizeEmail(body.email);
-  const { m, locale } = await getSiteI18n();
+  // 页面上显示的提示用读者选的语言；确认邮件和以后的新教程通知一样用网站语言
+  const [{ m }, { m: siteMessages, locale }] = await Promise.all([getRequestReaderI18n(), getSiteI18n()]);
   if (!email) return Response.json({ error: m.email.invalidEmail }, { status: 400 });
   // 隐藏的「网址」字段：真人看不到也不会填，填了的是机器人，假装成功
   if (typeof body.website === "string" && body.website.trim()) return ok();
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
   const { siteName } = await getSettings();
   const confirmUrl = absoluteUrl(`/subscribe/confirm?token=${signSubscriberToken(subscriber.id, "confirm")}`);
   try {
-    await sendOne(config, siteName, { to: email, ...confirmEmail({ siteName, confirmUrl, t: m.email, locale }) });
+    await sendOne(config, siteName, { to: email, ...confirmEmail({ siteName, confirmUrl, t: siteMessages.email, locale }) });
   } catch (error) {
     console.warn("[subscription] 确认邮件发送失败：", error instanceof Error ? error.message : error);
     // 允许稍后重试

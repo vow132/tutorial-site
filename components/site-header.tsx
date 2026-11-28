@@ -1,19 +1,22 @@
 import SiteLogo from "./site-logo";
 import IntentLink from "./intent-link";
-import { getSettings } from "@/lib/settings";
+
 import { getPublicCategoryTree } from "@/lib/public-data";
 import { getCategoryHref } from "@/lib/categories";
 import CapsuleNav, { type NavItem } from "./capsule-nav";
 import Mascot from "./mascot";
 import SearchInput from "./search-input";
 import ThemeToggle from "./theme-toggle";
-import { getSiteI18n } from "@/lib/i18n/server";
+import LanguageMenu from "./language-menu";
+import type { Locale } from "@/lib/i18n/locales";
+import { getReaderI18n, getReaderSettings } from "@/lib/i18n/reader-server";
 
-export default async function SiteHeader() {
+/** siteLocale：网站语言（读者选回网站语言时清掉自己的选择，见 components/language-menu.tsx） */
+export default async function SiteHeader({ siteLocale }: { siteLocale: Locale }) {
   const [categories, settings, { m }] = await Promise.all([
     getPublicCategoryTree(),
-    getSettings(),
-    getSiteI18n(),
+    getReaderSettings(),
+    getReaderI18n(),
   ]);
 
   const toNavItem = (category: (typeof categories)[number]): NavItem => ({
@@ -54,6 +57,7 @@ export default async function SiteHeader() {
           <CapsuleNav items={items} />
         </div>
 
+        <LanguageMenu siteLocale={siteLocale} />
         <ThemeToggle label={m.reader.theme.toggle} />
         <SearchInput labels={m.site.search} />
       </div>

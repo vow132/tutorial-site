@@ -87,7 +87,7 @@ npm ci && npx prisma migrate deploy && npm test
 | --- | --- |
 | 整体配色、圆角、字体等设计变量 | `app/globals.css` 的 `@theme`（主题色优先在后台改） |
 | 文章正文排版（标题、段落、代码块、表格） | `app/globals.css` 里的 `.article-body` |
-| 首页布局 | `app/(site)/page.tsx` |
+| 首页布局 | `app/[lang]/page.tsx`（前台页面都在 `app/[lang]/` 下，`[lang]` 是读者语言，不出现在网址里） |
 | 顶部导航、页脚 | `components/site-header.tsx`、`components/capsule-nav.tsx`、`components/site-footer.tsx` |
 | 小幽灵吉祥物的样子 | `components/mascot.tsx`（只想关掉的话在后台关） |
 | 教程卡片 | `components/tutorial-card.tsx` |
@@ -99,9 +99,9 @@ npm ci && npx prisma migrate deploy && npm test
 
 以 `/links`（友情链接）为例：
 
-1. 新建 `app/(site)/links/page.tsx`，页面元数据用 `lib/seo.ts` 的 `pageMetadata({ title, description, path: "/links" })`，不要自己写 `openGraph` / `alternates`（会把根布局的分享图、RSS 链接整个替换掉）；
+1. 新建 `app/[lang]/links/page.tsx`，页面元数据用 `lib/seo.ts` 的 `pageMetadata({ title, description, path: "/links" })`，不要自己写 `openGraph` / `alternates`（会把根布局的分享图、RSS 链接整个替换掉）；
 2. 站内链接用 `components/intent-link.tsx`，不要直接用 `next/link`；
-3. 页面上的文字从字典取（服务端组件用 `getSiteI18n()`），不要直接写在页面里；
+3. 页面上的文字从字典取（服务端组件用 `lib/i18n/reader-server.ts` 的 `getReaderI18n()`，跟读者选的语言走），不要直接写在页面里；
 4. 需要被搜索引擎收录时，把地址加进 `app/sitemap.ts`；
 5. 在后台「站点设置 → 顶部导航链接」或「页脚 → 底部栏目」加一个指向 `/links` 的链接。
 

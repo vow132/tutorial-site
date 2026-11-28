@@ -3,6 +3,7 @@ import type { Messages } from "../types";
 
 export const reader: Messages["reader"] = {
   theme: { toggle: "Toggle theme" },
+  language: { label: "Language" },
   error: {
     title: "Something went wrong",
     siteMessage: "The site can't be displayed right now. Please try again later; if it keeps happening, contact the site owner.",

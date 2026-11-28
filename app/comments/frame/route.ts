@@ -4,6 +4,7 @@ import { isDemoMode } from "@/lib/demo";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { messagesFor } from "@/lib/i18n/messages";
+import { getRequestReaderI18n } from "@/lib/i18n/reader-server";
 
 /**
  * 评论区小页面：文章页文末的 iframe（components/comments.tsx）加载它。
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
   // 演示站的后台对所有人开放，访客写的字不能经由本站展示给别人
   if (isDemoMode() || !slug || slug.length > 200) return notFound();
 
-  const { comments, locale } = await getSettings();
+  // 评论组件的界面语言跟读者选的语言走（iframe 和文章页同源，带着同一个 Cookie）
+  const [{ comments }, { locale }] = await Promise.all([getSettings(), getRequestReaderI18n()]);
   if (comments.provider === "none") return notFound();
   const tutorial = await prisma.tutorial.findFirst({ where: { slug, published: true }, select: { title: true } });
   if (!tutorial) return notFound();

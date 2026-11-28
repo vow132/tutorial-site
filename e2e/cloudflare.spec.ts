@@ -25,7 +25,13 @@ function fakeTurnstileScript(prefix: "pass" | "fail") {
   return `(() => {
     let n = 0;
     const widgets = {};
-    const issue = (id) => setTimeout(() => widgets[id] && widgets[id].opts.callback("${prefix}:" + widgets[id].opts.action + ":" + (++n)), 30);
+    // 和真的 Turnstile 一样，令牌稍后才给出；给出后在小组件上标记 data-issued，测试据此等令牌到手再提交
+    const issue = (id) => setTimeout(() => {
+      const widget = widgets[id];
+      if (!widget) return;
+      widget.opts.callback("${prefix}:" + widget.opts.action + ":" + (++n));
+      widget.box.dataset.issued = "1";
+    }, 30);
     window.turnstile = {
       render(el, opts) {
         const id = "w" + (++n);
@@ -173,6 +179,7 @@ test("Cloudflare Turnstile guards login, subscriptions and reader notes, and can
     await expect(blockedPage.getByText("假的人机验证（login）")).toBeVisible();
     await blockedPage.getByLabel("用户名").fill(admin.username);
     await blockedPage.getByLabel("密码").fill(admin.password);
+    await expect(blockedPage.locator(".fake-turnstile[data-issued]")).toBeAttached();
     await blockedPage.getByRole("button", { name: "登 录" }).click();
     await expect(blockedPage.getByText("人机验证没通过，请重新验证后再提交")).toBeVisible();
     await expect(blockedPage).toHaveURL(/\/admin\/login/);
@@ -195,6 +202,7 @@ test("Cloudflare Turnstile guards login, subscriptions and reader notes, and can
     await allowedPage.goto("/admin/login");
     await allowedPage.getByLabel("用户名").fill(admin.username);
     await allowedPage.getByLabel("密码").fill(admin.password);
+    await expect(allowedPage.locator(".fake-turnstile[data-issued]")).toBeAttached();
     await allowedPage.getByRole("button", { name: "登 录" }).click();
     await allowedPage.waitForURL((url) => !url.pathname.startsWith("/admin/login"));
     expect(siteverify.received.at(-1)?.response).toMatch(/^pass:login:/);
@@ -214,6 +222,7 @@ test("Cloudflare Turnstile guards login, subscriptions and reader notes, and can
     expect(scriptLoads).toHaveLength(1);
     const note = `人机验证后的留言 ${id}`;
     await feedback.getByLabel(/哪里没讲清楚/).fill(note);
+    await expect(feedback.locator(".fake-turnstile[data-issued]")).toBeAttached();
     await feedback.getByRole("button", { name: "发送" }).click();
     await expect(feedback.getByRole("status")).toHaveText("收到了，谢谢你花时间写下来！");
     expect(queryDatabase(`SELECT id FROM "FeedbackMessage" WHERE message = ?`, note)).toBeTruthy();
@@ -233,6 +242,8 @@ test("Cloudflare Turnstile guards login, subscriptions and reader notes, and can
     const email = `turnstile-${id}@example.com`;
     await box.getByLabel("邮箱地址").fill(email);
     await expect(box.getByText("假的人机验证（subscribe）")).toBeVisible();
+    // 令牌到手前点订阅，表单会提示「正在验证」而不提交（components/subscribe-form.tsx），所以先等令牌
+    await expect(box.locator(".fake-turnstile[data-issued]")).toBeAttached();
     await box.getByRole("button", { name: "订阅" }).click();
     await expect(box.getByRole("status")).toContainText(email);
     await expect.poll(() => smtp.mails.filter((mail) => mail.to.includes(email)).length).toBe(1);

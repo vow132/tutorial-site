@@ -2,8 +2,7 @@ import IntentLink from "./intent-link";
 import GlowCard from "./glow-card";
 import { categoryTextStyle } from "@/lib/color";
 import { assetUrl } from "@/lib/asset-url";
-import { getSettings } from "@/lib/settings";
-import { getSiteI18n } from "@/lib/i18n/server";
+import { getReaderI18n, getReaderSettings } from "@/lib/i18n/reader-server";
 
 type Props = {
   title: string;
@@ -28,7 +27,7 @@ export default async function TutorialCard({
   createdAt,
   thumbnail,
 }: Props) {
-  const [{ assetHost }, { m, date, plural }] = await Promise.all([getSettings(), getSiteI18n()]);
+  const [{ assetHost }, { m, date, plural }] = await Promise.all([getReaderSettings(), getReaderI18n()]);
   return (
     <IntentLink href={`/tutorials/${slug}`} className="group block h-full">
       <GlowCard className="flex h-full flex-col p-6">

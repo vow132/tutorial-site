@@ -7,6 +7,7 @@ import { assetUrl } from "@/lib/asset-url";
 import { OG_LOCALE } from "@/lib/i18n/locales";
 import { messagesFor } from "@/lib/i18n/messages";
 import { format } from "@/lib/i18n/format";
+import { getReaderLocale, getReaderSettings } from "@/lib/i18n/reader-server";
 
 /**
  * 没有配图的页面用的默认分享图：后台「站点设置 → 品牌」上传了就用上传的，
@@ -65,14 +66,15 @@ export async function pageMetadata({
   /** 不希望被收录时（如只有一篇教程的标签页）设为 false，仍允许爬虫顺着链接走。 */
   index?: boolean;
 }): Promise<Metadata> {
-  const settings = await getSettings();
+  // 读者看到的站名等（站长没改过的默认文字跟读者语言走）；默认分享图按网站语言生成（/og/site 用的是站点设置）
+  const [settings, siteSettings, readerLocale] = await Promise.all([getReaderSettings(), getSettings(), getReaderLocale()]);
   const shareTitle = title ?? settings.siteTitle;
   // 本站上传的图片（封面）走图片加速地址（lib/asset-url.ts）
-  const shareImage: SeoImage = image ? { ...image, url: assetUrl(image.url, settings.assetHost) } : await defaultShareImage(settings);
+  const shareImage: SeoImage = image ? { ...image, url: assetUrl(image.url, settings.assetHost) } : await defaultShareImage(siteSettings);
 
   const common = {
     siteName: settings.siteName,
-    locale: OG_LOCALE[settings.locale],
+    locale: OG_LOCALE[readerLocale],
     url: path,
     title: shareTitle,
     description,
