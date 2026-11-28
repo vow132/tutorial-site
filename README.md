@@ -1,385 +1,214 @@
 # 教程网
 
-基于 Next.js 16.4（App Router + webpack）、React 19、Tailwind CSS v4、Prisma 7 + SQLite 的图文教程平台。
+**简体中文** | [English](README.en.md) | [Русский](README.ru.md) | [日本語](README.ja.md)
 
-## 免责声明
-本站教程仅供个人合法学习研究，严禁用于违法、侵权等行为。用户使用内容产生的一切实操后果自行承担，与本站无关。
-本站不保证内容绝对无误，有权随时调整内容；
-如发现违规，我方保留配合调查的权利。访问本站即同意本声明。
-## 项目预览
+开源的图文教程网站：前台阅读 + 后台写作、管理，一台服务器就能跑（SQLite，不需要另装数据库）。基于 Next.js 16、React 19、Tailwind CSS v4、Prisma 7。界面支持简体中文、English、Русский、日本語。
 
-| 首页（跟随系统亮色） | 首页（跟随系统暗色） |
+> **免责声明**：本站教程仅供个人合法学习研究，严禁用于违法、侵权等行为。用户使用内容产生的一切实操后果自行承担，与本站无关。本站不保证内容绝对无误，有权随时调整内容；如发现违规，我方保留配合调查的权利。访问本站即同意本声明。
+
+## 预览
+
+| 首页（亮色） | 首页（暗色） |
 | --- | --- |
 | ![首页亮色](docs/screenshots/home-light.webp) | ![首页暗色](docs/screenshots/home-dark.webp) |
 
-| 从这里开始 · 教程分类 | 文章阅读（系列目录 + 本页目录） |
+| 文章阅读（系列目录 + 本页目录） | 手机阅读 |
 | --- | --- |
-| ![首页的入门路线和分类](docs/screenshots/home-start-here.webp) | ![文章阅读](docs/screenshots/article.webp) |
+| ![文章阅读](docs/screenshots/article.webp) | <img src="docs/screenshots/mobile-article.webp" alt="手机上的文章页" width="300"> |
 
-| 仪表盘（阅读趋势、上线检查清单） | 站点设置 · 品牌（Logo、图标、主题色） |
+| 仪表盘 | 批量导入 |
 | --- | --- |
-| ![管理后台仪表盘](docs/screenshots/admin-dashboard.webp) | ![品牌设置](docs/screenshots/admin-brand.webp) |
+| ![管理后台仪表盘](docs/screenshots/admin-dashboard.webp) | ![批量导入](docs/screenshots/admin-import.webp) |
 
-| 批量导入（Hexo / Hugo / WordPress…） | 手机阅读 |
-| --- | --- |
-| ![批量导入](docs/screenshots/admin-import.webp) | <img src="docs/screenshots/mobile-article.webp" alt="手机上的文章页" width="300"> |
+## 功能
 
-截图里的阅读数据是演示数据。
+- **阅读**：亮暗主题跟随系统、文章目录、代码高亮和一键复制、图片放大、阅读进度、上下篇和相关教程、系列教程做成「教程书」（分章、读完打勾、继续阅读）、标签、全文搜索（中文 1–2 个字也能搜）、RSS、打印排版；低配设备自动关掉动效
+- **写作**：富文本编辑器（拖拽/粘贴图片、表格、代码块、提示框）、自动保存草稿、历史版本、预览、定时发布、封面图、Markdown 导入导出、从 Hexo / Hugo / Jekyll / Obsidian / WordPress 批量搬家（保留时间、图片，生成旧地址跳转规则）、图片库
+- **运营**：阅读趋势、热门教程、读完率、来源网站、读者搜了什么、「有帮助吗」反馈和读者留言、邮件订阅新教程、可选的第三方评论（Waline / Twikoo / Artalk / Giscus）、打赏码和赞助位
+- **定制**：站名、Logo、网站图标、主题色、分享图、首页文案、导航链接、页脚、网站语言都在后台改，不用动代码；多人协作（站长 / 编辑 / 作者）
+- **SEO**：sitemap、canonical、结构化数据、自动生成分享图、各搜索引擎站长验证
+- **安全**：两步验证 + 恢复码、通行密钥、可吊销的会话、登录限流、正文白名单过滤、严格 CSP、安全日志和告警推送（钉钉 / 飞书 / 企业微信 / Telegram / Webhook）、加密备份、可选的 Cloudflare 人机验证和拒绝 AI 训练爬虫
 
-## 功能特性
+## Docker 部署
 
-- **前台**：悬浮胶囊导航（分类翻页、aura/流光动效）、亮暗双主题（默认跟随系统，手动切换后记住）、鼠标跟随聚光灯卡片与轻微 3D 倾斜、滚动触发的分区渐显、小幽灵吉祥物；低端设备（内存 < 4GB、CPU < 4 核）或开启省流量时自动进入精简模式，关掉毛玻璃、装饰光晕和循环动画
-- **文章**：服务端 TOC 提取与高亮（highlight.js）、代码块语言标签与一键复制、标题旁 `#` 复制章节链接（锚点按标题文字生成，改动其他段落不会失效）、点击图片放大、打印/另存 PDF 专用排版、显示最后更新日期、移动端可折叠目录、图片自动注入宽高防布局抖动、上下篇导航与相关教程推荐、顶部阅读进度条与「回到顶部」、文末「这篇有帮助吗」反馈（点「没帮助」可以留一句话给站长）、可选的第三方评论区（Waline / Twikoo / Artalk / Giscus，默认关闭，滚动到文末才加载）、可选的「复制正文时附上来源」、复制链接 / 微信扫码分享、文末打赏码与赞助位、邮件订阅新教程（双重确认、一键退订）；文章页默认「精简动效」（不倾斜、不跟随），可在后台切换；按 `/` 或 Ctrl/⌘+K 聚焦搜索，404 页提供搜索框和最新教程；上传图片自动缩放到 1600px 宽并转 WebP、去除 EXIF 定位信息，并生成 800/1200px 小图供手机按屏幕加载
-- **后台**：Tiptap 3 富文本编辑器（拖拽/粘贴上传图片、表格、代码块选语言、提示/注意/警告提示框；边写边自动保存到本浏览器，误关页面或登录过期可恢复）、教程历史版本（每次保存留旧版，可预览和一键恢复）、草稿预览、定时发布、教程封面图（文章头图 + 分享卡片；列表卡片显示缩略图，没设封面时用正文第一张图）、教程标签（每篇最多 8 个，后台可改名/合并/删除）、教程系列做成「教程书」（几篇按顺序组成一组、可以分章；文章页侧栏是全书目录和本页目录，读完的打勾、显示已读几篇，系列页有「继续阅读」；每个系列有自己的页面 `/series/…`）、图片库（浏览、搜索、复用上传过的图片，看每张用在哪篇，没用的一键清理）、仪表盘近 30 天阅读趋势与热门教程（含读完率和读者反馈好评率）、阅读来源（百度 / 微信 / 直接访问…）、读者搜了什么和「没搜到结果」的词（选题清单）、读者留言收件箱、Markdown 导入导出、首页「从这里开始」入门路线（展示选定的系列）、邮件订阅管理（发信设置加密保存、测试邮件、订阅者列表）、教程列表按标题搜索和按状态/分类筛选、可编辑的「关于本站」页面、分类树管理（最多三级、防循环依赖）、站点设置可视化编辑、账号安全；**多人协作**（站长 / 编辑 / 作者三种角色，作者只能管自己的教程，文章页显示作者署名）
-- **SEO 与健壮性**：动态 sitemap / robots、canonical、逐页 OpenGraph/Twitter 分享卡片（没有封面的文章自动生成「标题 + 分类」分享图，字体随项目打包，生成时不访问外网）、标签页（`/tags`，相关教程优先按共同标签推荐；只有一篇教程的标签页不收录）、系列页（`/series`，带 CreativeWorkSeries 结构化数据，只有一篇的系列不收录）、搜索结果显示关键词所在的那段正文、关于页（`/about`）、Article/面包屑/WebSite 结构化数据、后台填写 Google/Bing/百度/360/搜狗/神马/Yandex 站长验证码、真实 404 状态码、越界分页自动收敛、空/加载/错误状态齐全
-- **搬家导入**：后台「教程管理 → 批量导入」一次导入 Hexo、Hugo、Jekyll、Obsidian 等 Markdown 文件夹，或 WordPress 导出文件：保留发布时间、标签和分类，文件夹里的图片和外链图片一起搬到本站，默认存为草稿，导入后生成旧地址的 301 跳转规则，搜索引擎收录不断
-- **站点定制**：站名、Logo 图片、网站图标、默认分享图、主题色（按钮 / 链接 / 图表 / 分享图一起换色，自动保证对比度）、吉祥物开关、首页文案、顶部导航的自定义链接（关于、友链、交流群等）、页脚都在后台改，不用动代码，也不会挡住一键更新；第一次打开后台在安装页设置站名和站长账号；仪表盘的「上线检查清单」提示还没做的上线准备，示例数据一键清除；图片可以一键改从 CDN / 对象存储加载
-- **安全**：可吊销的服务端会话 + 两步验证（TOTP，含一次性恢复码）+ 通行密钥、敏感字段与备份加密、`security.txt`、受信任设备感知的登录限流、正文 HTML 白名单过滤、按文件头校验上传（不接受 SVG）、CSP/HSTS 等安全响应头（后台用每个请求一个 nonce 的严格 CSP）、后台安全日志、Server Actions / 接口 / 后台页面逐一鉴权（有测试保证新加的入口不会漏掉）、可选的 Cloudflare 人机验证（登录、订阅、留言）和 `robots.txt` 拒绝 AI 训练爬虫，接在 Cloudflare 后面时能拿到访客真实 IP，详见「安全加固」「接入 Cloudflare」
-
-## 做成你自己的教程网
-
-这是一个通用的教程站模板，放什么内容由你决定。部署后打开 `/admin`，在安装页设置站名和站长账号，再按仪表盘顶部的「上线检查清单」改站名和品牌、清除示例数据、改密码；原来在别的平台写过文章的，用「教程管理 → 批量导入」搬过来；更多定制方法（后台能改什么、改代码时动哪些文件、Fork 后怎么同步更新）见 [定制指南](docs/CUSTOMIZE.md)。
-
-当前版本见 [CHANGELOG.md](CHANGELOG.md)，后台侧栏底部也会显示正在运行的版本。参与开发请看 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
-
-## 本地运行
-
-```bash
-npm ci
-npx prisma generate
-npx prisma migrate deploy
-npx prisma db seed
-npm run dev
-```
-
-打开 `http://localhost:3000`，后台为 `/admin`。
-
-## 生产部署
-
-服务器要求：Node.js >= 22.12（推荐 24 LTS；Node 20 已于 2026 年 4 月停止维护）、npm、PM2。推荐使用项目根目录的脚本：
-
-```bash
-bash deploy.sh
-```
-
-脚本会按“安装依赖 → Prisma generate → migrate → seed → build → PM2 平滑重载”的顺序执行。迁移和种子数据必须在 `npm run build` 之前完成，否则静态主页可能把空数据库内容生成到 `.next` 中。
-
-不想装 Node 和 PM2 的话，也可以用 Docker 部署，见下文「Docker 部署」。
-
-### 升级 Node.js
-
-先用 `node -v` 查看版本，低于 22.12 时按下面升级（以 nvm 为例，也可以用系统包管理器安装 Node 24）：
-
-```bash
-nvm install 24 && nvm alias default 24
-npm install -g pm2            # nvm 下每个 Node 版本的全局包是分开的，需要重装 PM2
-pm2 info 教程网 | grep "exec cwd"   # 找到正在运行的目录（用过一键更新时在 .updates/releases/ 下）
-cd <上一步的 exec cwd>
-npm rebuild better-sqlite3    # SQLite 驱动是原生模块，换 Node 大版本后必须重新编译
-pm2 update                    # 让 PM2 守护进程改用新 Node 并恢复站点
-pm2 info 教程网 | grep "node.js version"   # 确认已是 24.x，再打开网站检查
-```
-
-之后的一键更新会在新 Node 下重新安装依赖，不需要再手动处理。
-
-### 环境变量
-
-在服务器设置 `.env.production`（完整模板和说明见 [`.env.example`](.env.example)，`cp .env.example .env.production` 后修改）：
-
-```dotenv
-DATABASE_URL="file:./prisma/dev.db"
-# 首次部署时的站长账号；不设置密码时第一次打开 /admin/setup 在网页上设置（见「首次安装」）
-# ADMIN_USERNAME="admin"
-# ADMIN_PASSWORD="一个强密码"
-# 会话签名密钥：必须替换为随机长字符串（openssl rand -base64 48），
-# 没设置或还是这里的占位值时，生产环境的后台会拒绝登录（Docker 部署直接拒绝启动）
-AUTH_SECRET="请替换为随机长字符串"
-# 登录 Cookie 的 Secure 标记：不设置时自动判断（经 HTTPS 访问即开启）；
-# 也可显式设为 true / false 覆盖
-# SESSION_COOKIE_SECURE="true"
-# 只有 Next 端口不对公网开放、所有请求都经过 Nginx/Caddy 时才设为 true，
-# 这样限流、安全日志和阅读量去重才会采用代理传来的真实访客 IP；
-# 网站接在 Cloudflare 后面时见下文「接入 Cloudflare」
-# TRUST_PROXY="true"
-# 站点对外地址（canonical、sitemap、分享卡片、结构化数据的绝对链接），生产环境必须设置，
-# 未设置或指向 localhost 时服务启动会打印警告，如：
-# SITE_URL="https://example.com"
-SITE_URL="http://localhost:3000"
-# 安全告警消息里的时间按哪个时区显示（默认北京时间）
-# ALERT_TIMEZONE="Asia/Shanghai"
-# 数据库里敏感字段（两步验证密钥、告警推送地址/Token）的加密密钥。不设置时由 AUTH_SECRET 派生；
-# 单独设置后更换 AUTH_SECRET（让所有登录失效）不会影响这些数据。设置后重启即自动重新加密。
-# DATA_ENCRYPTION_KEY="另一个随机长字符串（openssl rand -base64 48）"
-# 备份加密口令（至少 12 位）：设置后 npm run backup 输出加密的 .db.gz.enc。务必另外保管一份，丢了无法还原
-# BACKUP_PASSPHRASE="一个只用于备份的长口令"
-```
-
-`DATABASE_URL` 的相对路径以项目根目录为基准。PM2 配置已经固定 `cwd`，运行时和 Prisma CLI 会使用同一个数据库文件。
-
-### Docker 部署
-
-需要 Docker 和 Docker Compose（`docker compose version` 能输出版本即可）。默认直接拉取 GitHub 自动构建好的镜像 `ghcr.io/vow132/tutorial-site`（amd64 和 arm64 都有，树莓派、ARM 云服务器也能用；下载约 100MB，只带网站运行用到的文件），服务器上不用装 Node、不用构建：
+推荐方式。需要 Docker 和 Docker Compose，服务器上不用装 Node、不用构建，镜像 `ghcr.io/vow132/tutorial-site` 支持 amd64 和 arm64：
 
 ```bash
 git clone https://github.com/vow132/tutorial-site.git && cd tutorial-site
 cp .env.example .env
 # 编辑 .env：SITE_URL 改成正式地址，AUTH_SECRET 换成 openssl rand -base64 48 的输出
 docker compose up -d
-docker compose logs -f app     # 看到 Ready 就启动好了；日志里有安装地址和安装码，打开它设置站名和站长账号
+docker compose logs -f app     # 看到 Ready 就启动好了，日志里有安装地址和安装码
 ```
 
-只需要仓库里的 `docker-compose.yml` 和 `.env.example` 两个文件，不想克隆整个仓库的话下载这两个文件放在同一个目录里即可。
+只需要 `docker-compose.yml` 和 `.env.example` 两个文件，不克隆仓库也行。
 
-- 第一次启动会自动建库并写入示例数据，然后打开日志里的 `/admin/setup` 地址完成安装（见「首次安装」）；之后的启动只执行数据库迁移，不会再写入示例数据。
-- 数据都在 `./docker-data/` 下（`db` 数据库、`uploads` 上传图片、`backups` 备份），更新镜像、重建容器都不会丢。
-- 端口只绑定在 `127.0.0.1:3000`，请在前面用 Nginx / Caddy 配置 HTTPS 反向代理（见「安全加固」），并在 `.env` 里设置 `TRUST_PROXY=true`。用示例 Nginx 配置时，把 `/uploads/` 的 `alias` 改成 `/path/to/tutorial-site/docker-data/uploads/`。
-- 改了 `.env`（比如换域名）后执行 `docker compose up -d`，容器会按新设置重建。
-- 想固定在某个版本：在 `.env` 里设置 `TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:1.4.0`（`latest` 跟随 master 最新代码，和一键更新一致）。
+- 数据都在 `./docker-data/`（数据库、上传图片、备份），更新镜像、重建容器都不会丢。
+- 端口只绑定 `127.0.0.1:3000`，前面用 Nginx / Caddy 配 HTTPS（见「安全加固」），并在 `.env` 里设 `TRUST_PROXY=true`。用示例 Nginx 配置时把 `/uploads/` 的 `alias` 改成 `…/docker-data/uploads/`。
+- 改了 `.env` 后执行 `docker compose up -d` 生效；想固定版本就设 `TUTORIAL_IMAGE=ghcr.io/vow132/tutorial-site:<版本>`。
+- 运维命令要以 `node` 用户在容器里执行：`docker compose exec -u node app npm run backup`（用 root 执行会让数据库文件变成 root 所有，网站就写不进去了）。
+- 定时备份：宿主机 crontab 加 `17 3 * * * cd /path/to/tutorial-site && docker compose exec -T -u node app npm run backup`，再把 `docker-data` 同步到异地。
 
-更新到新版本（Docker 部署不使用后台的一键更新）：
+更新：`docker compose pull && docker compose up -d`。
+
+改过代码或拉不到 ghcr.io 时自己构建：`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`（npm 默认走 npmmirror，Debian 软件包慢时设 `APT_MIRROR=mirrors.aliyun.com`）。Fork 后在自己仓库启用 Actions，每次推送 master 会自动构建 `ghcr.io/<你的用户名>/tutorial-site`。
+
+## PM2 部署
+
+需要 Node.js ≥ 22.12（推荐 24 LTS）、npm、PM2：
 
 ```bash
-docker compose pull
-docker compose up -d
+git clone https://github.com/vow132/tutorial-site.git && cd tutorial-site
+cp .env.example .env.production   # 按里面的说明填写
+bash deploy.sh                    # 安装依赖 → 迁移 → 种子数据 → 构建 → PM2 启动
 ```
 
-**自己构建镜像**（改过代码，或者服务器拉不到 ghcr.io）：
+以后再执行 `bash deploy.sh` 时，站点照常服务，只在迁移正式数据库的几秒内停站。
+
+### 升级 Node.js
+
+`node -v` 低于 22.12 时（以 nvm 为例）：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
-# 以后更新：git pull，再执行同一条命令
+nvm install 24 && nvm alias default 24
+npm install -g pm2                          # nvm 下每个 Node 版本的全局包是分开的
+pm2 info 教程网 | grep "exec cwd"          # 找到正在运行的目录，cd 进去
+npm rebuild better-sqlite3                  # 原生模块，换 Node 大版本后要重新编译
+pm2 update                                  # PM2 改用新 Node 并恢复站点
 ```
 
-自己构建时 npm 默认走 npmmirror；拉 Debian 软件包慢时在 `.env` 里设置 `APT_MIRROR=mirrors.aliyun.com`；拉不到 `node:24-bookworm-slim` 基础镜像时请给 Docker 配置镜像加速器。Fork 之后在自己仓库的 Actions 页面启用工作流，以后每次推送到 master，GitHub 会自动把你的代码构建成 `ghcr.io/<你的用户名>/tutorial-site`，在 `.env` 里用 `TUTORIAL_IMAGE` 指过去就行（第一次构建后要在 GitHub 的 Packages 页面把镜像设为 Public，或者在服务器上 `docker login ghcr.io`）。
+### 一键更新
 
-运维命令要以 `node` 用户在容器里执行（用 root 执行会让数据库文件变成 root 所有，网站随后就写不进去了）：
+PM2 部署的站点可以在后台更新：仪表盘右上角圆点变黄表示有新版本，点它并再次输入密码即可。更新在独立进程里执行（下载 → 安装 → 对数据库副本迁移并构建 → 备份 → 切换 → 健康检查，失败自动回滚），切换时只中断几秒，不会运行种子数据。要求 Linux、单个 PM2 进程（默认名 `教程网`）、Git 部署且 `origin` 是本仓库、服务器能访问 GitHub 和 npm。设 `SITE_AUTO_UPDATE="false"` 可关闭。
 
-```bash
-docker compose exec -u node app npm run backup          # 备份到 docker-data/backups
-docker compose exec -u node app npm run admin:reset     # 忘记密码时重置管理员
-```
+第一次一键更新后 PM2 改用 `.updates/active.config.cjs` 启动，以后手动重启请用 `pm2 startOrReload .updates/active.config.cjs --update-env`。Fork 后改过代码的站点请按 [定制指南](docs/CUSTOMIZE.md) 手动合并更新。
 
-定时备份可以在宿主机的 crontab 里加 `17 3 * * * cd /path/to/tutorial-site && docker compose exec -T -u node app npm run backup`，再把整个 `docker-data` 目录同步到异地。
+## 首次安装
 
-### 后台 GitHub 入口与一键更新
+部署好后打开 `https://你的域名/admin`，会自动来到安装页：填安装码、站点名称、站长账号，选网站语言，可以保留示例教程看效果，也可以从空白开始。
 
-仪表盘右上角「写教程」旁的 GitHub 图标会打开 `vow132/tutorial-site`。右上角圆点每 5 分钟检测一次仓库的 `master` 分支：绿色表示无需更新，黄色表示有新版本，点击黄色圆点并**再次输入管理员密码**后提交更新任务（部署会在服务器上执行新代码，即使会话有效也要二次确认，并记入安全日志）；灰色表示正在检测或无法自动更新，红色表示失败，点击可查看原因。更新中的黄色圆点会显示当前步骤，成功后页面自动刷新。
+安装码防止别人抢先注册站长，只出现在服务器的启动日志里（搜「安装码」或 `Setup code`）：`docker compose logs app` 或 `pm2 logs 教程网`；找不到时运行 `npm run setup:code`（Docker：`docker compose exec -u node app npm run setup:code`）。
 
-一键更新适用于 **Linux + 单个 PM2 fork 模式进程** 的 Git 部署，默认进程名称为 `教程网`，需要 Git、npm、目录写入权限以及 GitHub / npm 网络访问，并且服务器上的 `origin` 必须是本仓库（Fork 后改过代码的站点请按[定制指南](docs/CUSTOMIZE.md)手动合并更新）。本地开发、Windows、Docker 或无 Git 的部署只检测版本或不提供一键更新。服务器存在未提交修改、运行版本与 Git 目录不一致、仓库历史分叉时，会停止自动更新。
+也可以跳过安装页：部署前在环境变量里设 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`。
 
-可选服务器环境变量（`.env.production`）：
+装好以后按仪表盘顶部的「上线检查清单」走一遍：改站名和品牌、清除示例数据、开两步验证、配备份。
 
-```dotenv
-SITE_AUTO_UPDATE="true"        # 设为 false 可关闭一键更新
-SITE_UPDATE_BRANCH="master"   # 要检测和部署的仓库分支
-SITE_PM2_APP_NAME="教程网"      # 已运行的单个 PM2 进程名称
-# GITHUB_TOKEN="..."          # 可选，只在服务端使用，提升 GitHub API 检测额度
-# SITE_UPDATE_REQUIRE_SIGNED="true"  # 可选，只部署通过 git verify-commit 校验的签名提交
-```
+## 环境变量
 
-开启 `SITE_UPDATE_REQUIRE_SIGNED` 前需在服务器上配置可信的 GPG 公钥或 SSH `gpg.ssh.allowedSignersFile`，并确保仓库提交都已签名。
+完整模板和说明见 [`.env.example`](.env.example)（Docker 用 `.env`，PM2 用 `.env.production`）。
 
-GitHub API 令牌仅用于版本检测；拉取源码使用服务器已配置的 Git 凭据。当前公共仓库无需凭据。生产构建会记录 Git 提交，检测时比较正在运行的构建版本，不能仅靠 `git pull` 改变版本圆点。
+| 变量 | 说明 |
+| --- | --- |
+| `SITE_URL` | **必填**，站点对外地址，如 `https://example.com` |
+| `AUTH_SECRET` | **必填**，随机长字符串（`openssl rand -base64 48`）；没设或是示例里的占位值时后台拒绝登录 |
+| `TRUST_PROXY` | 在 Nginx / Caddy 后面时设 `true`，才能拿到访客真实 IP；接在 Cloudflare 后面见「接入 Cloudflare」 |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | 可选，第一次启动时直接建好站长账号 |
+| `DATA_ENCRYPTION_KEY` | 可选，数据库敏感字段的加密密钥，不设时由 `AUTH_SECRET` 派生 |
+| `BACKUP_PASSPHRASE` | 可选，备份加密口令（至少 12 位），务必另外保管 |
+| `ALERT_TIMEZONE` | 可选，告警消息里的时区，默认 `Asia/Shanghai` |
+| `DATABASE_URL` | PM2 部署的数据库位置，默认 `file:./prisma/dev.db` |
 
-更新任务在独立进程中执行：下载固定提交 → 安装依赖 → 对数据库副本迁移并构建 → 暂停旧服务 → 备份最新数据库 → 对真实数据库迁移 → 切换 PM2 → 检查版本和服务健康。构建期间原网站继续运行，切换期间会短暂中断；切换失败会尝试恢复数据库和原版本，并验证恢复后的服务。更新不会运行 seed，已有教程、账号和设置保留；上传目录始终共享原项目的 `public/uploads`。
+## 日常运维
 
-更新状态和日志在 `.updates/status.json`、`.updates/worker.log`。发布目录、数据库备份与旧 PM2 配置也保存在 `.updates/`，供手动恢复；这些文件含站点数据或环境配置，请限制权限。每次更新成功后自动清理：除正在运行的版本和回滚目标外只保留最近 2 个发布目录，数据库备份与旧 PM2 配置各保留最近 5 份。
+Docker 部署在命令前加 `docker compose exec -u node app`。
 
-**首次自动更新后，PM2 使用 `.updates/active.config.cjs` 启动新版本**，并通过 `pm2 save` 持久化。以后手动启动请使用：
+| 命令 | 作用 |
+| --- | --- |
+| `npm run backup` | 在线备份数据库到 `backups/`（保留 14 份；设了 `BACKUP_PASSPHRASE` 时加密）。不要直接复制 `.db` 文件，WAL 模式下最新数据可能还在 `-wal` 里 |
+| `npm run backup:restore -- <文件>` | 把备份解成独立的 `restored-….db` 并检查完整性，不动线上库，再按输出的步骤替换 |
+| `npm run admin:reset` | 忘记密码时用：重置站长密码、关闭两步验证、删除通行密钥、退出所有设备、关闭人机验证；可加 `-- --username admin --password '新密码'` |
+| `npm run uploads:clean` | 列出没被引用的上传图片，加 `-- --apply` 移到上传目录的 `.trash/`（后台「图片库」也能清理） |
+| `npm run setup:code` | 再看一次首次安装的安装码 |
+| `npm run images:variants` | 给老图片补生成响应式小图 |
 
-```bash
-pm2 startOrReload .updates/active.config.cjs --update-env
-```
+`/api/health` 返回服务和数据库状态（正常 200，异常 503），可以接 Uptime Kuma 等做宕机告警。
 
-原始 Git 工作目录不被自动更新覆盖；再次执行原目录的 `deploy.sh` 或 `ecosystem.config.cjs` 会部署原目录代码。`SITE_UPDATE_ROOT` 必须保持为原项目的绝对路径（初始 PM2 配置和更新脚本自动设置），数据库使用同一共享文件。
+## 安全加固（上线必做）
 
-运行全部单元测试（含更新模块与安全模块，不执行真实部署）：
+1. **HTTPS 反向代理，不要直接暴露 3000 端口。** 参考 [`deploy/nginx.conf.example`](deploy/nginx.conf.example)（HTTP 跳转 HTTPS、登录和搜索限流、公开页面缓存 1 分钟、更新期间返回缓存页而不是 502）。防火墙只放行 80/443，设置 `TRUST_PROXY="true"` 和 `SITE_URL="https://你的域名"`。
+2. **定期异地备份。** crontab 每天执行 `npm run backup`，把备份和上传目录同步到另一台机器或对象存储（如 rclone），建议设 `BACKUP_PASSPHRASE` 加密。
+3. **账号。** 用强密码，开两步验证（会给 10 个一次性恢复码）或通行密钥（需要 HTTPS + 域名访问）；GitHub 账号也开两步验证并保护 `master` 分支，因为一键更新部署的就是它。
+4. **安全告警。** 后台「账号安全 → 安全告警」选钉钉、飞书、企业微信、Telegram 或 Webhook：新设备登录、登录被锁、改密码 / 两步验证 / 通行密钥、一键更新结果、备份失败或超过 2 天没备份时推送。
+5. **漏洞报告入口。** 「站点设置 → 安全联系方式」填邮箱或网址，网站会提供 `/.well-known/security.txt`。
+6. **依赖。** Dependabot 每周提交依赖更新，及时合并。
 
-```bash
-npm test
-```
+后台「安全日志」记录登录、改密、发布、上传、部署等操作，保留一年。
 
-端到端测试（Playwright，在真实浏览器里走一遍前台页面、SEO 输出、后台发文/改 slug/删除与缓存失效、站点设置、安全响应头）。测试会新建并删除 `e2e-` 前缀的教程，**只对开发/测试数据库运行**；CI 会在 Node 24 上自动执行：
-
-```bash
-npx playwright install chromium   # 首次运行前安装浏览器
-npm run build
-E2E_ADMIN_PASSWORD='你的后台密码' npm run test:e2e   # 默认读取 ADMIN_USERNAME / ADMIN_PASSWORD，未设置时用 admin / admin123456
-```
-
-### 邮件订阅（可选）
-
-读者在文章页或 `/subscribe` 留下邮箱，点确认邮件里的按钮后，每篇新教程发布（包括定时发布）时会收到一封提醒，每篇只发一次，邮件里带一键退订。需要一个能用 SMTP 发信的服务（阿里云邮件推送、腾讯云 SES、企业邮箱等）：
-
-1. 在服务商那里验证发件域名，并按提示添加 SPF / DKIM 解析记录，否则邮件容易进垃圾箱；
-2. 后台「邮件订阅」填写 SMTP 服务器、端口（465 勾选 SSL/TLS，587 不勾）、用户名、密码 / 授权码、发件人邮箱，保存后点「发送测试邮件」确认能收到；
-3. 勾选「开启邮件订阅」，文章页和页脚就会出现订阅框。
-
-发信配置加密保存在数据库里（和告警配置一样，密钥来自 `AUTH_SECRET` / `DATA_ENCRYPTION_KEY`），页面不回显密码。退订会直接删除这条订阅；7 天内没确认的订阅自动清除。上线这个功能之前已经发布的教程不会补发通知。
-
-### 首次安装
-
-部署好以后，打开 `https://你的域名/admin`，会自动来到安装页 `/admin/setup`：填站点名称、站长用户名和密码，就直接进入后台了（可以选择保留示例教程先看看效果，或者从空白开始）。
-
-安装页要输入**安装码**，防止有人抢在你前面把站长账号注册走。安装码只出现在服务器的启动日志里（搜「安装码」）：Docker 用 `docker compose logs app`，PM2 用 `pm2 logs 教程网`；找不到时在服务器上运行 `npm run setup:code`（Docker：`docker compose exec -u node app npm run setup:code`）。装好以后安装页自动关闭。
-
-也可以跳过安装页：部署前在 `.env` 里设置 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD`，第一次启动时直接建好站长账号；或者在服务器上运行 `npm run admin:reset -- --username admin --password '强密码'`。
+## 可选功能
 
 ### 多人协作
 
-站长在后台「账号管理」给每个写教程的人开账号，三种角色：
+站长在「账号管理」给每个人开账号（初始密码随机生成、只显示一次）：
 
 | 角色 | 能做什么 |
 | --- | --- |
-| 站长 | 全部，包括站点设置、账号管理、邮件订阅、安全日志、安全告警、一键更新 |
-| 编辑 | 所有教程、分类、标签、系列、关于页、读者留言、批量导入 |
+| 站长 | 全部，包括站点设置、账号管理、邮件订阅、安全日志、一键更新 |
+| 编辑 | 所有教程、分类、标签、系列、关于页、读者留言、批量导入、图片库 |
 | 作者 | 只能写、改、发布、删除自己的教程 |
 
-新账号的初始密码由系统随机生成、只显示一次，转交本人后让他在「账号安全」里改掉（每个人都能单独开两步验证、加通行密钥）。站长也可以帮人重置密码（同时清掉他的两步验证和通行密钥）、改角色、删除账号（他的教程转到站长名下）。
+文章页显示每个人在「账号安全」里填的署名，登录用户名不会出现在前台。
 
-每个人可以在「账号安全」里填**署名**，文章页显示「作者 署名」，结构化数据和 RSS 里也会带上；不填就不显示，登录用户名不会出现在前台。编辑和站长可以在教程表单里改一篇教程的作者。
+### 多语言
 
-### 图片加速（可选）
+界面有简体中文、English、Русский、日本語四种：
 
-图片多、访问量大时，可以让前台图片从 CDN 或对象存储加载：在「站点设置 → 图片加速」填一个加速域名，点「测试」通过后保存即可。图片文件仍存在本站，加速服务第一次被访问时自动回本站取图，所以不用搬文件、不用在网站里填云服务的密钥，随时清空就能恢复：
+- **网站语言**（「站点设置 → 网站语言」）：前台所有界面文字、RSS、邮件、告警消息用这种语言。换语言时，还是默认值的站名、首页文案、页脚会一起换成新语言的默认值，改过的保留。
+- **后台语言**：每个管理员在侧栏底部（或登录页）自己选，存在自己的浏览器里，不影响别人和前台。
 
-- **CDN**（阿里云 CDN、腾讯云 CDN、Cloudflare 等）：添加加速域名（如 `img.example.com`），源站填本站域名；
-- **阿里云 OSS**：建一个公共读的 Bucket，开启「镜像回源」并把回源地址设为本站域名，绑定自己的域名后填进来；
-- **腾讯云 COS**：建一个公共读的存储桶，开启「回源设置」指向本站域名。
+教程内容本身用什么语言写由你决定；示例教程是中文的，可以在仪表盘一键清除。
 
-### 评论（可选）
+### 邮件订阅
 
-本站自己不存评论（国内跟帖评论有实名和审核要求）。想要评论区，在后台「站点设置 → 评论」选一个第三方评论服务，评论存在你自己的服务里，审核、反垃圾在那边设置：
+需要一个 SMTP 发信服务（阿里云邮件推送、腾讯云 SES、企业邮箱等）。先在服务商那里验证发件域名并加好 SPF / DKIM，再在后台「邮件订阅」填 SMTP 信息、发测试邮件、勾选开启。读者双重确认后订阅，每篇新教程（含定时发布）只发一次，邮件里带一键退订。
 
-- **Waline**、**Twikoo**：自己部署服务端（Vercel、Docker 等），填它的地址；前端脚本从 npmmirror / unpkg / jsDelivr 加载（固定版本）。
-- **Artalk**：自己部署（Docker），填地址和站点名；前端脚本由 Artalk 服务端提供。
-- **Giscus**：评论存在 GitHub 仓库的 Discussions 里，读者用 GitHub 账号登录（国内访问可能较慢），在 giscus.app 生成配置后把四个值填进来。
+### 评论
 
-评论区放在文末，读者滚动到附近才加载（不读评论的人不用下载评论脚本）。评论组件跑在一个单独的小页面里（`/comments/frame`），那个页面的内容安全策略只放行你选的服务，文章页本身的不变。演示站不显示评论。
+本站不存评论。在「站点设置 → 评论」选 Waline、Twikoo、Artalk（自己部署服务端）或 Giscus（GitHub Discussions），评论存在你自己的服务里。评论区在文末，读者滚到附近才加载。
 
-### 接入 Cloudflare（可选）
+### 图片加速
 
-**人机验证（Cloudflare Turnstile，默认关闭）。** 开启后，后台密码登录、邮件订阅和读者留言提交前都要先过 Cloudflare 的人机验证（大多数人不用点，自动通过），拦住批量猜密码、刷订阅邮件和刷留言的脚本。不需要把网站接入 Cloudflare 的 CDN：
+「站点设置 → 图片加速」填 CDN 或对象存储（阿里云 OSS 镜像回源、腾讯云 COS 回源）的域名，源站设为本站，点「测试」通过后保存。图片仍存在本站，不用搬文件，清空就恢复。
 
-1. 登录 Cloudflare 控制台 → Turnstile → 添加小组件，域名填本站域名，模式选「托管」（Managed）；
-2. 在后台「站点设置 → 人机验证」填 Site Key 和 Secret Key，勾选「开启」，等下方的验证通过后保存。保存前服务器会用 Secret Key 去 Cloudflare 核对这一次验证，密钥填错或服务器连不上 `challenges.cloudflare.com` 都保存不了，不会把自己锁在外面。
+### 接入 Cloudflare
 
-通行密钥登录不需要人机验证。读者打开订阅框或留言框时才加载 Cloudflare 的脚本，平时浏览文章不加载第三方脚本。国内访问 `challenges.cloudflare.com` 大多正常，偶尔会慢。万一开启后谁都登录不了，在服务器上运行 `npm run admin:reset`（Docker：`docker compose exec -u node app npm run admin:reset`），会同时关闭人机验证（密钥保留，登录后重新开启即可）。
+**人机验证（Turnstile）**：Cloudflare 控制台 → Turnstile → 添加小组件（模式选 Managed），把 Site Key 和 Secret Key 填进「站点设置 → 人机验证」，过一次验证后保存。之后密码登录、订阅、留言都要先过验证（通行密钥登录不需要）。网站不用接入 Cloudflare CDN 也能用。开启后万一登录不了，运行 `npm run admin:reset` 会同时关掉它。
 
-**网站接在 Cloudflare 后面（橙色云朵）时，先把真实 IP 配好。** 不配的话网站看到的都是 Cloudflare 节点的 IP：登录限流、留言限流、阅读去重会把所有访客当成同几个人（一个人输错密码被锁，大家都登不上），安全日志里的 IP 也没用。二选一：
+**网站接在 Cloudflare 后面（橙色云朵）时，先把真实 IP 配好**，否则所有访客都像同几个 IP，登录限流会互相影响。二选一：
 
-- **推荐：在 Nginx 里还原真实 IP。** 打开 [`deploy/nginx.conf.example`](deploy/nginx.conf.example) 里「接在 Cloudflare 后面时」那段注释（`real_ip_header CF-Connecting-IP` + Cloudflare 的 IP 段，以 <https://www.cloudflare.com/ips/> 为准），`.env` 里仍然是 `TRUST_PROXY="true"`。这样 Nginx 自己的登录、搜索限流也按真实 IP 算。
-- **没有 Nginx、Cloudflare 直接连 Next：** 设置 `TRUST_PROXY="cloudflare"`，网站直接读 Cloudflare 写入的 `CF-Connecting-IP`。
+- 推荐：打开 [`deploy/nginx.conf.example`](deploy/nginx.conf.example) 里「接在 Cloudflare 后面时」那段（`real_ip_header CF-Connecting-IP` + [Cloudflare 的 IP 段](https://www.cloudflare.com/ips/)），`TRUST_PROXY="true"`；
+- 没有 Nginx、Cloudflare 直连 Next：`TRUST_PROXY="cloudflare"`。
 
-两种方式都要求源站只让 Cloudflare 访问（防火墙只对 Cloudflare 的 IP 段放行 80/443），否则别人绕过 Cloudflare 直连源站就能伪造 IP。Cloudflare 的 SSL/TLS 模式选「完全（严格）」（Full (strict)），`SITE_URL` 写 `https://你的域名`。配好后后台仪表盘的上线检查清单会检查拿到的是不是真实 IP。
+两种都要求防火墙只对 Cloudflare 的 IP 段放行 80/443；SSL/TLS 模式选 Full (strict)。上线检查清单会检查拿到的是不是真实 IP。
 
-**防爬。** 公开的内容浏览器能看到，程序就能抓到，能做的是提高成本：
+**防爬**：「站点设置 → 防爬」可以在 `robots.txt` 里拒绝 GPTBot、ClaudeBot、CCBot 等 AI 训练爬虫（搜索引擎照常收录），复制大段正文时附上来源。真正拦住批量抓取要在 Cloudflare 打开 Bot Fight Mode、「阻止 AI 机器人」，并加速率限制规则（如 `/tutorials/` 开头、同一 IP 10 秒超过 10 次 → 托管质询），Hotlink Protection 防盗链。不用 Cloudflare 的，Nginx 示例配置里有按 IP 限制文章页频率的写法。
 
-- 后台「站点设置 → 防爬」（默认都关闭）：「拒绝 AI 训练爬虫」在 `robots.txt` 里拒绝 GPTBot、ClaudeBot、CCBot、Bytespider 等抓内容训练大模型的爬虫，百度、Google、必应等搜索引擎和 AI 搜索照常收录（守规矩的爬虫会遵守）；「复制正文时附上来源」在读者复制一大段正文（50 字以上）时自动加上标题和原文链接，复制代码不加。
-- Cloudflare 后台（菜单名称以实际为准）：
-  - 安全性 → 机器人：打开 **Bot Fight Mode**，以及「阻止 AI 机器人」（Block AI bots / AI Crawl Control），拦不守规矩的爬虫；
-  - 安全性 → WAF → **速率限制规则**：例如「URI 路径以 `/tutorials/` 开头、同一 IP 10 秒内超过 10 次 → 托管质询（Managed Challenge）」，套餐没有质询选项时选「阻止」。只匹配文章页，不要包含 `/_next/static/`、`/uploads/` 这些静态资源；免费套餐只能按 10 秒统计；
-  - Scrape Shield → **Hotlink Protection**：别的网站不能直接引用本站图片。
-- 不用 Cloudflare 的，[`deploy/nginx.conf.example`](deploy/nginx.conf.example) 里有按 IP 限制文章页访问频率的示例（注释掉的 `tutorial_pages_rl`），数值放宽一些，免得误伤搜索引擎的爬虫。
+### 演示站
 
-### 图片库
+想公开展示后台：单独部署一份，在 `.env` 里加上要公开的演示账号和 `DEMO_MODE="true"`：
 
-后台「图片库」列出上传过的所有图片：每张显示用在哪篇教程、历史版本或设置里，可以复制地址复用；编辑器的「图片库」按钮可以直接挑一张插进正文。没被引用的可以删除，或者一键清理（最近 7 天上传的会跳过，可能在还没保存的草稿里）。删除不是真删：文件移到上传目录里的 `.trash/`，有问题移回来即可，确认没问题再自己删掉。站长和编辑能用。
-
-### 演示站（可选）
-
-想公开展示这套程序、让别人看看后台长什么样，可以单独部署一份并打开演示模式。
-
-**全新部署（一步）**：照「Docker 部署」准备好 `.env`，再加上公开的演示账号和演示模式，启动后就是一个带示例教程、后台只读的演示站：
-
-```bash
-SITE_URL="https://demo.example.com"
-AUTH_SECRET="用 openssl rand -base64 48 生成"
+```dotenv
 ADMIN_USERNAME="demo"
 ADMIN_PASSWORD="一个只用于演示站的密码"
 DEMO_MODE="true"
 ```
 
-想换成自己的演示内容、品牌：先注释掉 `DEMO_MODE` 重启（`docker compose up -d`），用上面的账号登录后台写好或批量导入，再打开 `DEMO_MODE` 重启。
+演示模式下登录页填好账号，后台什么都能看，但保存、上传、删除、改密码、一键更新都不生效；读者留言、搜索词不入库，邮件订阅关闭，其他访客的 IP 打码。想换演示内容时先注释掉 `DEMO_MODE` 重启，改好再打开。**正式站不要开**，开了等于公开后台密码。
 
-**把已有的站改成演示站**：
-
-1. 把管理员密码改成要公开的演示密码，同时关掉两步验证、删掉通行密钥：`npm run admin:reset -- --password 演示密码`（Docker：`docker compose exec -u node app npm run admin:reset -- --password 演示密码`）；
-2. 在 `.env`（PM2 部署是 `.env.production`）里加上 `DEMO_MODE="true"`，`ADMIN_PASSWORD` 改成同一个演示密码，然后重启网站（Docker：`docker compose up -d`）。
-
-演示模式下：
-
-- 前台顶部和登录页显示演示账号，登录页已经填好，访客点「登录」就能进后台；
-- 后台每个页面都能看，但保存、上传、删除、改密码、两步验证、一键更新都会被拒绝（页面上直接提示，服务端也拦着），所以演示数据不会被改乱，不需要定时重置；
-- 读者留言直接丢弃、不统计搜索词和来源网站、关闭邮件订阅：后台对所有人开放，不能让陌生人写的字展示给别人，也不能让人借演示站给任意邮箱发信。阅读量和「有帮助吗」照常计数；
-- 后台里其他访客的 IP 只显示前两段，登录失败时填的用户名不显示。
-
-演示模式只用在专门的演示站上：正式站打开它，等于把后台密码公开了。
-
-## 账号安全
-
-登录后台后进入侧栏 **账号安全**（`/admin/account`），每个账号管理自己的：
-
-- 修改用户名或密码都需要输入当前密码确认；
-- 新密码至少 10 位，且不能是常见弱口令或包含用户名；仍在使用默认/弱密码登录时会被直接带到这里；
-- 保存后当前浏览器保持登录，**其他设备上的登录全部失效**；
-- **两步验证**：用验证器 App 扫码并输入 6 位数字即可开启，之后登录需要密码 + 验证码。开启时会显示 10 个**一次性恢复码**（只显示这一次，请存到密码管理器或打印），手机丢失时在登录页验证码处输入任意一个即可登录；用恢复码登录会推送告警，剩余数量显示在账号安全页，可随时重新生成（旧的全部作废）。验证器密钥加密存库（见 `DATA_ENCRYPTION_KEY`）；
-- **通行密钥（Passkey）**：用指纹、面容、手机或 USB 安全密钥登录，不用输入用户名和密码，钓鱼网站也骗不走。添加时需要输入当前密码；通行密钥本身包含「设备 + 生物识别/PIN」两重验证，用它登录时不再要求两步验证码，密码登录照常可用。通行密钥绑定 `SITE_URL` 的域名，要求站点走 HTTPS、用域名访问（不能是 IP），更换域名后需要重新添加；
-- **登录设备**：列出所有未过期的会话，可一键「退出其他设备」或「退出所有设备」。退出登录会删除服务端会话，复制走的 Cookie 立即失效。
-
-登录限流只统计失败次数：
-
-- 曾在本浏览器登录成功过的「受信任设备」单独计数（15 分钟 5 次），攻击者刷错密码锁不住管理员常用的浏览器；
-- 陌生设备按用户名（15 分钟 10 次）、IP（配置 `TRUST_PROXY` 后，15 分钟 20 次）和全站总量（5 分钟 100 次）计数；
-- 可选开启 Cloudflare 人机验证（见「接入 Cloudflare」），脚本批量猜密码之前先要过验证。
-
-忘记密码，或手机丢失且恢复码也不可用时，在服务器项目目录执行：
+## 本地开发
 
 ```bash
-npm run admin:reset                       # 重置第一个站长：随机生成新密码并打印
-npm run admin:reset -- --password '新的强密码' --username admin
+npm ci
+npx prisma generate
+npx prisma migrate deploy
+npx prisma db seed
+npm run dev        # http://localhost:3000，后台 /admin，账号 admin / admin123456
 ```
 
-多人协作时，编辑、作者忘记密码可以由站长在「账号管理」里重置，不用登服务器。该命令会重置密码、关闭两步验证（连同恢复码）、删除所有通行密钥并退出所有设备，开启了人机验证时一并关闭；网站里一个站长都没有时（比如直接改过数据库），被重置的账号同时恢复为站长。更换了 `AUTH_SECRET` 又没有单独设置 `DATA_ENCRYPTION_KEY` 时，旧的两步验证密钥会无法解密（登录页会提示），用恢复码登录或运行此命令即可。后台 **安全日志**（`/admin/audit`）记录登录、改密、发布、上传、部署等操作，保留一年。
+测试：`npm test`（单元测试）；`npm run build && npm run test:e2e`（Playwright 端到端测试，会新建和删除 `e2e-` 开头的数据，只对开发数据库运行）。
 
-## 安全加固（上线必做）
+## 文档
 
-**1. HTTPS 反向代理，不要直接暴露 3000 端口。** 完整的 Nginx 配置见 [`deploy/nginx.conf.example`](deploy/nginx.conf.example)：复制到 `/etc/nginx/conf.d/tutorial.conf`，替换域名、证书和项目路径后 `sudo nginx -t && sudo systemctl reload nginx`。它包含：
-
-- HTTP 跳转 HTTPS、登录和搜索按 IP 限流、上传图片由 Nginx 直接读磁盘；
-- **公开页面缓存**：首页、教程列表/文章、分类、标签、关于页、RSS、sitemap 由 Nginx 缓存 1 分钟（文章分享图按版本长期缓存），大部分访问不再经过 Node。后台修改文章后访客最多晚 1 分钟看到；后台、搜索、接口、表单提交和站内点击跳转时的数据请求（带 `RSC` 请求头）都不走缓存。响应头 `X-Cache-Status` 可看到 HIT / MISS / STALE；
-- **更新不掉线**：Node 重启或一键更新切换期间，缓存过的页面继续返回（最长兜底 7 天），没缓存的页面显示「站点正在更新」提示（HTTP 503 + `Retry-After`），而不是 502 错误页；
-- 已在 Ubuntu 24.04 自带的 Nginx 1.24 上验证（`http2` 写在 `listen` 里，1.25 之前的版本不认识单独的 `http2 on;`）。
-
-然后：防火墙只放行 80/443（如 `ufw deny 3000`），在 `.env.production` 中设置 `TRUST_PROXY="true"` 与 `SITE_URL="https://你的域名"`。经 HTTPS 访问时站点会自动下发 HSTS、给 Cookie 加 Secure 标记。
-
-**2. 定期异地备份。** `npm run backup` 会在线备份 SQLite 到 `backups/`（gzip 压缩，默认保留 14 份，`BACKUP_DIR` / `BACKUP_KEEP` 可调）。备份要同步到异地，建议在 `.env.production` 设置 `BACKUP_PASSPHRASE`，备份会加密为 `.db.gz.enc`（scrypt + AES-256-GCM，文件被改动会被发现），备份泄露也看不到数据；口令请另外保管一份，丢了无法还原。建议加入 crontab，并把备份和上传目录同步到另一台机器或对象存储：
-
-```cron
-17 3 * * * cd /path/to/tutorial-site && npm run backup >> backups/backup.log 2>&1
-47 3 * * * rclone sync /path/to/tutorial-site/backups remote:tutorial-backups && rclone sync /path/to/tutorial-site/public/uploads remote:tutorial-uploads
-```
-
-本次升级之前上传的图片缺少部分响应式小图（列表缩略图用的 400px 小图是新增的），部署后执行一次 `npm run images:variants` 补生成（可重复执行，已有的会跳过），然后重启站点；旧文章的列表缩略图会在站点启动时自动补上。
-
-再次执行 `bash deploy.sh` 时如果站点正在运行，脚本会先对数据库快照执行迁移并构建（站点照常服务），最后只在迁移正式数据库的几秒内停站。生产数据库使用 SQLite WAL 模式，`prisma/` 下会有 `dev.db-wal`、`dev.db-shm`，最新的写入可能还在 `-wal` 里，所以不要直接复制 `dev.db` 当备份，请用 `npm run backup`（数据库需放在本地磁盘，WAL 不支持 NFS 等网络文件系统）。
-
-恢复备份：`npm run backup:restore -- backups/tutorial-xxx.db.gz.enc`（普通 `.db.gz` 也可以；加密备份需要同样的 `BACKUP_PASSPHRASE`，换机器还原时可写在命令前面）。它只把备份解出为一个独立的 `restored-….db` 并做完整性检查，不会动正在使用的数据库，随后按输出的步骤停站、删除 `-wal`/`-shm`、替换数据库文件再启动。前台的分类、设置缓存最多 1 小时后自动刷新，想立即生效可在后台随便保存一次站点设置和分类。
-
-**3. 账号。** 首次登录后立即修改密码并开启两步验证；GitHub 账号同样开启两步验证并为 `master` 设置分支保护，因为一键更新会部署该分支的最新提交。不需要在线更新的部署可设置 `SITE_AUTO_UPDATE="false"`。
-
-**4. 依赖。** CI 会单独运行 `npm audit`，Dependabot 每周提交依赖更新 PR，请及时合并。
-
-**5. 安全告警。** 在后台「账号安全 → 安全告警」选择钉钉、飞书、企业微信群机器人、Telegram 或通用 Webhook，填好后点「发送测试消息」确认能收到。以下情况会实时推送：
-
-- 新设备登录后台（之前没在这个浏览器登录过）；
-- 连续输错密码导致登录被临时锁定；
-- 修改用户名/密码、开启或关闭两步验证、用恢复码登录或重新生成恢复码、添加或删除通行密钥、修改告警设置（会先通知原来的渠道）；
-- 一键更新成功或失败；
-- `npm run backup` 执行失败，或超过 2 天没有新备份（每天最多提醒一次，可在告警设置里关闭）。
-
-保存告警设置需要输入当前密码，防止会话被盗后被人悄悄关掉告警；推送地址、签名密钥和 Bot Token 加密存库。服务器需要能访问对应平台（如 `oapi.dingtalk.com`；国内服务器通常无法访问 Telegram）。推送失败不影响登录等操作，失败原因显示在告警设置上方。仪表盘会显示上次备份时间和告警是否已开启。
-
-**6. 漏洞报告入口。** 在后台「站点设置 → 安全联系方式」填写邮箱或网址，网站会按 RFC 9116 提供 `/.well-known/security.txt`，安全研究人员发现问题时知道该联系谁；留空则不提供。
-
-**7. 监控与磁盘。** `/api/health` 返回服务和数据库状态（正常 200，数据库异常 503，不缓存、不暴露版本号），可以接 Uptime Kuma、宝塔监控或云监控做宕机告警。删文章、换封面后旧图片会留在 `public/uploads`，定期运行 `npm run uploads:clean` 查看没人引用的图片（教程正文、封面、历史版本、设置里都没用到的），确认后加 `-- --apply` 移到上传目录里的 `.trash/`（后台「图片库」也能看和清理），最近 7 天上传的不动。
+- [定制指南](docs/CUSTOMIZE.md)：后台能改什么、改代码动哪些文件、Fork 后怎么同步更新
+- [CHANGELOG.md](CHANGELOG.md)：版本记录（后台侧栏底部显示正在运行的版本）
+- [CONTRIBUTING.md](CONTRIBUTING.md)：参与开发
+- [SECURITY.md](SECURITY.md)：私下报告安全问题

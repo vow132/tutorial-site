@@ -8,6 +8,7 @@ import { defaultComments, readComments, type CommentsSettings } from "@/lib/comm
 import { defaultAntiScrape, readAntiScrape, type AntiScrapeSettings } from "@/lib/anti-scrape";
 import { DEFAULT_LOCALE, LOCALES, readLocale, type Locale } from "@/lib/i18n/locales";
 import { messagesFor } from "@/lib/i18n/messages";
+import { LOCALIZED_TEXT_FIELDS } from "@/lib/locale-defaults";
 import {
   defaultBrand,
   defaultNavLinks,
@@ -127,21 +128,7 @@ export function defaultSettingsFor(locale: Locale): SiteSettings {
 
 export const defaultSettings: SiteSettings = defaultSettingsFor(DEFAULT_LOCALE);
 
-/** 换网站语言时会跟着换成新语言默认值的文字字段（还是旧语言默认值、站长没改过的才换） */
-export const LOCALIZED_TEXT_FIELDS = [
-  "siteName",
-  "logoText",
-  "siteTitle",
-  "siteDescription",
-  "heroBadge",
-  "heroTitleA",
-  "heroTitleB",
-  "heroAccent",
-  "heroSubtitle",
-  "footerTagline",
-  "copyright",
-  "footerStatus",
-] as const;
+export { LOCALIZED_TEXT_FIELDS };
 
 /** 这个值是不是某种语言的默认文字（站长还没改过） */
 export function isDefaultText(field: (typeof LOCALIZED_TEXT_FIELDS)[number], value: string): boolean {

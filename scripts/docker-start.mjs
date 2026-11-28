@@ -19,7 +19,9 @@ import { authSecretFrom } from "../lib/auth-secret.mjs";
 if (!authSecretFrom({ ...process.env, NODE_ENV: "production" })) {
   console.error(
     "❌ AUTH_SECRET 没有设置，或者还是 .env.example 里的占位值（等于把后台登录的签名密钥公开）。\n" +
-      "   请在 .env 里改成 openssl rand -base64 48 生成的随机字符串，然后执行 docker compose up -d",
+      "   请在 .env 里改成 openssl rand -base64 48 生成的随机字符串，然后执行 docker compose up -d\n" +
+      "❌ AUTH_SECRET is not set, or still the placeholder from .env.example (which would make the admin sign-in key public).\n" +
+      "   Set it in .env to a random string from openssl rand -base64 48, then run docker compose up -d",
   );
   process.exit(1);
 }

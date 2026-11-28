@@ -117,7 +117,9 @@ export default function RichTextEditor({
   const e = useAdminI18n().m.admin.editor;
   // useEditor 只初始化一次：占位文字、拖入上传的提示从 ref 读，切换后台语言后也是新的
   const textRef = useRef(e);
-  textRef.current = e;
+  useEffect(() => {
+    textRef.current = e;
+  }, [e]);
   const [html, setHtml] = useState(initialContent);
   const [dragging, setDragging] = useState(false);
   const [colorOpen, setColorOpen] = useState(false);
@@ -141,6 +143,8 @@ export default function RichTextEditor({
       Image.configure({ inline: false, allowBase64: false }),
       Callout,
       ArticleTable,
+      // 占位文字函数由 Tiptap 绘制时调用（不在 React 渲染期间），读到的是当前后台语言的文字
+      // eslint-disable-next-line react-hooks/refs
       Placeholder.configure({
         placeholder: () => textRef.current.placeholder,
       }),

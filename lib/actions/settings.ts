@@ -4,7 +4,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
-import { defaultSettingsFor, getSettings, LOCALIZED_TEXT_FIELDS, SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
+import { defaultSettingsFor, getSettings, SETTINGS_KEY, type SiteSettings } from "@/lib/settings";
+import { MAX_FOOTER_STATUS, switchDefaultTexts } from "@/lib/locale-defaults";
 import { readLocale } from "@/lib/i18n/locales";
 import { CACHE_TAGS } from "@/lib/public-data";
 import {
@@ -131,11 +132,10 @@ export async function updateSettings(
     seriesSlugs: formData.getAll("startHere.series").map(String),
   });
 
-  // 网站语言：换了语言时，还是旧语言默认值（站长没改过）的文字一起换成新语言的默认值
   const previous = await getSettings();
   const locale = readLocale(text("locale"), previous.locale);
   const fresh = defaultSettingsFor(locale);
-  const settings: SiteSettings = {
+  let settings: SiteSettings = {
     locale,
     siteName: text("siteName") || fresh.siteName,
     logoText: text("logoText") || fresh.logoText,
@@ -155,7 +155,7 @@ export async function updateSettings(
     articleMotion: formData.get("articleMotion") === "full" ? "full" : "calm",
     support: support.data,
     brand: brand.data,
-    footerStatus: text("footerStatus").slice(0, 20),
+    footerStatus: Array.from(text("footerStatus")).slice(0, MAX_FOOTER_STATUS).join(""),
     navLinks: navLinks.data,
     assetHost: assetHost.value,
     comments: comments.data,
@@ -166,7 +166,8 @@ export async function updateSettings(
   };
 
   if (!settings.siteTitle) return { error: e.siteTitle };
-  if (locale !== previous.locale) switchDefaultTexts(settings, previous.locale);
+  // 换了网站语言：还是旧语言默认值（站长没改过）的文字一起换成新语言的默认值（lib/locale-defaults.ts）
+  settings = switchDefaultTexts(settings, previous.locale, locale);
 
   await prisma.setting.upsert({
     where: { key: SETTINGS_KEY },
@@ -180,18 +181,6 @@ export async function updateSettings(
   // robots.txt 是单独的路由，不在根布局下面（「拒绝 AI 训练爬虫」开关要马上生效）
   revalidatePath("/robots.txt");
   return { success: e.saved };
-}
-
-/** 换网站语言：还是旧语言默认值的文字（站长没改过）换成新语言的默认值，页脚栏目和「从这里开始」同理 */
-function switchDefaultTexts(settings: SiteSettings, from: SiteSettings["locale"]) {
-  const before = defaultSettingsFor(from);
-  const after = defaultSettingsFor(settings.locale);
-  for (const field of LOCALIZED_TEXT_FIELDS) {
-    if (settings[field] === before[field]) settings[field] = after[field];
-  }
-  if (JSON.stringify(settings.footerColumns) === JSON.stringify(before.footerColumns)) settings.footerColumns = after.footerColumns;
-  if (settings.startHere.title === before.startHere.title) settings.startHere.title = after.startHere.title;
-  if (settings.startHere.intro === before.startHere.intro) settings.startHere.intro = after.startHere.intro;
 }
 
 export type AssetHostTestResult = { ok: boolean; message: string };

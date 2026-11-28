@@ -43,7 +43,7 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [open, query, page]);
+  }, [open, query, page, t.loadFailed]);
 
   return (
     <dialog

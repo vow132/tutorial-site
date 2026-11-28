@@ -27,7 +27,9 @@ export default function GitHubUpdate() {
     return value.message;
   };
   const textRef = useRef(t.messages);
-  textRef.current = t.messages;
+  useEffect(() => {
+    textRef.current = t.messages;
+  }, [t.messages]);
   const [expanded, setExpanded] = useState(false);
   // 部署前必须再次输入管理员密码；确认框打开时弹层保持展开。
   const [confirming, setConfirming] = useState(false);
