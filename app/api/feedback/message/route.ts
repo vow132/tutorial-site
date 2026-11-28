@@ -6,7 +6,7 @@ import { NON_HUMAN_AGENT } from "@/lib/view-counter";
 import { isDemoMode } from "@/lib/demo";
 import { MAX_TOKEN_LENGTH } from "@/lib/turnstile";
 import { verifyHuman } from "@/lib/turnstile-store";
-import { getSiteI18n } from "@/lib/i18n/server";
+import { getRequestReaderI18n } from "@/lib/i18n/reader-server";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
   // 在限流之后核对：乱填令牌的请求也受上面的次数限制，不会无限制地替人去请求 Cloudflare
   const human = await verifyHuman(body.turnstileToken, "feedback");
-  if (!human.ok) return Response.json({ error: (await getSiteI18n()).m.email.humanCheckFailed }, { status: 400 });
+  if (!human.ok) return Response.json({ error: (await getRequestReaderI18n()).m.email.humanCheckFailed }, { status: 400 });
 
   // 只收已发布教程的留言；教程不存在或是草稿时什么也不存
   // 演示站不存留言：后台对所有访客开放，存下来就等于公开展示陌生人写的话

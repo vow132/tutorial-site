@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { MAX_TAG_LENGTH, normalizeTagName, tagPath, tagSlug } from "@/lib/tags";
 import { tutorialSlugsWithTag } from "@/lib/tag-sync";
+import { revalidateSitePath } from "@/lib/revalidate-public";
 
 export type TagFormState = { error?: string; success?: string };
 
@@ -16,11 +17,11 @@ export type TagFormState = { error?: string; success?: string };
 function revalidateTagPages(tutorialSlugs: string[], ...tagSlugs: string[]) {
   revalidateTag(CACHE_TAGS.tags, { expire: 0 });
   revalidateTag(CACHE_TAGS.tutorials, { expire: 0 });
-  revalidatePath("/tags");
-  for (const slug of tagSlugs) revalidatePath(tagPath(slug));
+  revalidateSitePath("/tags");
+  for (const slug of tagSlugs) revalidateSitePath(tagPath(slug));
   for (const slug of new Set(tutorialSlugs)) {
-    revalidatePath(`/tutorials/${slug}`);
-    revalidatePath(`/tutorials/${encodeURIComponent(slug)}`);
+    revalidateSitePath(`/tutorials/${slug}`);
+    revalidateSitePath(`/tutorials/${encodeURIComponent(slug)}`);
   }
   revalidatePath("/admin/tags");
 }

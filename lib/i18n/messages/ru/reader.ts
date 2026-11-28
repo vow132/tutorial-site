@@ -3,6 +3,7 @@ import type { Messages } from "../types";
 
 export const reader: Messages["reader"] = {
   theme: { toggle: "Сменить тему" },
+  language: { label: "Язык интерфейса · Language" },
   error: {
     title: "Что-то пошло не так",
     siteMessage: "Сайт сейчас недоступен. Попробуйте позже; если ошибка повторяется, свяжитесь с владельцем сайта.",

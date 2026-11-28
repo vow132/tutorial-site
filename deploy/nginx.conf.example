@@ -95,8 +95,10 @@ server {
         proxy_cache_background_update on;
         proxy_cache_lock on;
         # 站内点击跳转时浏览器请求的是 RSC 数据（带 RSC 请求头），不缓存。
-        proxy_cache_bypass $http_rsc $http_next_router_prefetch;
-        proxy_no_cache     $http_rsc $http_next_router_prefetch;
+        # 读者在顶栏选了别的界面语言（Cookie reader_locale）时，同一个网址给的是另一种语言：
+        # 不走这里的缓存，直接交给 Next（它自己按语言缓存了）。没选过的访客和搜索引擎照常走缓存。
+        proxy_cache_bypass $http_rsc $http_next_router_prefetch $cookie_reader_locale;
+        proxy_no_cache     $http_rsc $http_next_router_prefetch $cookie_reader_locale;
         # 排查用：HIT 命中缓存，MISS 回源，STALE 后端不可用时返回的旧页面，BYPASS 未走缓存
         add_header X-Cache-Status $upstream_cache_status always;
     }

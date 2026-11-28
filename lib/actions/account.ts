@@ -20,6 +20,7 @@ import { sealTotpSecret, verifySecondFactor } from "@/lib/second-factor";
 import { getAdminI18n } from "@/lib/i18n/server";
 import { readTotpSetup } from "@/lib/session";
 import { verifyTotp } from "@/lib/totp";
+import { revalidateSiteRoute } from "@/lib/revalidate-public";
 
 export type CredentialsFormState = { error?: string; success?: string };
 /** 新生成的恢复码只在这一次响应里出现，页面展示后不再能看到。 */
@@ -205,7 +206,7 @@ export async function updateDisplayName(_prev: CredentialsFormState, formData: F
   await prisma.admin.update({ where: { id: admin.id }, data: { displayName: parsed.value } });
   await audit("account.display_name", { actor: admin.username, detail: parsed.value ?? t.auditNoByline });
   // 署名出现在文章页（ISR）：作者的教程页全部失效
-  revalidatePath("/tutorials/[slug]", "page");
+  revalidateSiteRoute("/tutorials/[slug]");
   revalidatePath("/admin/account");
   return { success: parsed.value ? f(t.bylineSaved, { name: parsed.value }) : t.bylineCleared };
 }

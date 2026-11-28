@@ -17,6 +17,8 @@ export default function DemoBanner({ area, m }: { area: "site" | "admin"; m: Mes
         : account
           ? rich(format(t.withAccount, { username: account.username, password: account.password }), {
               admin: (
+                // 前台到后台是两个根布局（app/[lang]、app/admin），本来就整页跳转，用普通链接
+                // eslint-disable-next-line @next/next/no-html-link-for-pages
                 <a href="/admin" className="font-semibold underline underline-offset-2">
                   /admin
                 </a>

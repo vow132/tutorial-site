@@ -10,6 +10,7 @@ import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
 import { isRole, parseDisplayName, readRole, USERNAME_PATTERN, type Role } from "@/lib/roles";
 import { getAdminI18n } from "@/lib/i18n/server";
+import { revalidateSiteRoute } from "@/lib/revalidate-public";
 
 /**
  * 账号管理（只有站长能用：requireAuth() 不传权限即只允许站长）。
@@ -72,7 +73,7 @@ export async function updateUser(_prev: UserFormState, formData: FormData): Prom
   // 改了角色要推送告警（lib/alerts.ts），只改署名不推送
   await audit("user.update", { actor: admin.username, detail: `${target.username}: ${changes.join("; ")}`, alert: roleChanged });
   // 署名出现在文章页（ISR）
-  if (displayName.value !== (target.displayName ?? null)) revalidatePath("/tutorials/[slug]", "page");
+  if (displayName.value !== (target.displayName ?? null)) revalidateSiteRoute("/tutorials/[slug]");
   revalidatePath("/admin/users");
   return { success: f(t.saved, { name: target.username }) };
 }
@@ -118,7 +119,7 @@ export async function deleteUser(_prev: UserFormState, formData: FormData): Prom
     actor: admin.username,
     detail: `${target.username}${result.moved ? plural(result.moved, t.auditMoved, { to: admin.username }) : ""}`,
   });
-  if (result.moved) revalidatePath("/tutorials/[slug]", "page");
+  if (result.moved) revalidateSiteRoute("/tutorials/[slug]");
   // 这一行随账号一起消失，结果显示在页面顶部
   redirect(`/admin/users?deleted=${encodeURIComponent(target.username)}&moved=${result.moved}`);
 }

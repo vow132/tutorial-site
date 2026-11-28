@@ -2,6 +2,7 @@
 
 import IntentLink from "./intent-link";
 import { usePathname } from "next/navigation";
+import { stripReaderSegment } from "@/lib/i18n/reader";
 import { useEffect, useId, useRef, useState } from "react";
 import { categoryLinkTarget, isExternalHref } from "@/lib/categories";
 import LabelButton from "@/components/label-button";
@@ -536,7 +537,8 @@ function DesktopNav({ items, pathname }: { items: NavItem[]; pathname: string })
 
 /** 悬浮胶囊导航：桌面端悬停多级菜单，移动端侧滑树形菜单。 */
 export default function CapsuleNav({ items }: { items: NavItem[] }) {
-  const pathname = usePathname();
+  // 服务端预渲染时拿到的是改写后的 /default/…（proxy.ts），浏览器里是原地址，统一去掉语言段再比较
+  const pathname = stripReaderSegment(usePathname());
   const [open, setOpen] = useState(false);
   const { m } = useI18n();
   const t = m.reader.nav;

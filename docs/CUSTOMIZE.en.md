@@ -87,7 +87,7 @@ Keeping your changes in a few files makes merges much easier. Changes and upgrad
 | --- | --- |
 | Overall colors, radii, fonts and other design tokens | `@theme` in `app/globals.css` (prefer the admin for the accent color) |
 | Article typography (headings, paragraphs, code blocks, tables) | `.article-body` in `app/globals.css` |
-| Home page layout | `app/(site)/page.tsx` |
+| Home page layout | `app/[lang]/page.tsx` (public pages live under `app/[lang]/`; `[lang]` is the reader language and never appears in URLs) |
 | Top navigation, footer | `components/site-header.tsx`, `components/capsule-nav.tsx`, `components/site-footer.tsx` |
 | What the ghost mascot looks like | `components/mascot.tsx` (to just hide it, use the admin) |
 | Tutorial cards | `components/tutorial-card.tsx` |
@@ -99,9 +99,9 @@ Keeping your changes in a few files makes merges much easier. Changes and upgrad
 
 Taking `/links` (friend links) as an example:
 
-1. Create `app/(site)/links/page.tsx` and build its metadata with `pageMetadata({ title, description, path: "/links" })` from `lib/seo.ts`; don't write your own `openGraph` / `alternates` (they replace the root layout's share image and RSS link entirely);
+1. Create `app/[lang]/links/page.tsx` and build its metadata with `pageMetadata({ title, description, path: "/links" })` from `lib/seo.ts`; don't write your own `openGraph` / `alternates` (they replace the root layout's share image and RSS link entirely);
 2. use `components/intent-link.tsx` for internal links, not `next/link`;
-3. take the text from the dictionaries (`getSiteI18n()` in server components) rather than writing it into the page;
+3. take the text from the dictionaries (`getReaderI18n()` from `lib/i18n/reader-server.ts` in server components, which follows the reader language) rather than writing it into the page;
 4. if search engines should index it, add the URL to `app/sitemap.ts`;
 5. add a link to `/links` under “Site settings → Top navigation links” or “Footer → Footer columns”.
 

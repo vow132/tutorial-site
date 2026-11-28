@@ -81,6 +81,51 @@ test.describe.serial("interface languages", () => {
     await expect(page.getByRole("heading", { level: 1, name: "仪表盘" })).toBeVisible();
   });
 
+  test("readers pick their own language next to the theme button, without changing it for anyone else", async ({ browser, request }) => {
+    const reader = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await reader.newPage();
+    const errors = collectErrors(page);
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+    const picker = page.getByRole("combobox", { name: "界面语言 · Language" });
+    await expect(picker).toHaveValue("zh-CN");
+    await Promise.all([page.waitForEvent("load"), picker.selectOption("en")]);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByRole("link", { name: "All tutorials" }).first()).toBeVisible();
+    // 站长没改过的默认页脚文字跟着读者语言换
+    await expect(page.locator("footer")).toContainText("Quick links");
+    // 站内跳转后仍是读者选的语言，网址里没有语言
+    await page.getByRole("link", { name: "All tutorials" }).first().click();
+    await expect(page).toHaveURL(/\/tutorials$/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.getByRole("heading", { level: 1, name: "All tutorials" })).toBeVisible();
+    // 404 页也是读者的语言
+    await page.goto("/no-such-page");
+    await expect(page.getByPlaceholder("Search tutorials by keyword")).toBeVisible();
+
+    // 别的访客（没有这个 Cookie）照样看网站语言；RSS 始终是网站语言
+    const other = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const otherPage = await other.newPage();
+    await otherPage.goto("/tutorials");
+    await expect(otherPage.locator("html")).toHaveAttribute("lang", "zh-CN");
+    await other.close();
+    expect(await (await request.get("/feed.xml")).text()).toContain("<language>zh-CN</language>");
+
+    // 中间缓存不能存读者选的那份；网站语言那份照常缓存
+    const chosen = await page.request.get("/tutorials");
+    expect(chosen.headers()["x-accel-expires"]).toBe("0");
+    const plain = await request.get("/tutorials", { headers: { cookie: "" } });
+    expect(plain.headers()["x-accel-expires"]).toBeUndefined();
+
+    // 选回网站语言：清掉 Cookie
+    await page.goto("/");
+    await Promise.all([page.waitForEvent("load"), page.getByRole("combobox", { name: "Language" }).selectOption("zh-CN")]);
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+    expect((await reader.cookies()).some((cookie) => cookie.name === "reader_locale")).toBe(false);
+    expect(errors).toEqual([]);
+    await reader.close();
+  });
+
   test("the sign-in page can switch language before signing in", async ({ browser }) => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, locale: "zh-CN" });
     const page = await context.newPage();

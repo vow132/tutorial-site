@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { parseChapterInput, parseSeriesInput, seriesPath } from "@/lib/series";
+import { revalidateSitePath, revalidateSiteRoute } from "@/lib/revalidate-public";
 
 export type SeriesFormState = { error?: string; success?: string };
 export type ChapterFormState = { error?: string; success?: string };
@@ -18,16 +19,16 @@ export type ChapterFormState = { error?: string; success?: string };
  */
 function revalidateSeries(seriesSlugs: (string | null | undefined)[], tutorialSlugs: string[]) {
   revalidateTag(CACHE_TAGS.series, { expire: 0 });
-  revalidatePath("/series");
+  revalidateSitePath("/series");
   // 所有系列页一起失效（包括之前缓存下来的 404，例如改名后的新别名）
-  revalidatePath("/series/[slug]", "page");
+  revalidateSiteRoute("/series/[slug]");
   for (const slug of new Set(seriesSlugs.filter((item): item is string => Boolean(item)))) {
-    revalidatePath(`/series/${slug}`);
-    revalidatePath(seriesPath(slug));
+    revalidateSitePath(`/series/${slug}`);
+    revalidateSitePath(seriesPath(slug));
   }
   for (const slug of new Set(tutorialSlugs)) {
-    revalidatePath(`/tutorials/${slug}`);
-    revalidatePath(`/tutorials/${encodeURIComponent(slug)}`);
+    revalidateSitePath(`/tutorials/${slug}`);
+    revalidateSitePath(`/tutorials/${encodeURIComponent(slug)}`);
   }
   revalidatePath("/admin/series");
 }

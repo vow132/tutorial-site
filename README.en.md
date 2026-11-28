@@ -155,6 +155,7 @@ Article pages show the byline each person sets under “Account security”; sig
 The interface comes in Simplified Chinese, English, Russian and Japanese:
 
 - **Site language** (“Site settings → Site language”): all public interface text, RSS, emails and alert messages use it. When you switch, the site name, home page texts and footer change to the new language's defaults if they still have default values; anything you edited is kept.
+- **Reader language**: visitors can switch to a language they read with the globe button next to the theme button; it only affects them. Visitors who haven't chosen, and search engines, see the site language. Tutorial content itself isn't translated.
 - **Admin language**: each admin picks their own at the bottom of the sidebar (or on the sign-in page). It's stored in their browser and doesn't affect others or the public site.
 - **Server commands** (backup, restore, admin reset…) print Chinese for Chinese sites and English for sites in any other language; the deploy script and the Docker startup log are written in both.
 

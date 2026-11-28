@@ -1,22 +1,23 @@
 import IntentLink from "./intent-link";
 import SiteLogo from "./site-logo";
-import { getSettings } from "@/lib/settings";
+
 import { getPublicCategories } from "@/lib/public-data";
 import { getSubscriptionEnabled } from "@/lib/mail";
-import { getSiteI18n } from "@/lib/i18n/server";
+
 import {
   buildCategoryTree,
   categoryLinkTarget,
   flattenCategoryTree,
   getCategoryHref,
 } from "@/lib/categories";
+import { getReaderI18n, getReaderSettings } from "@/lib/i18n/reader-server";
 
 export default async function SiteFooter() {
   const [categories, settings, subscribeEnabled, { m }] = await Promise.all([
     getPublicCategories(),
-    getSettings(),
+    getReaderSettings(),
     getSubscriptionEnabled(),
-    getSiteI18n(),
+    getReaderI18n(),
   ]);
   const categoryLinks = flattenCategoryTree(buildCategoryTree(categories)).map(
     ({ node, depth }) => ({

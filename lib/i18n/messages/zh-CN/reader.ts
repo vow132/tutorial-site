@@ -3,6 +3,8 @@ import { p } from "../../format";
 /** 前台浏览器端组件的文案（网站语言，由根布局传给浏览器，所以只放用得到的）。 */
 export const reader = {
   theme: { toggle: "切换主题" },
+  /** 顶栏的语言按钮（提示文字带上英文 Language，看不懂当前语言的读者也找得到） */
+  language: { label: "界面语言 · Language" },
   error: {
     title: "页面出错了",
     siteMessage: "网站暂时无法显示，请稍后重试；如果反复出现，请联系站长。",

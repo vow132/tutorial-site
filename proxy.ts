@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { adminContentSecurityPolicy } from "@/lib/csp.mjs";
+import { DEFAULT_SEGMENT, isReaderPage, READER_LOCALE_COOKIE, readerRewritePath, readerSegment } from "@/lib/i18n/reader";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 const LOOPBACK = /^(?:127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/;
@@ -26,6 +27,26 @@ function isLocalHealthCheck(request: NextRequest) {
 }
 
 export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/admin")) return adminProxy(request);
+  if (!isReaderPage(pathname)) return NextResponse.next();
+
+  // 前台页面：按读者选的语言改写到 app/[lang] 下对应的那份（lib/i18n/reader.ts），浏览器里的网址不变。
+  const segment = readerSegment(request.cookies.get(READER_LOCALE_COOKIE)?.value);
+  const url = request.nextUrl.clone();
+  url.pathname = readerRewritePath(segment, pathname);
+  const response = NextResponse.rewrite(url);
+  if (segment !== DEFAULT_SEGMENT) {
+    // 同一个网址按 Cookie 给出不同语言，中间的缓存只按网址存的话，会把这个读者选的语言给到别人。
+    // Next 会覆盖页面的 Vary 和 Cache-Control，所以用它不碰的头：Nginx 认 X-Accel-Expires（示例配置只忽略了
+    // Cache-Control / Expires），Cloudflare 等 CDN 认 CDN-Cache-Control。网站语言那一份照常缓存。
+    response.headers.set("X-Accel-Expires", "0");
+    response.headers.set("CDN-Cache-Control", "no-store");
+  }
+  return response;
+}
+
+function adminProxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 登录页和首次安装页（还没有任何账号时用，页面自己校验安装码）不需要登录
@@ -59,5 +80,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  // 后台和前台页面都经过这里；接口、Next 自己的文件、上传图片、分享图等不经过（和 isReaderPage() 的排除列表一致）
+  matcher: ["/((?!api/|_next/|uploads/|og/|brand/|comments/|\\.well-known/|favicon\\.ico|feed\\.xml|sitemap\\.xml|robots\\.txt|manifest\\.webmanifest|__).*)"],
 };

@@ -9,6 +9,7 @@ import { MAX_CATEGORY_LEVELS } from "@/lib/categories";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { clearSearchCache } from "@/lib/search";
 import type { Messages } from "@/lib/i18n/messages";
+import { revalidateSitePath } from "@/lib/revalidate-public";
 
 export type CategoryFormState = { error?: string; success?: string };
 
@@ -258,8 +259,8 @@ export async function updateCategory(
   });
   await audit("category.update", { actor: admin.username, detail: `#${id} ${common.data.name} (${slug})` });
   if (current.slug !== slug) {
-    revalidatePath(`/categories/${current.slug}`);
-    revalidatePath(`/categories/${slug}`);
+    revalidateSitePath(`/categories/${current.slug}`);
+    revalidateSitePath(`/categories/${slug}`);
   }
   revalidate();
   return { success: (await getAdminI18n()).m.admin.common.saved };
