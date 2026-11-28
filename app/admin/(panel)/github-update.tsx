@@ -179,7 +179,7 @@ export default function GitHubUpdate() {
       <button
         type="button" onClick={requestUpdate} aria-label={actionLabel}
         aria-describedby={descriptionId} aria-expanded={open} aria-busy={busy}
-        aria-disabled={busy} title={`${labels[status.state]}: ${message}`}
+        aria-disabled={busy} title={f(t.dotTitle, { label: labels[status.state], message })}
         className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       >
         <span className={`h-3 w-3 rounded-full ring-2 ring-surface ${colors[status.state]}`} aria-hidden="true" />

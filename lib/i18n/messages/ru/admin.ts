@@ -563,6 +563,7 @@ export const admin: Messages["admin"] = {
     chooseFiles: "Выбрать файлы",
     filesLabel: "Файлы Markdown",
     wxr: "Файл экспорта WordPress",
+    wxrSite: "WordPress ({url})",
     wxrHint: "В WordPress откройте «Инструменты → Экспорт», выберите «Записи» и скачайте .xml-файл. Изображения скачаются с исходного сайта.",
     chooseWxr: "Выбрать .xml-файл",
     parsing: "Разбор…",
@@ -1277,6 +1278,7 @@ export const admin: Messages["admin"] = {
     savedOff: "Сохранено (проверка на робота выключена)",
   },
   update: {
+    dotTitle: "{label}: {message}",
     labels: { checking: "Проверка обновлений", current: "Последняя версия", available: "Есть обновление", updating: "Обновление", error: "Обновление не завершено", unavailable: "Обновление недоступно" },
     messages: {
       checking: "Проверяем обновления в репозитории…",

@@ -548,6 +548,7 @@ export const admin: Messages["admin"] = {
     chooseFiles: "Choose files",
     filesLabel: "Markdown files",
     wxr: "WordPress export file",
+    wxrSite: "WordPress ({url})",
     wxrHint: "In WordPress go to Tools → Export, choose “Posts” and download the .xml file. Images are downloaded from the original site.",
     chooseWxr: "Choose .xml file",
     parsing: "Parsing…",
@@ -1252,6 +1253,7 @@ export const admin: Messages["admin"] = {
     savedOff: "Saved (human verification is off)",
   },
   update: {
+    dotTitle: "{label}: {message}",
     labels: { checking: "Checking for updates", current: "Up to date", available: "Update available", updating: "Updating", error: "Update not finished", unavailable: "Updates unavailable" },
     messages: {
       checking: "Checking the repository for updates…",

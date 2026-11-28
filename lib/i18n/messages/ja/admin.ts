@@ -548,6 +548,7 @@ export const admin: Messages["admin"] = {
     chooseFiles: "ファイルを選択",
     filesLabel: "Markdown ファイル",
     wxr: "WordPress のエクスポートファイル",
+    wxrSite: "WordPress（{url}）",
     wxrHint: "WordPress の「ツール → エクスポート」で「投稿」を選び、ダウンロードした .xml ファイルを使います。画像は元のサイトからダウンロードします。",
     chooseWxr: ".xml ファイルを選択",
     parsing: "解析中…",
@@ -1252,6 +1253,7 @@ export const admin: Messages["admin"] = {
     savedOff: "保存しました（ボット対策はオフです）",
   },
   update: {
+    dotTitle: "{label}：{message}",
     labels: { checking: "更新を確認中", current: "最新版です", available: "新しいバージョンあり", updating: "更新中", error: "更新が完了していません", unavailable: "更新できません" },
     messages: {
       checking: "リポジトリの更新を確認しています…",

@@ -220,7 +220,7 @@ export default function BulkImport({ categories }: { categories: Category[] }) {
         setError(t.wxrEmpty);
         return;
       }
-      setLoaded({ kind: "wordpress", label: siteUrl ? `WordPress (${siteUrl})` : "WordPress", files: new Map() });
+      setLoaded({ kind: "wordpress", label: siteUrl ? f(t.wxrSite, { url: siteUrl }) : "WordPress", files: new Map() });
       setRows(items.map((item) => ({ ...item, selected: true })));
       setSkipped(skip);
     } catch {

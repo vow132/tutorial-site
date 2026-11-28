@@ -547,6 +547,8 @@ export const admin = {
     chooseFiles: "选择文件",
     filesLabel: "Markdown 文件",
     wxr: "WordPress 导出文件",
+    /** 解析结果里的来源，例如「WordPress（https://old.example）」 */
+    wxrSite: "WordPress（{url}）",
     wxrHint: "在 WordPress 后台「工具 → 导出」选「文章」，下载得到的 .xml 文件。图片会从原网站下载到本站。",
     chooseWxr: "选择 .xml 文件",
     parsing: "正在解析…",
@@ -1251,6 +1253,8 @@ export const admin = {
     savedOff: "已保存（人机验证未开启）",
   },
   update: {
+    /** 圆点的悬停提示：状态 + 说明 */
+    dotTitle: "{label}：{message}",
     labels: { checking: "检测更新中", current: "已是最新版本", available: "有新版本", updating: "正在更新", error: "更新未完成", unavailable: "暂无法更新" },
     messages: {
       checking: "正在检测仓库更新…",
