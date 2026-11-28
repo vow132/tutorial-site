@@ -1,10 +1,11 @@
-export default function ThemeToggle() {
+/** 主题按钮。文字由调用方传进来（前台是网站语言，后台是管理员的语言）。 */
+export default function ThemeToggle({ label }: { label: string }) {
   return (
     <button
       type="button"
       data-theme-toggle
-      aria-label="切换主题"
-      title="切换主题"
+      aria-label={label}
+      title={label}
       className="theme-toggle flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface/90 text-ink-2 shadow-capsule backdrop-blur-md transition-colors hover:bg-paper hover:text-ink"
     >
       <svg

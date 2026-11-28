@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 const MIN_HEIGHT = 240;
 const MAX_HEIGHT = 20000;
@@ -17,6 +18,8 @@ export default function Comments({ slug }: { slug: string }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [height, setHeight] = useState(MIN_HEIGHT);
+  const { m } = useI18n();
+  const t = m.reader.comments;
 
   useEffect(() => {
     const section = sectionRef.current;
@@ -61,14 +64,14 @@ export default function Comments({ slug }: { slug: string }) {
   return (
     <section ref={sectionRef} id="comments" aria-labelledby="comments-heading" className="print-hide mt-14 scroll-mt-24">
       <h2 id="comments-heading" className="text-lg font-bold text-ink">
-        评论
+        {t.heading}
       </h2>
       <div className="mt-4" style={{ minHeight: MIN_HEIGHT }}>
         {src ? (
           <iframe
             ref={frameRef}
             src={src}
-            title="评论区"
+            title={t.frameTitle}
             // 允许评论组件运行脚本、读写自己的登录信息、弹出登录窗口；不允许它把整个页面跳走（除非读者点了登录链接）
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
             referrerPolicy="strict-origin-when-cross-origin"
@@ -76,7 +79,7 @@ export default function Comments({ slug }: { slug: string }) {
             style={{ height }}
           />
         ) : (
-          <p className="pt-6 text-sm text-ink-3">评论区加载中…</p>
+          <p className="pt-6 text-sm text-ink-3">{t.loading}</p>
         )}
       </div>
     </section>

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminI18n } from "@/lib/i18n/client";
 import {
   disableTotp,
   enableTotp,
@@ -37,24 +38,22 @@ function Feedback({ state }: { state: CredentialsFormState }) {
 function RecoveryCodesPanel({ codes, message }: { codes: string[]; message?: string }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const t = useAdminI18n().m.admin.account;
   const text = codes.join("\n");
   const download = () => {
-    const url = URL.createObjectURL(new Blob([`两步验证恢复码（每个只能用一次）\n\n${text}\n`], { type: "text/plain" }));
+    const url = URL.createObjectURL(new Blob([`${t.recoveryFileTitle}\n\n${text}\n`], { type: "text/plain" }));
     const link = Object.assign(document.createElement("a"), { href: url, download: "recovery-codes.txt" });
     link.click();
     URL.revokeObjectURL(url);
   };
   return (
-    <div className="space-y-4" role="region" aria-label="恢复码">
+    <div className="space-y-4" role="region" aria-label={t.recoveryRegion}>
       {message && (
         <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">{message}</p>
       )}
       <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-800 dark:text-amber-200">
-        <p className="font-semibold">请立即保存下面的恢复码，离开本页后无法再次查看</p>
-        <p className="mt-1">
-          手机丢失或验证器被删除时，在登录页「两步验证码」处输入任意一个恢复码即可登录，每个只能用一次。
-          请存到密码管理器或打印出来，不要和密码放在一起。
-        </p>
+        <p className="font-semibold">{t.recoverySaveNow}</p>
+        <p className="mt-1">{t.recoveryExplain}</p>
       </div>
       <ul className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-paper p-4 font-mono text-sm text-ink sm:grid-cols-2">
         {codes.map((code) => (
@@ -70,21 +69,21 @@ function RecoveryCodesPanel({ codes, message }: { codes: string[]; message?: str
           }}
           className="h-10 rounded-xl border border-line px-4 text-sm font-medium text-ink transition-colors hover:bg-paper"
         >
-          {copied ? "已复制" : "复制全部"}
+          {copied ? t.copied : t.copyAll}
         </button>
         <button
           type="button"
           onClick={download}
           className="h-10 rounded-xl border border-line px-4 text-sm font-medium text-ink transition-colors hover:bg-paper"
         >
-          下载为文本文件
+          {t.download}
         </button>
         <button
           type="button"
           onClick={() => router.refresh()}
           className="h-10 rounded-xl bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
-          我已保存好
+          {t.savedThem}
         </button>
       </div>
     </div>
@@ -92,10 +91,11 @@ function RecoveryCodesPanel({ codes, message }: { codes: string[]; message?: str
 }
 
 function ConfirmFields({ allowRecovery = false }: { allowRecovery?: boolean }) {
+  const t = useAdminI18n().m.admin.account;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-ink-2">当前密码</label>
+        <label className="mb-1.5 block text-sm font-medium text-ink-2">{t.currentPassword}</label>
         <input
           name="currentPassword"
           type="password"
@@ -106,7 +106,7 @@ function ConfirmFields({ allowRecovery = false }: { allowRecovery?: boolean }) {
       </div>
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          {allowRecovery ? "验证码或恢复码" : "6 位验证码"}
+          {allowRecovery ? t.codeOrRecovery : t.code}
         </label>
         {allowRecovery ? (
           <input
@@ -147,6 +147,7 @@ export function EnableTwoFactorForm({
     enableTotp,
     {}
   );
+  const t = useAdminI18n().m.admin.account;
 
   if (state.recoveryCodes) return <RecoveryCodesPanel codes={state.recoveryCodes} message={state.success} />;
 
@@ -157,20 +158,17 @@ export function EnableTwoFactorForm({
         {/* eslint-disable-next-line @next/next/no-img-element -- 服务端生成的 data URL 二维码 */}
         <img
           src={qrDataUrl}
-          alt="两步验证二维码"
+          alt={t.qrAlt}
           width={176}
           height={176}
           className="h-44 w-44 shrink-0 rounded-2xl border border-line bg-white p-2 [image-rendering:pixelated]"
         />
         <div className="min-w-0 text-sm text-ink-2">
-          <p>
-            1. 用 Google Authenticator、Microsoft Authenticator、1Password 等验证器 App 扫描二维码；
-            无法扫码时手动输入密钥：
-          </p>
+          <p>{t.scanStep}</p>
           <code className="mt-2 block break-all rounded-xl bg-paper px-3 py-2 font-mono text-xs text-ink">
             {secret.match(/.{1,4}/g)?.join(" ")}
           </code>
-          <p className="mt-2">2. 输入当前密码和 App 显示的 6 位数字完成绑定。</p>
+          <p className="mt-2">{t.confirmStep}</p>
         </div>
       </div>
       <ConfirmFields />
@@ -180,7 +178,7 @@ export function EnableTwoFactorForm({
         disabled={pending}
         className="h-11 rounded-xl bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "验证中…" : "开启两步验证"}
+        {pending ? t.verifying : t.enable}
       </button>
     </form>
   );
@@ -191,6 +189,7 @@ export function DisableTwoFactorForm() {
     disableTotp,
     {}
   );
+  const t = useAdminI18n().m.admin.account;
 
   return (
     <form action={action} className="space-y-5">
@@ -201,7 +200,7 @@ export function DisableTwoFactorForm() {
         disabled={pending}
         className="h-11 rounded-xl border border-red-500/40 px-6 text-sm font-semibold text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
       >
-        {pending ? "验证中…" : "关闭两步验证"}
+        {pending ? t.verifying : t.disable}
       </button>
     </form>
   );
@@ -212,6 +211,7 @@ export function RegenerateRecoveryCodesForm() {
     regenerateRecoveryCodes,
     {}
   );
+  const t = useAdminI18n().m.admin.account;
 
   if (state.recoveryCodes) return <RecoveryCodesPanel codes={state.recoveryCodes} message={state.success} />;
 
@@ -224,7 +224,7 @@ export function RegenerateRecoveryCodesForm() {
         disabled={pending}
         className="h-11 rounded-xl border border-line px-6 text-sm font-semibold text-ink transition-colors hover:bg-paper disabled:opacity-50"
       >
-        {pending ? "验证中…" : "生成新的恢复码"}
+        {pending ? t.verifying : t.regenerateSubmit}
       </button>
     </form>
   );

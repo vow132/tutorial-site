@@ -3,6 +3,7 @@ import SiteLogo from "./site-logo";
 import { getSettings } from "@/lib/settings";
 import { getPublicCategories } from "@/lib/public-data";
 import { getSubscriptionEnabled } from "@/lib/mail";
+import { getSiteI18n } from "@/lib/i18n/server";
 import {
   buildCategoryTree,
   categoryLinkTarget,
@@ -11,10 +12,11 @@ import {
 } from "@/lib/categories";
 
 export default async function SiteFooter() {
-  const [categories, settings, subscribeEnabled] = await Promise.all([
+  const [categories, settings, subscribeEnabled, { m }] = await Promise.all([
     getPublicCategories(),
     getSettings(),
     getSubscriptionEnabled(),
+    getSiteI18n(),
   ]);
   const categoryLinks = flattenCategoryTree(buildCategoryTree(categories)).map(
     ({ node, depth }) => ({
@@ -37,7 +39,7 @@ export default async function SiteFooter() {
             </p>
             {subscribeEnabled && (
               <IntentLink href="/subscribe" className="mt-3 inline-block text-sm font-medium text-accent-ink hover:underline">
-                邮件订阅新教程 →
+                {m.site.nav.subscribeLink}
               </IntentLink>
             )}
           </div>

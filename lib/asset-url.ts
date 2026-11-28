@@ -8,20 +8,23 @@
  * 纯函数，服务端和浏览器都能用。
  */
 
+import { textOrKey } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages/types";
+
 const UPLOADS = "/uploads/";
 
 /** 后台填的加速地址：留空表示不加速；只收 https，不带查询参数，末尾的 / 去掉。 */
-export function parseAssetHost(raw: unknown): { value: string } | { error: string } {
+export function parseAssetHost(raw: unknown, t?: Messages["admin"]["settingsErrors"]): { value: string } | { error: string } {
   const value = typeof raw === "string" ? raw.trim().replace(/\/+$/, "") : "";
   if (!value) return { value: "" };
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    return { error: "图片加速地址要是完整的网址，如 https://img.example.com" };
+    return { error: textOrKey(t, "assetHostInvalid") };
   }
-  if (url.protocol !== "https:") return { error: "图片加速地址要用 https://（网站是 HTTPS 时，http 图片会被浏览器拦截或升级失败）" };
-  if (url.search || url.hash || url.username || url.password) return { error: "图片加速地址不能带 ?、# 或用户名密码" };
+  if (url.protocol !== "https:") return { error: textOrKey(t, "assetHostHttps") };
+  if (url.search || url.hash || url.username || url.password) return { error: textOrKey(t, "assetHostExtra") };
   return { value: `${url.origin}${url.pathname.replace(/\/+$/, "")}` };
 }
 

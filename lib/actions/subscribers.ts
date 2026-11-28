@@ -2,6 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAuth } from "@/lib/admin-auth";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { audit } from "@/lib/audit";
 import { getMailConfig, saveMailConfig, sendOne } from "@/lib/mail";
 import { prisma } from "@/lib/prisma";
@@ -27,39 +28,48 @@ export async function saveMailSettings(_prev: MailFormState, formData: FormData)
     fromName: text("fromName"),
     fromEmail: text("fromEmail").toLowerCase(),
   };
-  if (config.enabled && !mailConfigComplete(config)) return { error: "开启前请填好 SMTP 服务器、端口和发件人邮箱" };
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.subscribers;
+  if (config.enabled && !mailConfigComplete(config)) return { error: t.incomplete };
   const error = validateMailConfig(config);
-  if (error) return { error };
+  if (error) return { error: t.invalid[error] };
   await saveMailConfig(config);
   await audit("mail.settings", {
     actor: admin.username,
-    detail: `${config.enabled ? "开启" : "关闭"}邮件订阅；SMTP ${config.host || "未填写"}:${config.port}；发件人 ${config.fromEmail || "未填写"}`,
+    detail: f(t.auditDetail, {
+      state: config.enabled ? t.auditOn : t.auditOff,
+      host: config.host || t.auditEmpty,
+      port: config.port,
+      from: config.fromEmail || t.auditEmpty,
+    }),
   });
   // 前台订阅框是否显示跟着变（文章页、页脚）
   revalidateTag(CACHE_TAGS.settings, { expire: 0 });
   revalidatePath("/", "layout");
-  return { success: config.enabled ? "已保存，读者现在能看到订阅框了" : "已保存（邮件订阅未开启）" };
+  return { success: config.enabled ? t.savedOn : t.savedOff };
 }
 
 /** 用当前保存的配置发一封测试邮件。 */
 export async function sendTestMail(_prev: MailFormState, formData: FormData): Promise<MailFormState> {
   await requireAuth();
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.subscribers;
   const to = normalizeEmail(formData.get("to"));
-  if (!to) return { error: "请填写收件邮箱" };
+  if (!to) return { error: t.toRequired };
   const config = await getMailConfig();
-  if (!mailConfigComplete(config)) return { error: "请先保存 SMTP 服务器、端口和发件人邮箱" };
+  if (!mailConfigComplete(config)) return { error: t.saveFirst };
   const { siteName } = await getSettings();
   try {
     await sendOne(config, siteName, {
       to,
-      subject: `「${siteName}」测试邮件`,
-      text: "收到这封邮件说明发信设置是对的。",
-      html: "<p>收到这封邮件说明发信设置是对的。</p>",
+      subject: f(t.testSubject, { site: siteName }),
+      text: t.testBody,
+      html: `<p>${t.testBody}</p>`,
     });
   } catch (reason) {
-    return { error: `发送失败：${reason instanceof Error ? reason.message : String(reason)}` };
+    return { error: f(t.sendFailed, { reason: reason instanceof Error ? reason.message : String(reason) }) };
   }
-  return { success: `已发送到 ${to}，请查收（也看看垃圾邮件）` };
+  return { success: f(t.sent, { to }) };
 }
 
 export async function deleteSubscriber(formData: FormData) {

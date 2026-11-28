@@ -10,6 +10,7 @@ import { breadcrumbJsonLd, pageMetadata, pageSuffix, withPage } from "@/lib/seo"
 import { getSettings } from "@/lib/settings";
 import { MIN_INDEXABLE_TAG_TUTORIALS, tagPath } from "@/lib/tags";
 import { decodeSegment } from "@/lib/url";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 const PAGE_SIZE = 9;
 
@@ -31,14 +32,15 @@ export async function generateMetadata({
   // metadata 阶段就触发 404，保证流式传输开始前拿到真实 404 状态码。
   if (!tag) notFound();
   const { page: pageStr } = await searchParams;
-  const [{ page }, settings] = await Promise.all([
+  const [{ page }, settings, { m, f, plural }] = await Promise.all([
     getTagTutorialPage({ tag, page: Number(pageStr) || 1, pageSize: PAGE_SIZE }),
     getSettings(),
+    getSiteI18n(),
   ]);
-  const description = `${settings.siteName}里关于「${tag.name}」的 ${tag.count} 篇图文教程。`;
+  const description = plural(tag.count, m.site.tags.tagDescription, { site: settings.siteName, name: tag.name });
   return pageMetadata({
-    title: `${tag.name} 相关教程${pageSuffix(page)}`,
-    description: page > 1 ? `${description}（第 ${page} 页）` : description,
+    title: `${f(m.site.tags.tagTitle, { name: tag.name })}${pageSuffix(page, m.site.pageSuffix)}`,
+    description: page > 1 ? `${description}${f(m.site.pageInDescription, { page })}` : description,
     path: withPage(tagPath(tag.slug), page),
     // 只有一篇教程的标签页内容太薄，不让收录，但链接照常可以跟随。
     index: tag.count >= MIN_INDEXABLE_TAG_TUTORIALS,
@@ -56,26 +58,25 @@ export default async function TagPage({
   const tag = await findTag(slug);
   if (!tag) notFound();
   const { page: pageStr } = await searchParams;
-  const { total, totalPages, page, tutorials } = await getTagTutorialPage({
-    tag,
-    page: Number(pageStr) || 1,
-    pageSize: PAGE_SIZE,
-  });
+  const [{ total, totalPages, page, tutorials }, { m, f, plural }] = await Promise.all([
+    getTagTutorialPage({ tag, page: Number(pageStr) || 1, pageSize: PAGE_SIZE }),
+    getSiteI18n(),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
       <JsonLd
         data={breadcrumbJsonLd([
-          { name: "首页", path: "/" },
-          { name: "全部标签", path: "/tags" },
+          { name: m.site.nav.home, path: "/" },
+          { name: m.site.nav.allTags, path: "/tags" },
           { name: tag.name },
         ])}
       />
       <Reveal fade={false}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink-3">
-          <IntentLink href="/" className="transition-colors hover:text-accent">首页</IntentLink>
+          <IntentLink href="/" className="transition-colors hover:text-accent">{m.site.nav.home}</IntentLink>
           <span>/</span>
-          <IntentLink href="/tags" className="transition-colors hover:text-accent">全部标签</IntentLink>
+          <IntentLink href="/tags" className="transition-colors hover:text-accent">{m.site.nav.allTags}</IntentLink>
           <span>/</span>
           <span className="text-ink-2">{tag.name}</span>
         </nav>
@@ -83,11 +84,11 @@ export default async function TagPage({
           <span className="text-accent">#</span>
           {tag.name}
         </h1>
-        <p className="mt-3 text-sm text-ink-2">共 {total} 篇相关教程</p>
+        <p className="mt-3 text-sm text-ink-2">{plural(total, m.site.tags.tagIntro)}</p>
       </Reveal>
 
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <h2 className="sr-only">「{tag.name}」相关教程</h2>
+        <h2 className="sr-only">{f(m.site.tags.tagListHeading, { name: tag.name })}</h2>
         {tutorials.map((t, i) => (
           <Reveal key={t.id} delay={Math.min(i, 5) * 0.05}>
             <TutorialCard
@@ -104,7 +105,7 @@ export default async function TagPage({
         ))}
       </div>
 
-      <Pagination page={page} totalPages={totalPages} basePath={tagPath(tag.slug)} />
+      <Pagination page={page} totalPages={totalPages} basePath={tagPath(tag.slug)} labels={m.site.pagination} />
     </div>
   );
 }

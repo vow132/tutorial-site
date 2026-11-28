@@ -33,7 +33,9 @@ import {
 } from "@/lib/passkeys";
 import { sharedLimiter } from "@/lib/rate-limit";
 import { getSettings } from "@/lib/settings";
-import { DEMO_READ_ONLY_MESSAGE, isDemoMode } from "@/lib/demo";
+import { isDemoMode } from "@/lib/demo";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { format } from "@/lib/i18n/format";
 
 type Result = { error?: string; success?: string };
 
@@ -42,13 +44,15 @@ export async function beginPasskeyRegistration(
   rawName: string,
   currentPassword: string,
 ): Promise<Result & { options?: PublicKeyCredentialCreationOptionsJSON }> {
-  if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.passkeys;
+  if (isDemoMode()) return { error: m.admin.demoReadOnly };
   const { admin } = await requireSession("account");
   const rp = relyingParty();
-  if ("error" in rp) return { error: rp.error };
+  if ("error" in rp) return { error: t[rp.error] };
 
   const name = String(rawName ?? "").trim().slice(0, 40);
-  if (!name) return { error: "请给这个通行密钥起个名字，如「MacBook 指纹」「iPhone」" };
+  if (!name) return { error: t.nameRequired };
   const passwordError = await confirmCurrentPassword(admin, String(currentPassword ?? ""));
   if (passwordError) return { error: passwordError };
 
@@ -56,7 +60,7 @@ export async function beginPasskeyRegistration(
     where: { adminId: admin.id },
     select: { id: true, transports: true },
   });
-  if (existing.length >= MAX_PASSKEYS) return { error: `最多登记 ${MAX_PASSKEYS} 个通行密钥，请先删除不用的` };
+  if (existing.length >= MAX_PASSKEYS) return { error: f(t.tooMany, { n: MAX_PASSKEYS }) };
 
   const { siteName } = await getSettings();
   const options = await generateRegistrationOptions({
@@ -76,10 +80,12 @@ export async function beginPasskeyRegistration(
 /** 登记新通行密钥第二步：校验浏览器返回的凭据并保存公钥。 */
 export async function finishPasskeyRegistration(response: RegistrationResponseJSON): Promise<Result> {
   const { admin } = await requireSession("account");
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.passkeys;
   const rp = relyingParty();
-  if ("error" in rp) return { error: rp.error };
+  if ("error" in rp) return { error: t[rp.error] };
   const challenge = await takePasskeyChallenge("register");
-  if (!challenge || challenge.adminId !== admin.id) return { error: "操作已过期，请重新添加" };
+  if (!challenge || challenge.adminId !== admin.id) return { error: t.expired };
 
   let verification;
   try {
@@ -91,12 +97,12 @@ export async function finishPasskeyRegistration(response: RegistrationResponseJS
       requireUserVerification: true,
     });
   } catch (error) {
-    return { error: `通行密钥校验失败：${error instanceof Error ? error.message : "未知错误"}` };
+    return { error: f(t.verifyFailedWithReason, { reason: error instanceof Error ? error.message : t.unknownError }) };
   }
-  if (!verification.verified) return { error: "通行密钥校验失败，请重试" };
+  if (!verification.verified) return { error: t.verifyFailed };
 
   const { credential, credentialBackedUp } = verification.registrationInfo;
-  const name = challenge.name ?? "通行密钥";
+  const name = challenge.name ?? t.defaultName;
   await prisma.adminPasskey.create({
     data: {
       id: credential.id,
@@ -111,19 +117,21 @@ export async function finishPasskeyRegistration(response: RegistrationResponseJS
   await audit("passkey.add", { actor: admin.username, detail: name });
   revalidatePath("/admin/account");
   revalidatePath("/admin/login");
-  return { success: `已添加「${name}」，下次可直接用它登录` };
+  return { success: f(t.added, { name }) };
 }
 
 export async function removePasskey(id: string): Promise<Result> {
-  if (isDemoMode()) return { error: DEMO_READ_ONLY_MESSAGE };
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.passkeys;
+  if (isDemoMode()) return { error: m.admin.demoReadOnly };
   const { admin } = await requireSession("account");
   const passkey = await prisma.adminPasskey.findFirst({ where: { id: String(id), adminId: admin.id } });
-  if (!passkey) return { error: "通行密钥不存在" };
+  if (!passkey) return { error: t.notFound };
   await prisma.adminPasskey.delete({ where: { id: passkey.id } });
   await audit("passkey.remove", { actor: admin.username, detail: passkey.name });
   revalidatePath("/admin/account");
   revalidatePath("/admin/login");
-  return { success: `已删除「${passkey.name}」` };
+  return { success: f(t.removed, { name: passkey.name }) };
 }
 
 /**
@@ -144,10 +152,12 @@ async function passkeyLoginWait(ip: string | null) {
 
 /** 通行密钥登录第一步：不需要用户名（可发现凭据），由浏览器列出本站的通行密钥。 */
 export async function beginPasskeyLogin(): Promise<Result & { options?: PublicKeyCredentialRequestOptionsJSON }> {
+  const { m, plural } = await getAdminI18n();
+  const t = m.admin.passkeys;
   const rp = relyingParty();
-  if ("error" in rp) return { error: rp.error };
+  if ("error" in rp) return { error: t[rp.error] };
   const wait = await passkeyLoginWait(await getClientIp());
-  if (wait > 0) return { error: `尝试次数过多，请约 ${Math.ceil(wait / 60)} 分钟后再试` };
+  if (wait > 0) return { error: plural(Math.ceil(wait / 60), m.admin.tooManyAttempts) };
   const options = await generateAuthenticationOptions({ rpID: rp.rpID, userVerification: "required" });
   await storePasskeyChallenge("login", options.challenge);
   return { options };
@@ -155,27 +165,29 @@ export async function beginPasskeyLogin(): Promise<Result & { options?: PublicKe
 
 /** 通行密钥登录第二步：验证签名后建立会话。通行密钥已含设备持有 + 生物识别/PIN，不再要求两步验证码。 */
 export async function finishPasskeyLogin(response: AuthenticationResponseJSON, from?: string): Promise<Result> {
+  const { m, plural } = await getAdminI18n();
+  const t = m.admin.passkeys;
   const rp = relyingParty();
-  if ("error" in rp) return { error: rp.error };
+  if ("error" in rp) return { error: t[rp.error] };
   const ip = await getClientIp();
   const wait = await passkeyLoginWait(ip);
-  if (wait > 0) return { error: `尝试次数过多，请约 ${Math.ceil(wait / 60)} 分钟后再试` };
+  if (wait > 0) return { error: plural(Math.ceil(wait / 60), m.admin.tooManyAttempts) };
 
   const fail = async (detail: string) => {
     loginLimiters.global.hit("all");
     if (ip) loginLimiters.ip.hit(ip);
     await audit("login.passkey_failed", { detail });
-    return { error: "通行密钥验证失败，请重试或改用密码登录" };
+    return { error: t.loginFailed };
   };
 
   const challenge = await takePasskeyChallenge("login");
-  if (!challenge) return { error: "操作已过期，请重新点击「使用通行密钥登录」" };
+  if (!challenge) return { error: t.loginExpired };
 
   const passkey = await prisma.adminPasskey.findUnique({
     where: { id: String(response?.id ?? "") },
     include: { admin: true },
   });
-  if (!passkey) return fail("未登记的通行密钥");
+  if (!passkey) return fail(m.admin.auditDetail.passkeyUnknown);
 
   let verification;
   try {
@@ -193,9 +205,9 @@ export async function finishPasskeyLogin(response: AuthenticationResponseJSON, f
       requireUserVerification: true,
     });
   } catch (error) {
-    return fail(error instanceof Error ? error.message.slice(0, 200) : "校验异常");
+    return fail(error instanceof Error ? error.message.slice(0, 200) : m.admin.auditDetail.passkeyError);
   }
-  if (!verification.verified) return fail("签名无效");
+  if (!verification.verified) return fail(m.admin.auditDetail.passkeyBadSignature);
 
   await prisma.adminPasskey.update({
     where: { id: passkey.id },
@@ -212,7 +224,11 @@ export async function finishPasskeyLogin(response: AuthenticationResponseJSON, f
   await rememberDevice(admin.username, device);
   await audit("login.success", {
     actor: admin.username,
-    detail: `${device ? "受信任设备" : "新设备"}（通行密钥：${passkey.name}）`,
+    detail: format(m.admin.auditDetail.passkeyLogin, {
+      device: device ? m.admin.auditDetail.trustedDevice : m.admin.auditDetail.newDevice,
+      name: passkey.name,
+    }),
+    alert: !device,
   });
   redirect(safeAdminFrom(from));
 }

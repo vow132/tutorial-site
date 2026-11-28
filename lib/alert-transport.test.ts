@@ -15,13 +15,13 @@ const NOW = 1_763_280_000_123;
 
 test("only official robot hosts are accepted for named channels", () => {
   assert.equal(validateAlertConfig({ channel: "dingtalk", url: "https://oapi.dingtalk.com/robot/send?access_token=x" }), null);
-  assert.match(validateAlertConfig({ channel: "dingtalk", url: "https://evil.example/robot/send" }) ?? "", /钉钉/);
-  assert.match(validateAlertConfig({ channel: "wecom", url: "http://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=x" }) ?? "", /企业微信/);
+  assert.match(validateAlertConfig({ channel: "dingtalk", url: "https://evil.example/robot/send" }) ?? "", /host/);
+  assert.match(validateAlertConfig({ channel: "wecom", url: "http://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=x" }) ?? "", /host/);
   assert.equal(validateAlertConfig({ channel: "feishu", url: "https://open.larksuite.com/open-apis/bot/v2/hook/x" }), null);
   assert.equal(validateAlertConfig({ channel: "webhook", url: "https://hooks.example.com/a" }), null);
   assert.equal(validateAlertConfig({ channel: "webhook", url: "http://127.0.0.1:9000/hook" }), null);
   assert.match(validateAlertConfig({ channel: "webhook", url: "http://10.0.0.5/hook" }) ?? "", /https/);
-  assert.match(validateAlertConfig({ channel: "telegram", telegramToken: "bad", telegramChatId: "1" }) ?? "", /Token/);
+  assert.match(validateAlertConfig({ channel: "telegram", telegramToken: "bad", telegramChatId: "1" }) ?? "", /telegramToken/);
   assert.equal(
     validateAlertConfig({ channel: "telegram", telegramToken: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ", telegramChatId: "-100123456" }),
     null,
@@ -95,7 +95,7 @@ test("HTTP 200 with a business error code is reported as a failure", async () =>
   const keyword = fakeFetch(200, { errcode: 310000, errmsg: "keywords not in content" });
   await assert.rejects(sendAlert(config, message, { fetchImpl: keyword.impl }), /310000/);
   const down = fakeFetch(502, "bad gateway");
-  await assert.rejects(sendAlert(config, message, { fetchImpl: down.impl }), /HTTP 502/);
+  await assert.rejects(sendAlert(config, message, { fetchImpl: down.impl }), /http: 502/);
 });
 
 test("scripts read the config from SQLite and never throw", async () => {

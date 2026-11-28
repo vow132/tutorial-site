@@ -8,15 +8,18 @@ import { createVariants, detectImageFormat, optimizeImage } from "@/lib/upload-i
  * 把一张图片存进 public/uploads：按文件头识别格式（不接受 SVG）、缩放转 WebP、去 EXIF，并生成响应式小图。
  * 后台上传（app/api/upload）和批量导入下载外链图片共用。
  */
-export async function storeUploadedImage(buffer: Buffer): Promise<{ url: string; name: string; bytes: number } | { error: string }> {
+/** 失败原因（文字按后台语言：m.admin.upload） */
+export type UploadProblem = "unsupported" | "broken";
+
+export async function storeUploadedImage(buffer: Buffer): Promise<{ url: string; name: string; bytes: number } | { error: UploadProblem }> {
   const ext = detectImageFormat(buffer);
-  if (!ext) return { error: "仅支持 PNG/JPG/GIF/WebP 图片（出于安全考虑不再接受 SVG）" };
+  if (!ext) return { error: "unsupported" };
 
   let optimized: { data: Buffer; ext: string };
   try {
     optimized = await optimizeImage(buffer, ext);
   } catch {
-    return { error: "图片已损坏或尺寸过大（最多约 4000 万像素）" };
+    return { error: "broken" };
   }
 
   const dir = path.join(process.cwd(), "public", "uploads");

@@ -271,17 +271,23 @@ export function headingSlug(text: string) {
 /** 代码块右上角显示的语言名。 */
 
 
+/** 正文 HTML 里的按钮文字：调用方传网站语言的 m.site.articleHtml（不传时用简体中文，测试用） */
+export type ArticleLabels = { copy: string; copyCode: string; code: string; copySectionLink: string };
+const DEFAULT_LABELS: ArticleLabels = { copy: "复制", copyCode: "复制代码", code: "代码", copySectionLink: "复制本节链接" };
+
+const escapeAttr = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
 /** 代码块外壳：语言标签 + 复制按钮（按钮由 components/article-enhancer.tsx 接管）。 */
-function codeBlock(language: string, highlighted: string) {
-  const label = language === "plaintext" ? "代码" : CODE_LANGUAGES[language] ?? "代码";
+function codeBlock(language: string, highlighted: string, labels: ArticleLabels) {
+  const label = language === "plaintext" ? escapeAttr(labels.code) : CODE_LANGUAGES[language] ?? escapeAttr(labels.code);
   return (
     `<div class="code-block"><div class="code-head"><span class="code-lang">${label}</span>` +
-    `<button type="button" class="code-copy" data-copy-code aria-label="复制代码">复制</button></div>` +
+    `<button type="button" class="code-copy" data-copy-code aria-label="${escapeAttr(labels.copyCode)}">${escapeAttr(labels.copy)}</button></div>` +
     `<pre><code class="hljs language-${language}">${highlighted}</code></pre></div>`
   );
 }
 
-async function processArticleUncached(html: string): Promise<ProcessedArticle> {
+async function processArticleUncached(html: string, labels: ArticleLabels): Promise<ProcessedArticle> {
   const toc: TocItem[] = [];
   const usedIds = new Set(RESERVED_IDS);
 
@@ -297,7 +303,7 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
       usedIds.add(id);
       toc.push({ id, text, level: Number(level) });
       // 悬停时出现的 # 链接：点击复制本节地址（components/article-enhancer.tsx）。
-      return `<h${level} id="${id}">${inner}<a class="heading-anchor" href="#${id}" aria-label="复制本节链接">#</a></h${level}>`;
+      return `<h${level} id="${id}">${inner}<a class="heading-anchor" href="#${id}" aria-label="${escapeAttr(labels.copySectionLink)}">#</a></h${level}>`;
     },
   );
 
@@ -307,10 +313,10 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
       const decoded = decodeEntities(code);
       try {
         if (language && hljs.getLanguage(language)) {
-          return codeBlock(language, hljs.highlight(decoded, { language }).value);
+          return codeBlock(language, hljs.highlight(decoded, { language }).value, labels);
         }
         const auto = hljs.highlightAuto(decoded);
-        return codeBlock(auto.language ?? "plaintext", auto.value);
+        return codeBlock(auto.language ?? "plaintext", auto.value, labels);
       } catch {
         return match;
       }
@@ -328,15 +334,15 @@ async function processArticleUncached(html: string): Promise<ProcessedArticle> {
  * Highlighting and image probing are stable for a saved article, so keep a
  * small process-local LRU of promises. Concurrent requests also share work.
  */
-export function processArticle(html: string): Promise<ProcessedArticle> {
-  const key = createHash("sha256").update(html).digest("base64url");
+export function processArticle(html: string, labels: ArticleLabels = DEFAULT_LABELS): Promise<ProcessedArticle> {
+  const key = createHash("sha256").update(labels.copy).update("\0").update(html).digest("base64url");
   const cached = articleCache.get(key);
   if (cached) {
     remember(articleCache, key, cached, MAX_ARTICLE_CACHE);
     return cached;
   }
 
-  const task = processArticleUncached(html).catch((error) => {
+  const task = processArticleUncached(html, labels).catch((error) => {
     articleCache.delete(key);
     throw error;
   });

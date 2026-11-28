@@ -7,10 +7,14 @@ import { updateTutorial } from "@/lib/actions/tutorials";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import { tagSuggestions, tutorialTagNames } from "@/lib/tag-sync";
 import TutorialForm from "../tutorial-form";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { can, canEditTutorial } from "@/lib/roles";
 import { authorOptions } from "@/lib/authors";
 
-export const metadata: Metadata = { title: "编辑教程" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.tutorials.editMetaTitle };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,7 @@ export default async function EditTutorialPage({
   params: Promise<{ id: string }>;
 }) {
   const admin = await requireAdminPage("tutorials");
+  const { m, f } = await getAdminI18n();
   const { id } = await params;
   const tutorial = await prisma.tutorial.findUnique({
     where: { id: Number(id) },
@@ -42,7 +47,7 @@ export default async function EditTutorialPage({
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
       id: node.id,
-      name: `${"　".repeat(depth)}${node.name}（${depth + 1}级）`,
+      name: `${"　".repeat(depth)}${f(m.admin.common.categoryOption, { name: node.name, n: depth + 1 })}`,
     }),
   );
 
@@ -52,7 +57,7 @@ export default async function EditTutorialPage({
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-ink">编辑教程</h1>
+          <h1 className="text-2xl font-bold text-ink">{m.admin.tutorials.editMetaTitle}</h1>
           <p className="mt-1 text-sm text-ink-3">/{tutorial.slug}</p>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -62,20 +67,20 @@ export default async function EditTutorialPage({
             prefetch={false}
             className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"
           >
-            预览已保存的版本
+            {m.admin.tutorials.previewSaved}
           </Link>
           <a
             href={`/admin/tutorials/${tutorial.id}/markdown`}
             download
             className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"
           >
-            导出 Markdown
+            {m.admin.tutorials.exportMarkdown}
           </a>
           <Link
             href={`/admin/tutorials/${tutorial.id}/revisions`}
             className="rounded-full border border-line px-4 py-2 text-ink-2 transition-colors hover:bg-paper hover:text-ink"
           >
-            历史版本（{revisionCount}）
+            {f(m.admin.tutorials.revisions, { n: revisionCount })}
           </Link>
         </div>
       </div>

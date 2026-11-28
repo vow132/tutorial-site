@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { login, type LoginState } from "@/lib/actions/auth";
 import TurnstileWidget from "@/components/turnstile-widget";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
@@ -23,6 +24,8 @@ export default function LoginForm({
   );
   // 人机验证的令牌只能用一次：每次服务器返回结果（密码错、要两步验证码……）都重新验证
   const [token, setToken] = useState<string | null>(null);
+  const { m } = useAdminI18n();
+  const t = m.admin.login;
   const [humanCheckFailed, setHumanCheckFailed] = useState(false);
   // 小组件加载失败（连不上 Cloudflare）时也允许提交，由服务器决定：命令行 admin:reset 关掉人机验证后就能登录
   const waitingForHuman = Boolean(turnstileSiteKey) && !token && !humanCheckFailed;
@@ -47,7 +50,7 @@ export default function LoginForm({
       {token && <input type="hidden" name="turnstileToken" value={token} />}
       <div>
         <label htmlFor="login-username" className="mb-1.5 block text-sm font-medium text-ink-2">
-          用户名
+          {t.username}
         </label>
         <input
           id="login-username"
@@ -62,7 +65,7 @@ export default function LoginForm({
       </div>
       <div>
         <label htmlFor="login-password" className="mb-1.5 block text-sm font-medium text-ink-2">
-          密码
+          {t.password}
         </label>
         <input
           id="login-password"
@@ -79,7 +82,7 @@ export default function LoginForm({
       {state.needsTotp && (
         <div>
           <label htmlFor="login-totp" className="mb-1.5 block text-sm font-medium text-ink-2">
-            两步验证码
+            {t.totp}
           </label>
           <input
             id="login-totp"
@@ -92,10 +95,10 @@ export default function LoginForm({
             spellCheck={false}
             aria-describedby="login-totp-hint"
             className={`${inputClass} tracking-[0.2em]`}
-            placeholder="验证器中的 6 位数字"
+            placeholder={t.totpPlaceholder}
           />
           <p id="login-totp-hint" className="mt-1.5 text-xs text-ink-3">
-            手机不在身边？输入开启两步验证时保存的恢复码（形如 abcd-efgh-ijkl-mnop），每个只能用一次。
+            {t.totpHint}
           </p>
         </div>
       )}
@@ -124,7 +127,7 @@ export default function LoginForm({
         disabled={pending || waitingForHuman}
         className="h-11 w-full rounded-xl bg-btn text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "登录中…" : waitingForHuman ? "正在进行人机验证…" : state.needsTotp ? "验 证" : "登 录"}
+        {pending ? t.submitting : waitingForHuman ? t.waitingForHuman : state.needsTotp ? t.verify : t.submit}
       </button>
     </form>
   );

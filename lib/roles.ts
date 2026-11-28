@@ -9,15 +9,14 @@
  * 所以新加的页面和 Server Action 默认只有站长能用，要开放给编辑、作者时显式写上权限。
  */
 
-export const ROLES = {
-  owner: { label: "站长", description: "全部权限：站点设置、账号管理、邮件订阅、安全日志、一键更新" },
-  editor: { label: "编辑", description: "管理所有教程、分类、标签、系列、关于页、图片库和读者留言，可以批量导入" },
-  author: { label: "作者", description: "只能写、改、发布、删除自己的教程" },
-} as const;
+import type { Messages } from "@/lib/i18n/messages/types";
 
-export type Role = keyof typeof ROLES;
+/** 角色（名称和说明按后台语言显示：m.admin.roles） */
+export const ROLE_ORDER = ["owner", "editor", "author"] as const;
 
-export const ROLE_ORDER: Role[] = ["owner", "editor", "author"];
+export type Role = (typeof ROLE_ORDER)[number];
+
+export const isRole = (value: unknown): value is Role => typeof value === "string" && (ROLE_ORDER as readonly string[]).includes(value);
 
 export type Permission =
   /** 仪表盘（阅读数据） */
@@ -68,11 +67,11 @@ export function bylineOf(author: { displayName: string | null } | null | undefin
 export const MAX_DISPLAY_NAME = 20;
 
 /** 署名的校验：去掉首尾空白，最长 20 个字；空串表示不显示署名。 */
-export function parseDisplayName(raw: unknown): { value: string | null } | { error: string } {
+export function parseDisplayName(raw: unknown, t: Messages["admin"]["validation"]): { value: string | null } | { error: string } {
   const value = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
   if (!value) return { value: null };
-  if (Array.from(value).length > MAX_DISPLAY_NAME) return { error: `署名最多 ${MAX_DISPLAY_NAME} 个字` };
-  if (/[<>]/.test(value)) return { error: "署名不能包含 < 或 >" };
+  if (Array.from(value).length > MAX_DISPLAY_NAME) return { error: t.displayNameTooLong.replace("{max}", String(MAX_DISPLAY_NAME)) };
+  if (/[<>]/.test(value)) return { error: t.displayNameBrackets };
   return { value };
 }
 

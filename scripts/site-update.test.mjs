@@ -101,7 +101,7 @@ async function fixture(t, options = {}) {
   const notify = async (databasePath, moduleRoot, message) => { notices.push({ databasePath, message }); };
   const result = await performUpdate({ root, targetRevision: TARGET, jobId: JOB }, {
     platform: "linux", env: { NODE_ENV: "production", SITE_AUTO_UPDATE: "true", DATABASE_URL: `file:${database}`, SITE_CURRENT_REVISION: CURRENT },
-    run, backup, health, notify, link: (source, target) => symlink(source, target, process.platform === "win32" ? "junction" : "dir"),
+    run, backup, health, notify, ...(options.locale !== undefined ? { locale: options.locale } : {}), link: (source, target) => symlink(source, target, process.platform === "win32" ? "junction" : "dir"),
     logError: (...items) => errors.push(items.map((item) => item instanceof Error ? item.message : item).join(" ")),
   });
   return {
@@ -135,6 +135,17 @@ test("successful update builds against a snapshot before stopping and activates 
   assert.equal(f.notices[0].message.event, "site-update.success");
   assert.equal(f.notices[0].databasePath, f.database);
   assert.ok(f.notices[0].message.lines.some((line) => line.includes(TARGET.slice(0, 7))));
+});
+
+test("progress, the failure reason and the alert follow the site language", async (t) => {
+  const f = await fixture(t, { buildFails: true, locale: "en" });
+  assert.equal(f.result.success, false);
+  assert.match(f.status.message, /^Building the new version failed; the site keeps running the old one/);
+  assert.equal(f.notices[0].message.title, "Site update failed");
+  assert.ok(f.notices[0].message.lines.includes("Failed at: build"));
+  const ja = await fixture(t, { buildFails: true, locale: "ja" });
+  assert.equal(ja.notices[0].message.title, "サイトの更新に失敗しました");
+  assert.ok(ja.notices[0].message.lines.includes("失敗した段階：ビルド"));
 });
 
 test("a failed staged build leaves the original running process and database untouched", async (t) => {

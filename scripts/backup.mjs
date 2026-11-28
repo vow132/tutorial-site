@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { createGzip } from "node:zlib";
 import { notifyFromDatabase } from "../lib/alert-transport.mjs";
 import { encryptStream, passphraseProblem } from "../lib/backup-crypto.mjs";
+import { cliText, scriptText, siteLocaleOfFile } from "../lib/script-i18n.mjs";
 import { databaseFile } from "./site-update.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,9 +36,12 @@ const passphrase = process.env.BACKUP_PASSPHRASE ?? "";
 const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
 const target = path.join(directory, `tutorial-${stamp}.db.gz${passphrase ? ".enc" : ""}`);
 const snapshot = path.join(directory, `.tutorial-${stamp}.db.partial`);
+// 输出跟网站语言：中文站点中文，其余英文；告警按网站语言（lib/script-i18n.mjs）
+const locale = siteLocaleOfFile(Database, source);
+const say = cliText(locale);
 
 async function runBackup() {
-  const problem = passphrase ? passphraseProblem(passphrase) : null;
+  const problem = passphrase ? passphraseProblem(passphrase, say) : null;
   if (problem) throw new Error(problem);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const db = new Database(source, { readonly: true, fileMustExist: true, timeout: 10_000 });
@@ -59,22 +63,28 @@ async function runBackup() {
   const backups = (await readdir(directory)).filter((name) => /^tutorial-\d{8}-\d{6}\.db\.gz(\.enc)?$/.test(name)).sort().reverse();
   for (const name of backups.slice(keep)) await rm(path.join(directory, name), { force: true });
 
-  console.log(`✅ 数据库已${passphrase ? "加密" : ""}备份到 ${target}（保留最近 ${keep} 份）`);
+  console.log(
+    say(
+      `✅ 数据库已${passphrase ? "加密" : ""}备份到 ${target}（保留最近 ${keep} 份）`,
+      `✅ Database backed up${passphrase ? " (encrypted)" : ""} to ${target} (keeping the latest ${keep})`,
+    ),
+  );
 }
 
 try {
   await runBackup();
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);
-  console.error("❌ 数据库备份失败：", reason);
+  console.error(say("❌ 数据库备份失败：", "❌ Database backup failed:"), reason);
   // 备份失败要让人知道：读取后台配置的安全告警渠道推送（数据库打不开时只能打印）。
   try {
     const alertDb = new Database(source, { readonly: true, fileMustExist: true, timeout: 10_000 });
     try {
+      const t = scriptText(locale);
       await notifyFromDatabase(alertDb, {
         event: "backup.failed",
-        title: "数据库备份失败",
-        lines: [`原因：${reason.slice(0, 300)}`, `数据库：${source}`, `备份目录：${directory}`],
+        title: t("backupFailed"),
+        lines: [t("backupReason", { reason: reason.slice(0, 300) }), t("backupDatabase", { path: source }), t("backupDirectory", { path: directory })],
       });
     } finally {
       alertDb.close();

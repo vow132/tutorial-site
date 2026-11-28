@@ -18,6 +18,8 @@ import { getDatabaseUrl } from "../lib/database-url";
 import { passwordProblem } from "../lib/password-policy";
 import { USERNAME_PATTERN } from "../lib/roles";
 import { disabledStoredTurnstile, TURNSTILE_SETTING_KEY } from "../lib/turnstile";
+import { admin as enAdmin } from "../lib/i18n/messages/en/admin";
+import { cliText, localeFromSiteSetting } from "../lib/script-i18n.mjs";
 
 if (process.env.NODE_ENV === "production") loadEnv({ path: ".env.production", quiet: true });
 loadEnv({ path: ".env", quiet: true });
@@ -43,18 +45,24 @@ async function disableTurnstile() {
 }
 
 async function main() {
+  // 输出和安全日志跟网站语言：中文站点中文，其余英文（还没装好的新库中英文都输出）
+  const locale = localeFromSiteSetting((await prisma.setting.findUnique({ where: { key: "site" } }))?.value);
+  const say = cliText(locale);
+  const passwordText = locale && locale !== "zh-CN" ? enAdmin.password : undefined;
   // 还没有任何账号：等于在命令行完成安装（创建站长），不用打开 /admin/setup
   if ((await prisma.admin.count()) === 0) {
     const username = values.username ?? "admin";
-    if (!USERNAME_PATTERN.test(username)) throw new Error("用户名要 3-32 位字母、数字、下划线或连字符");
+    if (!USERNAME_PATTERN.test(username)) {
+      throw new Error(say("用户名要 3-32 位字母、数字、下划线或连字符", "The username needs 3–32 letters, digits, underscores or hyphens"));
+    }
     const password = values.password ?? randomBytes(12).toString("base64url");
-    const problem = values.password ? passwordProblem(password, username) : null;
+    const problem = values.password ? passwordProblem(password, username, passwordText) : null;
     if (problem) throw new Error(problem);
     await prisma.admin.create({ data: { username, role: "owner", password: await bcrypt.hash(password, 12) } });
-    await prisma.auditLog.create({ data: { action: "account.reset_cli", actor: username, detail: "服务器命令行创建站长账号" } });
-    console.log(`✅ 已创建站长账号 ${username}`);
-    if (!values.password) console.log(`   密码：${password}`);
-    console.log("   登录后台后建议立即开启两步验证。");
+    await prisma.auditLog.create({ data: { action: "account.reset_cli", actor: username, detail: say("服务器命令行创建站长账号", "Owner account created from the server command line") } });
+    console.log(say(`✅ 已创建站长账号 ${username}`, `✅ Owner account ${username} created`));
+    if (!values.password) console.log(say(`   密码：${password}`, `   Password: ${password}`));
+    console.log(say("   登录后台后建议立即开启两步验证。", "   Turn on two-factor authentication right after signing in."));
     return;
   }
 
@@ -62,11 +70,11 @@ async function main() {
     ? await prisma.admin.findUnique({ where: { username: values.username } })
     : ((await prisma.admin.findFirst({ where: { role: "owner" }, orderBy: { id: "asc" } })) ??
       (await prisma.admin.findFirst({ orderBy: { id: "asc" } })));
-  if (!admin) throw new Error(`找不到账号 ${values.username}，请检查 --username`);
+  if (!admin) throw new Error(say(`找不到账号 ${values.username}，请检查 --username`, `No account named ${values.username}; check --username`));
   const promote = admin.role !== "owner" && (await prisma.admin.count({ where: { role: "owner" } })) === 0;
 
   const password = values.password ?? randomBytes(12).toString("base64url");
-  const problem = values.password ? passwordProblem(password, admin.username) : null;
+  const problem = values.password ? passwordProblem(password, admin.username, passwordText) : null;
   if (problem) throw new Error(problem);
 
   await prisma.$transaction([
@@ -86,22 +94,39 @@ async function main() {
       data: {
         action: "account.reset_cli",
         actor: admin.username,
-        detail: `服务器命令行重置密码，关闭两步验证（含恢复码）并删除所有通行密钥${promote ? "；网站没有站长，恢复为站长" : ""}`,
+        detail: say(
+          `服务器命令行重置密码，关闭两步验证（含恢复码）并删除所有通行密钥${promote ? "；网站没有站长，恢复为站长" : ""}`,
+          `Password reset from the server command line; two-factor authentication (with recovery codes) turned off and all passkeys deleted${promote ? "; the site had no owner, so this account is the owner again" : ""}`,
+        ),
       },
     }),
   ]);
 
   const turnstileOff = await disableTurnstile();
   if (turnstileOff) {
-    await prisma.auditLog.create({ data: { action: "turnstile.settings", actor: admin.username, detail: "服务器命令行关闭人机验证" } });
+    await prisma.auditLog.create({ data: { action: "turnstile.settings", actor: admin.username, detail: say("服务器命令行关闭人机验证", "Human verification turned off from the server command line") } });
   }
 
-  console.log(`✅ 已重置账号 ${admin.username}`);
-  if (promote) console.log("   网站里没有站长，这个账号已恢复为站长。");
-  if (!values.password) console.log(`   新密码：${password}`);
-  console.log("   两步验证已关闭、通行密钥已全部删除，所有已登录设备已退出。");
-  if (turnstileOff) console.log("   人机验证已关闭（密钥还在），登录后可以在「站点设置 → 人机验证」重新开启。");
-  console.log("   登录后请立即修改密码，并重新开启两步验证、重新添加通行密钥。");
+  console.log(say(`✅ 已重置账号 ${admin.username}`, `✅ Account ${admin.username} reset`));
+  if (promote) console.log(say("   网站里没有站长，这个账号已恢复为站长。", "   The site had no owner, so this account is the owner again."));
+  if (!values.password) console.log(say(`   新密码：${password}`, `   New password: ${password}`));
+  console.log(
+    say("   两步验证已关闭、通行密钥已全部删除，所有已登录设备已退出。", "   Two-factor authentication is off, all passkeys were deleted and every device was signed out."),
+  );
+  if (turnstileOff) {
+    console.log(
+      say(
+        "   人机验证已关闭（密钥还在），登录后可以在「站点设置 → 人机验证」重新开启。",
+        "   Human verification is off (the keys are kept); turn it back on under Site settings → Human verification after signing in.",
+      ),
+    );
+  }
+  console.log(
+    say(
+      "   登录后请立即修改密码，并重新开启两步验证、重新添加通行密钥。",
+      "   After signing in, change the password right away and set up two-factor authentication and passkeys again.",
+    ),
+  );
 }
 
 main()

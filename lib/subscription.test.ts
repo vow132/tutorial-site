@@ -12,6 +12,9 @@ import {
   emptyMailConfig,
 } from "./subscription";
 import { parseStartHereInput, parseSupportInput, pickStartHereSeries, readArticleMotion, readStartHere, readSupport } from "./settings-extras";
+import { messagesFor } from "./i18n/messages";
+
+const v = messagesFor("zh-CN").admin.settingsErrors;
 
 test("emails are normalised and obviously bad ones rejected", () => {
   assert.equal(normalizeEmail("  Reader@Example.COM "), "reader@example.com");
@@ -39,9 +42,9 @@ test("mail settings are validated and read back safely", () => {
   const base = { ...emptyMailConfig, enabled: true, host: "smtp.example.com", port: 465, fromEmail: "noreply@example.com" };
   assert.equal(validateMailConfig(base), null);
   assert.equal(validateMailConfig({ ...emptyMailConfig }), null);
-  assert.match(validateMailConfig({ ...base, host: "smtp example" })!, /SMTP/);
-  assert.match(validateMailConfig({ ...base, port: 70000 })!, /端口/);
-  assert.match(validateMailConfig({ ...base, fromEmail: "nope" })!, /发件人/);
+  assert.match(validateMailConfig({ ...base, host: "smtp example" })!, /host/);
+  assert.match(validateMailConfig({ ...base, port: 70000 })!, /port/);
+  assert.match(validateMailConfig({ ...base, fromEmail: "nope" })!, /fromEmail/);
   assert.deepEqual(readMailConfig({ host: "h", port: "x", enabled: "yes" }), { ...emptyMailConfig, host: "h" });
 });
 
@@ -66,11 +69,11 @@ test("email bodies escape content and carry the right links", () => {
 
 test("support settings accept only uploaded images and safe links", () => {
   const empty = { donationText: "", wechatQr: "", alipayQr: "", sponsorText: "", sponsorUrl: "", sponsorImage: "" };
-  assert.deepEqual(parseSupportInput(empty), { data: empty });
-  assert.ok("data" in parseSupportInput({ ...empty, wechatQr: "/uploads/qr-1.png", sponsorText: "某某云", sponsorUrl: "https://example.com" }));
-  assert.match((parseSupportInput({ ...empty, wechatQr: "https://evil.example/qr.png" }) as { error: string }).error, /上传/);
-  assert.match((parseSupportInput({ ...empty, sponsorText: "x", sponsorUrl: "javascript:alert(1)" }) as { error: string }).error, /https/);
-  assert.match((parseSupportInput({ ...empty, sponsorUrl: "https://example.com" }) as { error: string }).error, /赞助文字/);
+  assert.deepEqual(parseSupportInput(empty, v), { data: empty });
+  assert.ok("data" in parseSupportInput({ ...empty, wechatQr: "/uploads/qr-1.png", sponsorText: "某某云", sponsorUrl: "https://example.com" }, v));
+  assert.match((parseSupportInput({ ...empty, wechatQr: "https://evil.example/qr.png" }, v) as { error: string }).error, /上传/);
+  assert.match((parseSupportInput({ ...empty, sponsorText: "x", sponsorUrl: "javascript:alert(1)" }, v) as { error: string }).error, /https/);
+  assert.match((parseSupportInput({ ...empty, sponsorUrl: "https://example.com" }, v) as { error: string }).error, /赞助文字/);
   assert.deepEqual(readSupport(null), empty);
 });
 

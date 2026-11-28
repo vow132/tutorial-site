@@ -20,7 +20,7 @@ async function main() {
       });
     } else if (process.env.NODE_ENV === "production") {
       // 生产环境没设置管理员密码（或照抄了 .env.example 的占位值）：不建账号，由站长打开安装页设置（lib/setup-code.mjs）
-      console.log(`\n${setupHint(process.env.SITE_URL || "http://你的域名")}\n`);
+      console.log(`\n${setupHint(process.env.SITE_URL || "http://your-domain")}\n`);
     } else {
       // 开发环境：固定的开发密码，方便本地调试和端到端测试
       await prisma.admin.create({
@@ -182,7 +182,7 @@ await pipeline(
     }
   }
 
-  console.log("✅ 种子数据写入完成");
+  console.log("✅ 种子数据写入完成 / Seed data written");
 }
 
 main()

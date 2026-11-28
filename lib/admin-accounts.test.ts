@@ -6,7 +6,9 @@ import { after, before, beforeEach, test } from "node:test";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../generated/prisma/client";
 import { applyMigrations } from "../scripts/migrate.mjs";
-import { changeAccount, LOST_OWNER_MESSAGE, removeAccount } from "./admin-accounts";
+import { changeAccount, removeAccount } from "./admin-accounts";
+
+const LOST_OWNER_MESSAGE = "lostOwner";
 
 /*
  * 「至少留一个站长」在并发下也成立：用真实的 SQLite（套用全部迁移）和与线上相同的 Prisma 适配器，
@@ -75,7 +77,7 @@ test("own role cannot change; display name and other people's roles can", async 
   const a = await account("owner-a", "owner");
   const writer = await account("writer", "author");
   assert.deepEqual(await changeAccount(db, { actorId: a.id, targetId: a.id, role: "editor", displayName: null }), {
-    error: "不能修改自己的角色（防止把自己降级后没人能管理网站）",
+    error: "ownRole",
   });
   assert.deepEqual(await changeAccount(db, { actorId: a.id, targetId: a.id, role: "owner", displayName: "站长" }), {
     previousRole: "owner",
@@ -97,6 +99,6 @@ test("deleting an account moves its tutorials to the owner who deleted it", asyn
   });
   assert.deepEqual(await removeAccount(db, { actorId: a.id, targetId: writer.id }), { moved: 2 });
   assert.equal(await db.tutorial.count({ where: { authorId: a.id } }), 2);
-  assert.deepEqual(await removeAccount(db, { actorId: a.id, targetId: writer.id }), { error: "这个账号不存在或已被删除" });
-  assert.deepEqual(await removeAccount(db, { actorId: a.id, targetId: a.id }), { error: "不能删除自己的账号" });
+  assert.deepEqual(await removeAccount(db, { actorId: a.id, targetId: writer.id }), { error: "notFound" });
+  assert.deepEqual(await removeAccount(db, { actorId: a.id, targetId: a.id }), { error: "deleteSelf" });
 });

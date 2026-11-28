@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { beginPasskeyRegistration, finishPasskeyRegistration, removePasskey } from "@/lib/actions/passkeys";
+import { useAdminI18n } from "@/lib/i18n/client";
+import type { RelyingPartyProblem } from "@/lib/passkeys";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
@@ -14,17 +16,22 @@ export type PasskeyRow = {
   backedUp: boolean;
 };
 
-function describeRegistrationError(error: unknown) {
+type Text = ReturnType<typeof useAdminI18n>["m"]["admin"]["account"];
+
+function describeRegistrationError(error: unknown, t: Text) {
   const name = error instanceof Error ? error.name : "";
-  if (name === "InvalidStateError") return "这个设备已经登记过通行密钥了";
-  if (name === "NotAllowedError" || name === "AbortError") return "已取消或超时，请重试";
-  if (name === "SecurityError") return "当前地址与站点设置的域名（SITE_URL）不一致，无法登记通行密钥";
-  return "这个浏览器或设备不支持通行密钥";
+  if (name === "InvalidStateError") return t.passkeyAlready;
+  if (name === "NotAllowedError" || name === "AbortError") return t.passkeyCancelled;
+  if (name === "SecurityError") return t.passkeyWrongDomain;
+  return t.passkeyUnsupported;
 }
 
-const dateFormat = new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" });
+const DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
 
-export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyRow[]; unavailable: string | null }) {
+export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyRow[]; unavailable: RelyingPartyProblem | null }) {
+  const { m, f, date } = useAdminI18n();
+  const t = m.admin.account;
+  const formatTime = (value: string) => date(value, DATE_TIME);
   const [message, setMessage] = useState<{ error?: string; success?: string }>({});
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -37,7 +44,7 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
         String(formData.get("currentPassword") ?? ""),
       );
       if (begin.error || !begin.options) {
-        setMessage({ error: begin.error ?? "无法开始登记，请刷新后重试" });
+        setMessage({ error: begin.error ?? t.passkeyBeginFailed });
         return;
       }
       const { startRegistration } = await import("@simplewebauthn/browser");
@@ -45,7 +52,7 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
       try {
         response = await startRegistration({ optionsJSON: begin.options });
       } catch (cause) {
-        setMessage({ error: describeRegistrationError(cause) });
+        setMessage({ error: describeRegistrationError(cause, t) });
         return;
       }
       const result = await finishPasskeyRegistration(response);
@@ -54,7 +61,7 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
     });
 
   const remove = (row: PasskeyRow) => {
-    if (!confirm(`确定删除通行密钥「${row.name}」吗？删除后这个设备不能再用它登录。`)) return;
+    if (!confirm(f(t.passkeyDeleteConfirm, { name: row.name }))) return;
     startTransition(async () => setMessage(await removePasskey(row.id)));
   };
 
@@ -67,13 +74,13 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
               <span className="font-medium text-ink">
                 {row.name}
                 {row.backedUp && (
-                  <span className="ml-2 rounded-full bg-paper px-2 py-0.5 text-xs font-normal text-ink-3">已同步</span>
+                  <span className="ml-2 rounded-full bg-paper px-2 py-0.5 text-xs font-normal text-ink-3">{t.passkeySynced}</span>
                 )}
               </span>
               <span className="flex items-center gap-3 text-xs text-ink-3">
                 <span>
-                  添加于 {dateFormat.format(new Date(row.createdAt))}
-                  {row.lastUsedAt ? ` · 上次使用 ${dateFormat.format(new Date(row.lastUsedAt))}` : " · 还没用过"}
+                  {f(t.passkeyAdded, { time: formatTime(row.createdAt) })}
+                  {row.lastUsedAt ? f(t.passkeyLastUsed, { time: formatTime(row.lastUsedAt) }) : t.passkeyNeverUsed}
                 </span>
                 <button
                   type="button"
@@ -81,7 +88,7 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
                   disabled={pending}
                   className="rounded-lg px-2 py-1 text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-50"
                 >
-                  删除
+                  {m.admin.common.delete}
                 </button>
               </span>
             </li>
@@ -90,7 +97,7 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
       )}
 
       {unavailable ? (
-        <p className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">{unavailable}</p>
+        <p className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">{m.admin.passkeys[unavailable]}</p>
       ) : (
         <form
           ref={formRef}
@@ -102,13 +109,13 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
         >
           <div>
             <label htmlFor="passkey-name" className="mb-1.5 block text-sm font-medium text-ink-2">
-              名称
+              {t.passkeyName}
             </label>
-            <input id="passkey-name" name="name" maxLength={40} placeholder="如：MacBook 指纹" className={inputClass} />
+            <input id="passkey-name" name="name" maxLength={40} placeholder={t.passkeyNamePlaceholder} className={inputClass} />
           </div>
           <div>
             <label htmlFor="passkey-password" className="mb-1.5 block text-sm font-medium text-ink-2">
-              当前密码
+              {t.currentPassword}
             </label>
             <input
               id="passkey-password"
@@ -123,7 +130,7 @@ export default function Passkeys({ passkeys, unavailable }: { passkeys: PasskeyR
             disabled={pending}
             className="h-11 rounded-xl bg-btn px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {pending ? "处理中…" : "添加通行密钥"}
+            {pending ? t.processing : t.passkeyAdd}
           </button>
         </form>
       )}

@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { confirmCurrentPassword, requireSession } from "@/lib/admin-auth";
-import { ALERT_CHANNELS, validateAlertConfig, type AlertChannel, type AlertConfig } from "@/lib/alert-transport.mjs";
-import { getAlertConfig, notifyInBackground, notifyNow, saveAlertConfig } from "@/lib/alerts";
+import { validateAlertConfig, type AlertChannel, type AlertConfig } from "@/lib/alert-transport.mjs";
+import { alertSite, getAlertConfig, notifyInBackground, notifyNow, saveAlertConfig } from "@/lib/alerts";
+import { getAdminI18n } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/messages";
 import { audit } from "@/lib/audit";
 
 export type AlertFormState = { error?: string; success?: string };
@@ -25,19 +27,23 @@ async function configFromForm(formData: FormData): Promise<AlertConfig> {
   };
 }
 
-const channelLabel = (channel: AlertChannel) =>
-  ALERT_CHANNELS.find((item) => item.value === channel)?.label ?? channel;
+const channelLabel = (channel: AlertChannel, m: Messages) => m.admin.alertChannels[channel] ?? channel;
+
+function problemText(problem: NonNullable<ReturnType<typeof validateAlertConfig>>, channel: AlertChannel, m: Messages) {
+  return m.admin.alertsForm.invalid[problem].replace("{channel}", channelLabel(channel, m));
+}
 
 /** 保存告警设置。改推送目标需要当前密码：防止会话被盗后被人悄悄关掉告警。 */
 export async function saveAlertSettings(_prev: AlertFormState, formData: FormData): Promise<AlertFormState> {
   const { admin } = await requireSession();
+  const { m } = await getAdminI18n();
   const passwordError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
   if (passwordError) return { error: passwordError };
 
   const previous = await getAlertConfig();
   const next = await configFromForm(formData);
   const problem = validateAlertConfig(next);
-  if (problem) return { error: problem };
+  if (problem) return { error: problemText(problem, next.channel, m) };
 
   const targetChanged =
     previous.channel !== next.channel ||
@@ -46,33 +52,36 @@ export async function saveAlertSettings(_prev: AlertFormState, formData: FormDat
     previous.telegramToken !== next.telegramToken;
   // 先通知旧渠道：如果不是本人改的，原来的接收人还能收到这条消息。
   if (previous.channel !== "off" && targetChanged) {
+    // 推送内容跟网站语言（lib/alerts.ts 的 alertSite()）
+    const site = (await alertSite()).m;
+    const t = site.admin.alerts;
     await notifyInBackground(
       "alerts.update",
-      "告警推送设置被修改",
-      [`账号：${admin.username}`, `新的推送渠道：${channelLabel(next.channel)}`, "如果不是你本人操作，请立即登录后台检查。"],
+      t.titles.alertsUpdate,
+      [t.account.replace("{name}", admin.username), t.newChannel.replace("{channel}", channelLabel(next.channel, site)), t.checkNow],
       previous,
     );
   }
 
   await saveAlertConfig(next);
-  await audit("alerts.update", { actor: admin.username, detail: channelLabel(next.channel) });
+  await audit("alerts.update", { actor: admin.username, detail: channelLabel(next.channel, m) });
   revalidatePath("/admin/account");
-  return {
-    success: next.channel === "off" ? "已关闭安全告警" : "已保存，建议点「发送测试消息」确认能收到",
-  };
+  return { success: next.channel === "off" ? m.admin.alertsForm.off : m.admin.alertsForm.saved };
 }
 
 /** 用表单当前的配置发一条测试消息（不保存）。 */
 export async function sendTestAlert(_prev: AlertFormState, formData: FormData): Promise<AlertFormState> {
   const { admin } = await requireSession();
+  const { m, f } = await getAdminI18n();
   const config = await configFromForm(formData);
-  if (config.channel === "off") return { error: "请先选择推送渠道" };
+  if (config.channel === "off") return { error: m.admin.alertsForm.chooseChannel };
   const problem = validateAlertConfig(config);
-  if (problem) return { error: problem };
+  if (problem) return { error: problemText(problem, config.channel, m) };
   try {
-    await notifyNow("alerts.test", "测试消息：安全告警推送正常", [`操作人：${admin.username}`], config);
-    return { success: "测试消息已发出，请到群里或 Telegram 查看" };
+    const t = (await alertSite()).m.admin.alerts;
+    await notifyNow("alerts.test", t.titles.test, [t.operator.replace("{name}", admin.username)], config);
+    return { success: m.admin.alertsForm.testSent };
   } catch (error) {
-    return { error: `发送失败：${error instanceof Error ? error.message : String(error)}` };
+    return { error: f(m.admin.alertsForm.sendFailed, { reason: error instanceof Error ? error.message : String(error) }) };
   }
 }

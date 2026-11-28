@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { absoluteUrl } from "@/lib/site-url";
 import { readSubscriberToken } from "@/lib/subscription";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 /**
  * 退订：
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
   const token = url.searchParams.get("token") ?? form?.get("token");
   const id = readSubscriberToken(token, "unsubscribe");
   if (id) await prisma.subscriber.deleteMany({ where: { id } });
-  if (oneClick) return new Response(id ? "已退订" : "链接无效", { status: id ? 200 : 400 });
+  if (oneClick) {
+    const { m } = await getSiteI18n();
+    return new Response(id ? m.email.unsubscribed : m.email.invalidLink, { status: id ? 200 : 400 });
+  }
   return Response.redirect(absoluteUrl(`/subscribe/unsubscribe?status=${id ? "ok" : "invalid"}`), 303);
 }

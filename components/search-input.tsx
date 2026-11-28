@@ -1,14 +1,15 @@
 import IntentLink from "./intent-link";
 import SearchShortcut from "./search-shortcut";
+import type { Messages } from "@/lib/i18n/messages";
 
-export default function SearchInput() {
+export default function SearchInput({ labels }: { labels: Messages["site"]["search"] }) {
   return (
     <>
       <SearchShortcut />
       {/* 小屏使用图标入口，避免窄屏输入框挤压 Logo。 */}
       <IntentLink
         href="/search"
-        aria-label="打开搜索"
+        aria-label={labels.openSearch}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface/90 text-ink-2 shadow-capsule backdrop-blur-md transition-colors hover:bg-paper hover:text-ink sm:hidden"
       >
         <svg width="17" height="17" viewBox="0 0 17 17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
@@ -29,15 +30,15 @@ export default function SearchInput() {
         </svg>
         <input
           name="q"
-          aria-label="搜索教程"
+          aria-label={labels.heading}
           enterKeyHint="search"
-          placeholder="搜索教程…"
+          placeholder={labels.placeholder}
           aria-keyshortcuts="/ Control+K Meta+K"
           className="w-24 bg-transparent text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 transition-all placeholder:text-ink-3 focus:w-40 sm:w-32"
         />
         <kbd
           className="hidden rounded-md border border-line px-1.5 font-sans text-[11px] leading-5 text-ink-3 lg:inline"
-          title="按 / 或 Ctrl+K 快速搜索"
+          title={labels.shortcutTitle}
           aria-hidden="true"
         >
           /
@@ -45,7 +46,7 @@ export default function SearchInput() {
         <button
           type="submit"
           className="flex h-8 w-8 items-center justify-center rounded-full bg-btn text-white transition-transform hover:scale-105"
-          aria-label="搜索"
+          aria-label={labels.submit}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
             <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />

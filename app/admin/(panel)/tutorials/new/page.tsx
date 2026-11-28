@@ -7,13 +7,18 @@ import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import { tagSuggestions } from "@/lib/tag-sync";
 import { authorOptions } from "@/lib/authors";
 import TutorialForm from "../tutorial-form";
+import { getAdminI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "写教程" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.tutorials.newMetaTitle };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function NewTutorialPage() {
   const admin = await requireAdminPage("tutorials");
+  const { m, f } = await getAdminI18n();
   const [categoryRows, suggestions, series, authors] = await Promise.all([
     prisma.category.findMany({
       orderBy: [{ order: "asc" }, { id: "asc" }],
@@ -26,16 +31,14 @@ export default async function NewTutorialPage() {
   const categories = flattenCategoryTree(buildCategoryTree(categoryRows)).map(
     ({ node, depth }) => ({
       id: node.id,
-      name: `${"　".repeat(depth)}${node.name}（${depth + 1}级）`,
+      name: `${"　".repeat(depth)}${f(m.admin.common.categoryOption, { name: node.name, n: depth + 1 })}`,
     }),
   );
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-ink">写教程</h1>
-      <p className="mt-1 text-sm text-ink-3">
-        像使用 Word 一样撰写，图片可直接拖入正文
-      </p>
+      <h1 className="text-2xl font-bold text-ink">{m.admin.tutorials.newMetaTitle}</h1>
+      <p className="mt-1 text-sm text-ink-3">{m.admin.tutorials.newIntro}</p>
       <div className="mt-6">
         <TutorialForm
           draftKey="new"

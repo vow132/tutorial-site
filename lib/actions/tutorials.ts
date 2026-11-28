@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { FORBIDDEN_MESSAGE, requireAuth } from "@/lib/admin-auth";
+import { requireAuth } from "@/lib/admin-auth";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { can, canEditTutorial } from "@/lib/roles";
 import { audit } from "@/lib/audit";
 import { sanitizeArticleHtml } from "@/lib/sanitize";
@@ -23,6 +24,8 @@ export type TutorialFormState = { error?: string };
 const COVER_URL = /^\/uploads\/[\w-]+\.(?:webp|png|jpe?g|gif)$/i;
 
 async function parseForm(formData: FormData, admin: { id: number; role: string }) {
+  const { m } = await getAdminI18n();
+  const t = m.admin.tutorials;
   const title = String(formData.get("title") ?? "").trim();
   const excerpt = String(formData.get("excerpt") ?? "").trim();
   // 不信任客户端：Server Action 可被绕过编辑器直接调用，入库前按白名单过滤。
@@ -35,36 +38,36 @@ async function parseForm(formData: FormData, admin: { id: number; role: string }
   const publishAt = publishAtRaw ? new Date(publishAtRaw) : null;
   const cover = String(formData.get("cover") ?? "").trim() || null;
   // 标签输入框里还没确认成标签的文字（tagsPending）也一起算上，免得点保存时丢掉。
-  const tags = parseTagNames(`${formData.get("tags") ?? ""},${formData.get("tagsPending") ?? ""}`);
+  const tags = parseTagNames(`${formData.get("tags") ?? ""},${formData.get("tagsPending") ?? ""}`, m.admin.validation);
   const slug = normalizeSlug(
     String(formData.get("slug") ?? "").trim(),
     title
   );
 
-  if (!title) return { error: "请输入标题" as const };
-  if (title.length > 200) return { error: "标题不能超过 200 个字符" as const };
-  if (excerpt.length > 500) return { error: "摘要不能超过 500 个字符" as const };
-  if (!content || content === "<p></p>") return { error: "正文不能为空" as const };
-  if (!categoryId) return { error: "请选择分类" as const };
+  if (!title) return { error: t.titleRequired };
+  if (title.length > 200) return { error: t.titleTooLong };
+  if (excerpt.length > 500) return { error: t.excerptTooLong };
+  if (!content || content === "<p></p>") return { error: t.contentRequired };
+  if (!categoryId) return { error: t.categoryRequired };
   if ("error" in tags) return { error: tags.error };
   if (publishAt) {
-    if (Number.isNaN(publishAt.getTime())) return { error: "定时发布时间无效" as const };
-    if (publishAt.getTime() <= Date.now()) return { error: "定时发布时间要晚于现在" as const };
-    if (publishAt.getTime() > Date.now() + 366 * 24 * 60 * 60 * 1000) return { error: "定时发布最多提前一年" as const };
+    if (Number.isNaN(publishAt.getTime())) return { error: t.scheduleInvalid };
+    if (publishAt.getTime() <= Date.now()) return { error: t.schedulePast };
+    if (publishAt.getTime() > Date.now() + 366 * 24 * 60 * 60 * 1000) return { error: t.scheduleTooFar };
     published = false; // 到点前保持草稿
   }
   if (seriesId && !(await prisma.series.findUnique({ where: { id: seriesId }, select: { id: true } }))) {
-    return { error: "所选系列不存在或已被删除，请重新选择" as const };
+    return { error: t.seriesMissing };
   }
   if (cover && (!COVER_URL.test(cover) || !(await uploadedImage(cover)))) {
-    return { error: "封面图无效或文件已不存在，请重新上传" as const };
+    return { error: t.coverInvalid };
   }
   // 作者：编辑和站长可以在表单里改（例如替别人发稿），作者提交的这个字段一律忽略
   let authorId: number | undefined;
   const rawAuthor = Number(formData.get("authorId"));
   if (can(admin.role, "tutorials.others") && rawAuthor) {
     if (!(await prisma.admin.findUnique({ where: { id: rawAuthor }, select: { id: true } }))) {
-      return { error: "所选作者的账号不存在，请重新选择" as const };
+      return { error: t.authorMissing };
     }
     authorId = rawAuthor;
   }
@@ -99,7 +102,7 @@ export async function createTutorial(
   const exists = await prisma.tutorial.findUnique({
     where: { slug: parsed.data.slug },
   });
-  if (exists) return { error: "Slug 已被占用，请更换" };
+  if (exists) return { error: (await getAdminI18n()).m.admin.tutorials.slugTaken };
 
   const created = await prisma.tutorial.create({
     data: { ...parsed.data, authorId: parsed.authorId ?? admin.id, seriesOrder: await seriesOrderFor(parsed.data.seriesId) },
@@ -119,16 +122,17 @@ export async function updateTutorial(
   formData: FormData
 ): Promise<TutorialFormState> {
   const admin = await requireAuth("tutorials");
+  const { m } = await getAdminI18n();
   const current = await prisma.tutorial.findUnique({ where: { id }, select: { authorId: true } });
-  if (!current) return { error: "这篇教程不存在或已被删除" };
-  if (!canEditTutorial(admin, current)) return { error: FORBIDDEN_MESSAGE };
+  if (!current) return { error: m.admin.tutorials.gone };
+  if (!canEditTutorial(admin, current)) return { error: m.admin.forbidden };
   const parsed = await parseForm(formData, admin);
   if ("error" in parsed) return { error: parsed.error };
 
   const conflict = await prisma.tutorial.findFirst({
     where: { slug: parsed.data.slug, NOT: { id } },
   });
-  if (conflict) return { error: "Slug 已被其他教程占用" };
+  if (conflict) return { error: m.admin.tutorials.slugTakenOther };
 
   const before = await prisma.tutorial.findUnique({
     where: { id },
@@ -159,7 +163,7 @@ export async function deleteTutorial(formData: FormData) {
   if (!id) return;
   const target = await prisma.tutorial.findUnique({ where: { id }, select: { authorId: true } });
   if (!target) return;
-  if (!canEditTutorial(admin, target)) throw new Error(FORBIDDEN_MESSAGE);
+  if (!canEditTutorial(admin, target)) throw new Error((await getAdminI18n()).m.admin.forbidden);
   const deleted = await prisma.tutorial.delete({ where: { id } });
   await audit("tutorial.delete", { actor: admin.username, detail: `#${id} ${deleted.title}` });
   revalidatePublic(deleted.slug);
@@ -172,7 +176,7 @@ export async function togglePublish(formData: FormData) {
   if (!id) return;
   const t = await prisma.tutorial.findUnique({ where: { id } });
   if (!t) return;
-  if (!canEditTutorial(admin, t)) throw new Error(FORBIDDEN_MESSAGE);
+  if (!canEditTutorial(admin, t)) throw new Error((await getAdminI18n()).m.admin.forbidden);
   await prisma.tutorial.update({
     where: { id },
     // 手动切换状态时取消定时发布
@@ -198,7 +202,8 @@ export async function restoreRevision(formData: FormData) {
       })
     : null;
   if (!revision) return;
-  if (!canEditTutorial(admin, revision.tutorial)) throw new Error(FORBIDDEN_MESSAGE);
+  const { m, f } = await getAdminI18n();
+  if (!canEditTutorial(admin, revision.tutorial)) throw new Error(m.admin.forbidden);
   const { tutorial } = revision;
   await saveRevision(tutorial.id, tutorial, admin.username);
   await prisma.tutorial.update({
@@ -212,7 +217,7 @@ export async function restoreRevision(formData: FormData) {
   });
   await audit("tutorial.restore", {
     actor: admin.username,
-    detail: `#${tutorial.id} ${revision.title}（恢复到 ${revision.savedAt.toISOString().slice(0, 16).replace("T", " ")} UTC 的版本）`,
+    detail: `#${tutorial.id} ${revision.title}${f(m.admin.auditDetail.restoredTo, { time: revision.savedAt.toISOString().slice(0, 16).replace("T", " ") })}`,
   });
   revalidatePublic(tutorial.slug);
   revalidatePath(`/admin/tutorials/${tutorial.id}`);

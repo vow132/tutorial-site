@@ -14,18 +14,21 @@ const CHALLENGE_SECONDS = 5 * 60;
  * WebAuthn 依赖方（RP）：通行密钥绑定在 SITE_URL 的域名上。浏览器只在 HTTPS
  * （或 localhost）下提供 WebAuthn，且 RP ID 不能是 IP 地址。
  */
-export function relyingParty(): { rpID: string; origin: string } | { error: string } {
+/** 不能用通行密钥的原因（字典 m.admin.passkeys 里的键） */
+export type RelyingPartyProblem = "rpInvalidUrl" | "rpIpAddress" | "rpNeedsHttps";
+
+export function relyingParty(): { rpID: string; origin: string } | { error: RelyingPartyProblem } {
   let url: URL;
   try {
     url = new URL(SITE_URL);
   } catch {
-    return { error: "SITE_URL 配置无效，无法使用通行密钥" };
+    return { error: "rpInvalidUrl" };
   }
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(url.hostname) || url.hostname.startsWith("[")) {
-    return { error: "通行密钥不支持用 IP 地址访问：请把 SITE_URL 设为站点域名" };
+    return { error: "rpIpAddress" };
   }
   if (url.protocol !== "https:" && url.hostname !== "localhost") {
-    return { error: "通行密钥需要 HTTPS：请为站点配置 HTTPS，并把 SITE_URL 设为 https:// 开头的域名" };
+    return { error: "rpNeedsHttps" };
   }
   return { rpID: url.hostname, origin: url.origin };
 }

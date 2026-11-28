@@ -5,14 +5,15 @@ import { deleteFeedbackMessage, markAllFeedbackRead, setFeedbackRead } from "@/l
 import { prisma } from "@/lib/prisma";
 import Pagination from "@/components/pagination";
 import DeleteMessageButton from "./delete-message-button";
+import { getAdminI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "读者留言" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.feedback.metaTitle };
+}
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 30;
-
-const formatTime = (date: Date) =>
-  date.toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai" });
 
 export default async function AdminFeedbackPage({
   searchParams,
@@ -20,6 +21,9 @@ export default async function AdminFeedbackPage({
   searchParams: Promise<{ page?: string; show?: string }>;
 }) {
   await requireAdminPage("feedback");
+  const { m, f, date } = await getAdminI18n();
+  const t = m.admin.feedback;
+  const formatTime = (value: Date) => date(value, { dateStyle: "medium", timeStyle: "short" });
   const { page: rawPage, show } = await searchParams;
   const unreadOnly = show !== "all";
   const where = unreadOnly ? { read: false } : {};
@@ -41,30 +45,30 @@ export default async function AdminFeedbackPage({
     <div className="max-w-4xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-ink">读者留言</h1>
-          <p className="mt-1 text-sm text-ink-3">读者点「没帮助」之后写下的话，只有你能看到，适合拿来改稿。</p>
+          <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+          <p className="mt-1 text-sm text-ink-3">{t.intro}</p>
         </div>
         {unread > 0 && (
           <form action={markAllFeedbackRead}>
             <button type="submit" className="rounded-full border border-line px-4 py-2 text-sm text-ink-2 transition-colors hover:bg-paper hover:text-ink">
-              全部标为已读
+              {t.markAllRead}
             </button>
           </form>
         )}
       </div>
 
-      <nav aria-label="留言筛选" className="mt-5 flex gap-2">
+      <nav aria-label={t.filter} className="mt-5 flex gap-2">
         <Link href="/admin/feedback" className={tab(unreadOnly)} aria-current={unreadOnly ? "page" : undefined}>
-          未读（{unread}）
+          {f(t.unreadTab, { n: unread })}
         </Link>
         <Link href="/admin/feedback?show=all" className={tab(!unreadOnly)} aria-current={unreadOnly ? undefined : "page"}>
-          全部
+          {t.all}
         </Link>
       </nav>
 
       {messages.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-dashed border-line bg-surface/60 py-16 text-center text-sm text-ink-3">
-          {unreadOnly ? "没有未读留言" : "还没有读者留言"}
+          {unreadOnly ? t.noUnread : t.empty}
         </div>
       ) : (
         <ul className="mt-6 space-y-3">
@@ -74,7 +78,7 @@ export default async function AdminFeedbackPage({
               className={`rounded-2xl border bg-surface p-5 ${item.read ? "border-line" : "border-accent/40"}`}
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
-                {!item.read && <span className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent-ink">未读</span>}
+                {!item.read && <span className="rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent-ink">{t.unread}</span>}
                 <Link href={`/admin/tutorials/${item.tutorial.id}`} className="font-medium text-ink-2 hover:text-accent-ink">
                   {item.tutorial.title}
                 </Link>
@@ -86,7 +90,7 @@ export default async function AdminFeedbackPage({
                   <input type="hidden" name="id" value={item.id} />
                   <input type="hidden" name="read" value={item.read ? "0" : "1"} />
                   <button type="submit" className="rounded-lg px-2.5 py-1.5 text-xs text-ink-2 transition-colors hover:bg-paper hover:text-ink">
-                    {item.read ? "标为未读" : "标为已读"}
+                    {item.read ? t.markUnread : t.markRead}
                   </button>
                 </form>
                 <Link
@@ -95,15 +99,15 @@ export default async function AdminFeedbackPage({
                   target="_blank"
                   className="rounded-lg px-2.5 py-1.5 text-xs text-ink-2 transition-colors hover:bg-paper hover:text-ink"
                 >
-                  查看文章
+                  {t.viewArticle}
                 </Link>
-                <DeleteMessageButton id={item.id} action={deleteFeedbackMessage} />
+                <DeleteMessageButton id={item.id} action={deleteFeedbackMessage} label={m.admin.common.delete} confirmText={t.deleteConfirm} />
               </div>
             </li>
           ))}
         </ul>
       )}
-      <Pagination page={page} totalPages={totalPages} basePath="/admin/feedback" query={unreadOnly ? {} : { show: "all" }} />
+      <Pagination page={page} totalPages={totalPages} basePath="/admin/feedback" query={unreadOnly ? {} : { show: "all" }} labels={m.site.pagination} />
     </div>
   );
 }

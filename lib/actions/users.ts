@@ -8,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { changeAccount, removeAccount } from "@/lib/admin-accounts";
 import { requireAuth } from "@/lib/admin-auth";
 import { audit } from "@/lib/audit";
-import { parseDisplayName, readRole, ROLES, USERNAME_PATTERN, type Role } from "@/lib/roles";
+import { isRole, parseDisplayName, readRole, USERNAME_PATTERN, type Role } from "@/lib/roles";
+import { getAdminI18n } from "@/lib/i18n/server";
 
 /**
  * 账号管理（只有站长能用：requireAuth() 不传权限即只允许站长）。
@@ -22,61 +23,69 @@ function randomPassword() {
 }
 
 function parseRole(raw: FormDataEntryValue | null): Role | null {
-  return typeof raw === "string" && raw in ROLES ? (raw as Role) : null;
+  return isRole(raw) ? raw : null;
 }
 
 export async function createUser(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   const admin = await requireAuth();
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.users;
   const username = String(formData.get("username") ?? "").trim();
-  if (!USERNAME_PATTERN.test(username)) return { error: "用户名要 3-32 位字母、数字、下划线或连字符" };
+  if (!USERNAME_PATTERN.test(username)) return { error: t.badUsername };
   const role = parseRole(formData.get("role"));
-  if (!role) return { error: "请选择角色" };
-  const displayName = parseDisplayName(formData.get("displayName"));
+  if (!role) return { error: t.chooseRole };
+  const displayName = parseDisplayName(formData.get("displayName"), m.admin.validation);
   if ("error" in displayName) return { error: displayName.error };
   if (await prisma.admin.findUnique({ where: { username }, select: { id: true } })) {
-    return { error: `用户名 ${username} 已经有人用了` };
+    return { error: f(t.usernameTaken, { name: username }) };
   }
   const password = randomPassword();
   await prisma.admin.create({
     data: { username, role, displayName: displayName.value, password: await bcrypt.hash(password, 12) },
   });
-  await audit("user.create", { actor: admin.username, detail: `${username}（${ROLES[role].label}）` });
+  await audit("user.create", { actor: admin.username, detail: f(m.admin.authorOption, { name: username, role: m.admin.roles[role].label }) });
   revalidatePath("/admin/users");
-  return { success: `已创建 ${username}（${ROLES[role].label}），把下面的初始密码交给本人，登录后请在「账号安全」里改掉。`, password };
+  return { success: f(t.created, { name: username, role: m.admin.roles[role].label }), password };
 }
 
 export async function updateUser(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   const admin = await requireAuth();
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.users;
   const id = Number(formData.get("id"));
   const target = id ? await prisma.admin.findUnique({ where: { id } }) : null;
-  if (!target) return { error: "这个账号不存在或已被删除" };
+  if (!target) return { error: t.errors.notFound };
   const role = parseRole(formData.get("role"));
-  if (!role) return { error: "请选择角色" };
-  const displayName = parseDisplayName(formData.get("displayName"));
+  if (!role) return { error: t.chooseRole };
+  const displayName = parseDisplayName(formData.get("displayName"), m.admin.validation);
   if ("error" in displayName) return { error: displayName.error };
-  if (role === readRole(target.role) && displayName.value === (target.displayName ?? null)) return { success: "没有变化" };
+  if (role === readRole(target.role) && displayName.value === (target.displayName ?? null)) return { success: t.unchanged };
 
   // 「不能改自己的角色、至少留一个站长」在事务里检查（lib/admin-accounts.ts）
   const result = await changeAccount(prisma, { actorId: admin.id, targetId: id, role, displayName: displayName.value });
-  if ("error" in result) return { error: result.error };
+  if ("error" in result) return { error: t.errors[result.error] };
+  const roleChanged = role !== result.previousRole;
   const changes = [
-    role !== result.previousRole ? `角色 ${ROLES[result.previousRole].label} → ${ROLES[role].label}` : "",
-    displayName.value !== (target.displayName ?? null) ? `署名「${displayName.value ?? "（不显示）"}」` : "",
+    roleChanged ? f(t.auditRole, { from: m.admin.roles[result.previousRole].label, to: m.admin.roles[role].label }) : "",
+    displayName.value !== (target.displayName ?? null) ? f(t.auditByline, { name: displayName.value ?? t.auditNoByline }) : "",
   ].filter(Boolean);
-  await audit("user.update", { actor: admin.username, detail: `${target.username}：${changes.join("，")}` });
+  // 改了角色要推送告警（lib/alerts.ts），只改署名不推送
+  await audit("user.update", { actor: admin.username, detail: `${target.username}: ${changes.join("; ")}`, alert: roleChanged });
   // 署名出现在文章页（ISR）
   if (displayName.value !== (target.displayName ?? null)) revalidatePath("/tutorials/[slug]", "page");
   revalidatePath("/admin/users");
-  return { success: `已保存 ${target.username}` };
+  return { success: f(t.saved, { name: target.username }) };
 }
 
 /** 帮别人重置：新的随机密码，同时关闭两步验证、删除恢复码和通行密钥、退出所有设备（和 npm run admin:reset 一样）。 */
 export async function resetUserPassword(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   const admin = await requireAuth();
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.users;
   const id = Number(formData.get("id"));
   const target = id ? await prisma.admin.findUnique({ where: { id }, select: { id: true, username: true } }) : null;
-  if (!target) return { error: "这个账号不存在或已被删除" };
-  if (target.id === admin.id) return { error: "自己的密码请在「账号安全」里修改" };
+  if (!target) return { error: t.errors.notFound };
+  if (target.id === admin.id) return { error: t.selfReset };
   const password = randomPassword();
   await prisma.$transaction([
     prisma.admin.update({
@@ -90,7 +99,7 @@ export async function resetUserPassword(_prev: UserFormState, formData: FormData
   await audit("user.reset", { actor: admin.username, detail: target.username });
   revalidatePath("/admin/users");
   return {
-    success: `已重置 ${target.username}：两步验证和通行密钥已清除，所有设备已退出。把新密码交给本人：`,
+    success: f(t.resetDone, { name: target.username }),
     password,
   };
 }
@@ -98,14 +107,16 @@ export async function resetUserPassword(_prev: UserFormState, formData: FormData
 /** 删除账号：他写的教程转给执行删除的站长（文章不会丢，署名随之变成站长的）。 */
 export async function deleteUser(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   const admin = await requireAuth();
+  const { m, plural } = await getAdminI18n();
+  const t = m.admin.users;
   const id = Number(formData.get("id"));
   const target = id ? await prisma.admin.findUnique({ where: { id }, select: { id: true, username: true } }) : null;
-  if (!target) return { error: "这个账号不存在或已被删除" };
+  if (!target) return { error: t.errors.notFound };
   const result = await removeAccount(prisma, { actorId: admin.id, targetId: id });
-  if ("error" in result) return { error: result.error };
+  if ("error" in result) return { error: t.errors[result.error] };
   await audit("user.delete", {
     actor: admin.username,
-    detail: `${target.username}${result.moved ? `，${result.moved} 篇教程转给 ${admin.username}` : ""}`,
+    detail: `${target.username}${result.moved ? plural(result.moved, t.auditMoved, { to: admin.username }) : ""}`,
   });
   if (result.moved) revalidatePath("/tutorials/[slug]", "page");
   // 这一行随账号一起消失，结果显示在页面顶部

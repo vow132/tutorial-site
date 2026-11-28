@@ -6,6 +6,9 @@ import { contrastRatio } from "./color";
 import { parseBrandInput, readBrand } from "./settings-extras";
 import { shareImageVersion, siteShareCard, siteShareImagePath } from "./share-image";
 import { SITE_VERSION, versionLabel } from "./version";
+import { messagesFor } from "./i18n/messages";
+
+const v = messagesFor("zh-CN").admin.settingsErrors;
 
 test("the default or an invalid accent colour adds no CSS", () => {
   for (const value of ["", "#6366f1", "#6366F1", "red", "#fff", "#12345g", "#6366f1;}body{display:none"]) {
@@ -48,15 +51,15 @@ test("stored brand settings fall back to safe defaults", () => {
 
 test("brand form input is validated", () => {
   const empty = { logoImage: "", favicon: "", shareImage: "", accentColor: "", mascot: true };
-  assert.deepEqual(parseBrandInput(empty), { data: empty });
-  assert.deepEqual(parseBrandInput({ ...empty, accentColor: " #6366F1 " }), { data: empty }, "the default colour is stored as empty");
-  assert.deepEqual(parseBrandInput({ ...empty, accentColor: "#0EA5E9", logoImage: "/uploads/logo-1.webp" }), {
+  assert.deepEqual(parseBrandInput(empty, v), { data: empty });
+  assert.deepEqual(parseBrandInput({ ...empty, accentColor: " #6366F1 " }, v), { data: empty }, "the default colour is stored as empty");
+  assert.deepEqual(parseBrandInput({ ...empty, accentColor: "#0EA5E9", logoImage: "/uploads/logo-1.webp" }, v), {
     data: { ...empty, accentColor: "#0ea5e9", logoImage: "/uploads/logo-1.webp" },
   });
-  assert.match((parseBrandInput({ ...empty, accentColor: "blue" }) as { error: string }).error, /RRGGBB/);
+  assert.match((parseBrandInput({ ...empty, accentColor: "blue" }, v) as { error: string }).error, /RRGGBB/);
   for (const key of ["logoImage", "favicon", "shareImage"] as const) {
-    assert.match((parseBrandInput({ ...empty, [key]: "https://evil.example/x.png" }) as { error: string }).error, /上传/);
-    assert.match((parseBrandInput({ ...empty, [key]: "/uploads/../.env" }) as { error: string }).error, /上传/);
+    assert.match((parseBrandInput({ ...empty, [key]: "https://evil.example/x.png" }, v) as { error: string }).error, /上传/);
+    assert.match((parseBrandInput({ ...empty, [key]: "/uploads/../.env" }, v) as { error: string }).error, /上传/);
   }
 });
 

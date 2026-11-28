@@ -18,6 +18,7 @@ import { categoryTextStyle } from "@/lib/color";
 import { pageMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site-url";
 import { assetUrl } from "@/lib/asset-url";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 // 首页是静态页：内容变更时由后台立即刷新；阅读量等统计每 10 分钟刷新一次。
 // 后台改动会立即让首页失效；但如果有一次重新生成恰好在改动之前开始、之后才结束，
@@ -31,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [settings, categories, latest, tutorialStats, allSeries] = await Promise.all([
+  const [settings, categories, latest, tutorialStats, allSeries, { m, plural, num, date, f }] = await Promise.all([
     getSettings(),
     getHomeCategories(),
     prisma.tutorial.findMany({
@@ -55,7 +56,9 @@ export default async function HomePage() {
       _sum: { views: true },
     }),
     getPublishedSeries(),
+    getSiteI18n(),
   ]);
+  const t = m.site.home;
   // 首页「从这里开始」：后台选的系列，没选就取最新的 3 个；没有已发布的系列时整块不显示
   const startSeries = settings.startHere.enabled ? pickStartHereSeries(allSeries, settings.startHere.seriesSlugs) : [];
 
@@ -64,25 +67,11 @@ export default async function HomePage() {
     category: (typeof categories)[number],
   ): number => category._count.tutorials;
 
+  const statValues = [tutorialStats._count._all, flattenCategoryTree(categories).length, tutorialStats._sum.views ?? 0];
   const stats = [
-    {
-      label: "精选教程",
-      value: tutorialStats._count._all,
-      unit: "篇",
-      color: "var(--chart-indigo)",
-    },
-    {
-      label: "教程分类",
-      value: flattenCategoryTree(categories).length,
-      unit: "个",
-      color: "var(--chart-green)",
-    },
-    {
-      label: "累计阅读",
-      value: tutorialStats._sum.views ?? 0,
-      unit: "次",
-      color: "var(--chart-amber)",
-    },
+    { label: t.statTutorials, value: statValues[0], unit: plural(statValues[0], t.unitTutorials), color: "var(--chart-indigo)" },
+    { label: t.statCategories, value: statValues[1], unit: plural(statValues[1], t.unitCategories), color: "var(--chart-green)" },
+    { label: t.statViews, value: statValues[2], unit: plural(statValues[2], t.unitViews), color: "var(--chart-amber)" },
   ];
 
   // 告诉搜索引擎站点名称（搜索结果里显示的站点名）。
@@ -93,7 +82,7 @@ export default async function HomePage() {
     alternateName: settings.siteTitle,
     url: absoluteUrl("/"),
     description: settings.siteDescription,
-    inLanguage: "zh-CN",
+    inLanguage: settings.locale,
   };
 
   return (
@@ -139,7 +128,7 @@ export default async function HomePage() {
             href="/tutorials"
             className="group flex h-12 items-center gap-2 rounded-full bg-btn px-7 text-sm font-semibold text-white shadow-capsule transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lifted active:translate-y-0 active:scale-[0.98]"
           >
-            开始学习
+            {t.startLearning}
             <svg className="transition-transform duration-200 group-hover:translate-x-1" width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
               <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
             </svg>
@@ -148,7 +137,7 @@ export default async function HomePage() {
             href="#categories"
             className="flex h-12 items-center rounded-full border border-line bg-surface px-7 text-sm font-semibold text-ink transition-all duration-200 hover:border-accent hover:text-accent active:scale-[0.98]"
           >
-            浏览分类
+            {t.browseCategories}
           </IntentLink>
         </Reveal>
       </section>
@@ -164,7 +153,7 @@ export default async function HomePage() {
                   className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: s.color }}
                 />
-                <span className="text-3xl font-extrabold text-ink">{s.value}</span>
+                <span className="text-3xl font-extrabold text-ink">{num(s.value)}</span>
                 <span className="text-sm font-medium text-ink-3">{s.unit}</span>
               </p>
             </GlowCard>
@@ -187,7 +176,7 @@ export default async function HomePage() {
                 <Reveal mode="scroll" delay={index * 0.06}>
                   <GlowCard className="flex h-full flex-col p-6">
                     <span className="text-xs font-medium text-accent-ink">
-                      路线 {index + 1} · 共 {series.tutorials.length} 篇
+                      {plural(series.tutorials.length, t.routeLabel, { index: index + 1 })}
                     </span>
                     <h3 className="mt-2 text-lg font-bold text-ink">
                       <IntentLink href={seriesPath(series.slug)} className="transition-colors hover:text-accent-ink">
@@ -201,7 +190,7 @@ export default async function HomePage() {
                       href={`/tutorials/${series.tutorials[0].slug}`}
                       className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-medium text-accent-ink hover:underline"
                     >
-                      <span className="truncate">从第 1 篇开始：{series.tutorials[0].title}</span>
+                      <span className="truncate">{f(t.startFromFirst, { title: series.tutorials[0].title })}</span>
                       <span aria-hidden="true">→</span>
                     </IntentLink>
                   </GlowCard>
@@ -217,8 +206,8 @@ export default async function HomePage() {
         <Reveal mode="scroll">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-ink md:text-3xl">教程分类</h2>
-              <p className="mt-2 text-sm text-ink-2">选一个方向，开始系统学习</p>
+              <h2 className="text-2xl font-bold text-ink md:text-3xl">{t.categoriesTitle}</h2>
+              <p className="mt-2 text-sm text-ink-2">{t.categoriesIntro}</p>
             </div>
           </div>
         </Reveal>
@@ -241,15 +230,15 @@ export default async function HomePage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-ink">{c.name}</h3>
                       <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-ink-3">
-                        {countCategoryTutorials(c)} 篇
+                        {plural(countCategoryTutorials(c), m.site.tutorialCount)}
                       </span>
                     </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-ink-2 line-clamp-2">
-                      {c.description ?? "暂无描述"}
+                      {c.description ?? m.site.noDescription}
                     </p>
                     {c.children.length > 0 && (
                       <p className="mt-2 text-xs text-accent-ink">
-                        包含 {c.children.length} 个子分类
+                        {plural(c.children.length, t.subcategories)}
                       </p>
                     )}
                   </div>
@@ -265,14 +254,14 @@ export default async function HomePage() {
         <Reveal mode="scroll">
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-ink md:text-3xl">最新教程</h2>
-              <p className="mt-2 text-sm text-ink-2">新鲜出炉，趁热阅读</p>
+              <h2 className="text-2xl font-bold text-ink md:text-3xl">{t.latestTitle}</h2>
+              <p className="mt-2 text-sm text-ink-2">{t.latestIntro}</p>
             </div>
             <IntentLink
               href="/tutorials"
               className="hidden items-center gap-1.5 text-sm font-medium text-ink-2 transition-colors hover:text-accent sm:flex"
             >
-              查看全部
+              {t.viewAll}
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="M1.5 6h9M7 2.5L10.5 6 7 9.5" />
               </svg>
@@ -298,18 +287,14 @@ export default async function HomePage() {
                     </span>
                     <span>·</span>
                     <time dateTime={latest[0].createdAt.toISOString()}>
-                      {latest[0].createdAt.toLocaleDateString("zh-CN", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {date(latest[0].createdAt, { year: "numeric", month: "short", day: "numeric" })}
                     </time>
                   </div>
                   <h3 className="mt-3 truncate text-xl font-bold text-ink transition-colors group-hover:text-accent md:text-2xl">
                     {latest[0].title}
                   </h3>
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2 line-clamp-2">
-                    {latest[0].excerpt ?? "暂无摘要"}
+                    {latest[0].excerpt ?? m.site.noExcerpt}
                   </p>
                 </div>
                 {latest[0].thumbnail && (

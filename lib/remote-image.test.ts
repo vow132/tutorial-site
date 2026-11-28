@@ -51,19 +51,19 @@ test("downloads an image, following redirects and sending the site's own Referer
 
 test("refuses local and private targets by default, including through redirects and host names", async () => {
   await assert.rejects(fetchRemoteImage(`${base}/a.png`, { ports: new Set([port()]) }), RemoteImageError);
-  await assert.rejects(fetchRemoteImage(`http://localhost:${port()}/a.png`, { ports: new Set([port()]) }), /内网|本机/);
-  await assert.rejects(fetchRemoteImage(`${base}/to-private`, local()), /内网|本机/);
-  await assert.rejects(fetchRemoteImage("http://169.254.169.254/latest/meta-data/"), /内网|本机/);
-  await assert.rejects(fetchRemoteImage("http://[::1]/a.png"), /内网|本机/);
+  await assert.rejects(fetchRemoteImage(`http://localhost:${port()}/a.png`, { ports: new Set([port()]) }), /private/);
+  await assert.rejects(fetchRemoteImage(`${base}/to-private`, local()), /private/);
+  await assert.rejects(fetchRemoteImage("http://169.254.169.254/latest/meta-data/"), /private/);
+  await assert.rejects(fetchRemoteImage("http://[::1]/a.png"), /private/);
 });
 
 test("rejects bad schemes, credentials, odd ports, loops, oversized and slow responses", async () => {
-  await assert.rejects(fetchRemoteImage("file:///etc/passwd"), /http/);
-  await assert.rejects(fetchRemoteImage("ftp://example.com/a.png"), /http/);
-  await assert.rejects(fetchRemoteImage("http://user:pass@example.com/a.png"), /用户名/);
-  await assert.rejects(fetchRemoteImage("http://example.com:22/a.png"), /端口/);
-  await assert.rejects(fetchRemoteImage(`${base}/loop`, local()), /跳转/);
-  await assert.rejects(fetchRemoteImage(`${base}/big`, { ...local(), maxBytes: 1024 }), /太大/);
-  await assert.rejects(fetchRemoteImage(`${base}/slow`, { ...local(), timeoutMs: 200 }), /超时/);
+  await assert.rejects(fetchRemoteImage("file:///etc/passwd"), /protocol/);
+  await assert.rejects(fetchRemoteImage("ftp://example.com/a.png"), /protocol/);
+  await assert.rejects(fetchRemoteImage("http://user:pass@example.com/a.png"), /credentials/);
+  await assert.rejects(fetchRemoteImage("http://example.com:22/a.png"), /port/);
+  await assert.rejects(fetchRemoteImage(`${base}/loop`, local()), /redirects/);
+  await assert.rejects(fetchRemoteImage(`${base}/big`, { ...local(), maxBytes: 1024 }), /tooLarge/);
+  await assert.rejects(fetchRemoteImage(`${base}/slow`, { ...local(), timeoutMs: 200 }), /timeout/);
   await assert.rejects(fetchRemoteImage(`${base}/missing`, local()), /404/);
 });

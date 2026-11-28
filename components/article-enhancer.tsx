@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COPY_ATTRIBUTION_MIN_LENGTH, copyAttribution } from "@/lib/anti-scrape";
+import { useI18n } from "@/lib/i18n/client";
 
 /** 复制到剪贴板：HTTPS / localhost 用 Clipboard API，http 部署退回 execCommand。 */
 async function copyText(text: string) {
@@ -46,6 +47,8 @@ function inCode(node: Node | null) {
 export default function ArticleEnhancer({ attribution = null }: { attribution?: { title: string; url: string } | null }) {
   const [zoom, setZoom] = useState<Zoom>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const { m } = useI18n();
+  const t = m.reader.article;
   const toastTimer = useRef(0);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -79,8 +82,8 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
       if (copyButton) {
         const code = copyButton.closest(".code-block")?.querySelector("pre")?.textContent ?? "";
         const ok = await copyText(code.replace(/\n$/, ""));
-        copyButton.textContent = ok ? "已复制" : "复制失败";
-        window.setTimeout(() => (copyButton.textContent = "复制"), 1600);
+        copyButton.textContent = ok ? t.copied : t.copyFailed;
+        window.setTimeout(() => (copyButton.textContent = t.copy), 1600);
         return;
       }
 
@@ -91,7 +94,7 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
         history.replaceState(null, "", `#${id}`);
         document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
         const ok = await copyText(window.location.href);
-        showToast(ok ? "已复制本节链接" : "复制失败，请从地址栏复制");
+        showToast(ok ? t.sectionLinkCopied : t.sectionLinkFailed);
         return;
       }
 
@@ -110,7 +113,7 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
       if (inCode(selection.anchorNode) || inCode(selection.focusNode)) return;
       const copied = document.createElement("div");
       for (let i = 0; i < selection.rangeCount; i++) copied.append(selection.getRangeAt(i).cloneContents());
-      const source = copyAttribution(attribution.title, attribution.url);
+      const source = copyAttribution(attribution.title, attribution.url, t.copySource);
       event.clipboardData.setData("text/plain", text + source.text);
       event.clipboardData.setData("text/html", copied.innerHTML + source.html);
       event.preventDefault();
@@ -126,7 +129,7 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
       window.removeEventListener("hashchange", mapLegacyHash);
       delete article.dataset.enhanced;
     };
-  }, [showToast, attribution]);
+  }, [showToast, attribution, t]);
 
   useEffect(() => {
     if (!zoom) return;
@@ -149,7 +152,7 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={zoom.alt || "查看大图"}
+          aria-label={zoom.alt || t.zoomImage}
           className="image-zoom fixed inset-0 z-[90] flex cursor-zoom-out items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setZoom(null)}
         >
@@ -164,7 +167,7 @@ export default function ArticleEnhancer({ attribution = null }: { attribution?: 
             type="button"
             onClick={() => setZoom(null)}
             className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-xl text-white transition-colors hover:bg-white/25"
-            aria-label="关闭大图"
+            aria-label={t.closeImage}
           >
             ×
           </button>

@@ -1,23 +1,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseSeriesInput, seriesPath, seriesPosition, groupByChapter, parseChapterInput, firstUnread } from "./series";
+import { messagesFor } from "./i18n/messages";
+
+const v = messagesFor("zh-CN").admin.validation;
 
 test("series input is trimmed and gets a readable slug", () => {
-  assert.deepEqual(parseSeriesInput({ title: "  从零搭建 Next.js 博客 ", slug: "", description: "  " }), {
+  assert.deepEqual(parseSeriesInput({ title: "  从零搭建 Next.js 博客 ", slug: "", description: "  " }, v), {
     data: { title: "从零搭建 Next.js 博客", slug: "从零搭建-next-js-博客", description: null },
   });
-  assert.deepEqual(parseSeriesInput({ title: "Docker 入门", slug: "Docker Basics", description: "五篇" }), {
+  assert.deepEqual(parseSeriesInput({ title: "Docker 入门", slug: "Docker Basics", description: "五篇" }, v), {
     data: { title: "Docker 入门", slug: "docker-basics", description: "五篇" },
   });
   assert.equal(seriesPath("docker-入门"), "/series/docker-%E5%85%A5%E9%97%A8");
 });
 
 test("series input rejects empty or oversized values", () => {
-  assert.deepEqual(parseSeriesInput({ title: " ", slug: "", description: "" }), { error: "请输入系列名称" });
-  assert.ok("error" in parseSeriesInput({ title: "长".repeat(61), slug: "", description: "" }));
-  assert.ok("error" in parseSeriesInput({ title: "系列", slug: "", description: "字".repeat(301) }));
-  assert.deepEqual(parseSeriesInput({ title: "系列", slug: "---", description: "" }), { error: "网址别名需要包含文字或数字" });
-  assert.deepEqual(parseSeriesInput({ title: "!!!", slug: "", description: "" }), { error: "网址别名需要包含文字或数字" });
+  assert.deepEqual(parseSeriesInput({ title: " ", slug: "", description: "" }, v), { error: "请输入系列名称" });
+  assert.ok("error" in parseSeriesInput({ title: "长".repeat(61), slug: "", description: "" }, v));
+  assert.ok("error" in parseSeriesInput({ title: "系列", slug: "", description: "字".repeat(301) }, v));
+  assert.deepEqual(parseSeriesInput({ title: "系列", slug: "---", description: "" }, v), { error: "网址别名需要包含文字或数字" });
+  assert.deepEqual(parseSeriesInput({ title: "!!!", slug: "", description: "" }, v), { error: "网址别名需要包含文字或数字" });
 });
 
 test("position in a series gives the number and neighbours", () => {
@@ -50,10 +53,10 @@ test("chapters group neighbouring tutorials with the same chapter name, numberin
 });
 
 test("chapter names are optional and short", () => {
-  assert.deepEqual(parseChapterInput("  第一部分  基础 "), { value: "第一部分 基础" });
-  assert.deepEqual(parseChapterInput(""), { value: null });
-  assert.deepEqual(parseChapterInput(null), { value: null });
-  assert.ok("error" in parseChapterInput("长".repeat(31)));
+  assert.deepEqual(parseChapterInput("  第一部分  基础 ", v), { value: "第一部分 基础" });
+  assert.deepEqual(parseChapterInput("", v), { value: null });
+  assert.deepEqual(parseChapterInput(null, v), { value: null });
+  assert.ok("error" in parseChapterInput("长".repeat(31), v));
 });
 
 test("continue reading points at the first tutorial not read yet", () => {

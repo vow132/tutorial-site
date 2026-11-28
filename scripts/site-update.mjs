@@ -5,9 +5,20 @@ import { createRequire } from "node:module";
 import { access, copyFile, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { scriptText, siteLocaleOfFile } from "../lib/script-i18n.mjs";
 
 export const REPOSITORY = "https://github.com/vow132/tutorial-site.git";
 const SHA = /^[a-f0-9]{40}$/;
+
+/** 网站语言：读站点数据库的设置，读不到时返回 null（文字按简体中文）。 */
+function readSiteLocale(configuredUrl, root) {
+  try {
+    const require = createRequire(path.join(root, "package.json"));
+    return siteLocaleOfFile(require("better-sqlite3"), databaseFile(configuredUrl, root));
+  } catch {
+    return null;
+  }
+}
 const JOB = /^[a-zA-Z0-9][a-zA-Z0-9_-]{7,79}$/;
 
 export function isExpectedOrigin(origin) {
@@ -16,15 +27,15 @@ export function isExpectedOrigin(origin) {
 
 export function databaseFile(configured, cwd) {
   const url = (configured || "file:./prisma/dev.db").trim();
-  if (!url.startsWith("file:")) throw new Error("自动更新仅支持本地 SQLite 数据库。");
+  if (!url.startsWith("file:")) throw new Error("自动更新仅支持本地 SQLite 数据库。/ Only a local SQLite database is supported.");
   const file = url.slice(5).split("?")[0];
-  if (!file || file === ":memory:") throw new Error("自动更新需要持久化 SQLite 数据库。");
+  if (!file || file === ":memory:") throw new Error("自动更新需要持久化 SQLite 数据库。/ A persistent SQLite database file is required.");
   return path.resolve(cwd, file);
 }
 
 export function assertBranch(branch) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(branch) || branch.includes("..") || branch.endsWith("/") || branch.includes("//") || branch.endsWith(".lock")) {
-    throw new Error("更新分支配置无效。");
+    throw new Error("更新分支配置无效。/ Invalid update branch setting.");
   }
   return branch;
 }
@@ -139,7 +150,7 @@ async function notifyUpdateResult(databasePath, moduleRoot, message) {
       db.close();
     }
   } catch (error) {
-    console.error("[site-update] 推送更新结果失败：", error instanceof Error ? error.message : error);
+    console.error("[site-update] notify failed:", error instanceof Error ? error.message : error);
   }
 }
 
@@ -152,7 +163,7 @@ async function health(revision, port) {
     } catch { /* A restarted process can need a few seconds to bind its port. */ }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  throw new Error("新版本健康检查失败。");
+  throw new Error("新版本健康检查失败。/ The new version failed its health check.");
 }
 
 function processConfig(app) {
@@ -189,15 +200,17 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
   const prune = dependencies.prune || pruneUpdateArtifacts;
   const notify = dependencies.notify || notifyUpdateResult;
   const notifyDatabase = () => liveDatabase || databaseFile(environment.DATABASE_URL, root);
+  // 进度、失败原因会显示在后台，结果会推送到告警渠道：都按网站语言（lib/script-i18n.mjs）
+  const t = scriptText(dependencies.locale !== undefined ? dependencies.locale : readSiteLocale(environment.DATABASE_URL, root));
   const branch = environment.SITE_UPDATE_BRANCH || "master";
-  if (!SHA.test(targetRevision) || !JOB.test(jobId)) throw new Error("更新任务参数无效。");
+  if (!SHA.test(targetRevision) || !JOB.test(jobId)) throw new Error(t("error.badJob"));
   root = await realpath(root);
   const updates = path.join(root, ".updates");
   const lock = path.join(updates, "update.lock");
   const statusFile = path.join(updates, "status.json");
   const initial = JSON.parse(await readFile(statusFile, "utf8"));
   if (initial.jobId !== jobId || initial.state !== "running" || !(await stat(lock)).isDirectory()) {
-    throw new Error("更新任务锁无效。");
+    throw new Error(t("error.badLock"));
   }
   let current = { ...initial, jobId, targetRevision, pid: process.pid };
   let phase = "preflight";
@@ -219,57 +232,57 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
   const previousConfig = path.join(updates, `previous-${jobId}.config.cjs`);
   const appName = environment.SITE_PM2_APP_NAME || "教程网";
   try {
-    await progress("preflight", "正在检查部署环境…");
+    await progress("preflight", t("progress.preflight"));
     assertBranch(branch);
     if (platform !== "linux" || environment.NODE_ENV !== "production" || environment.SITE_AUTO_UPDATE === "false") {
-      throw new Error("自动更新需要启用更新功能的 Linux + PM2 生产部署。");
+      throw new Error(t("error.notEnabled"));
     }
     const origin = await command("git", ["remote", "get-url", "origin"], { capture: true, timeout: 15_000 });
-    if (!isExpectedOrigin(origin)) throw new Error("本地 Git 仓库来源与教程网仓库不一致。");
+    if (!isExpectedOrigin(origin)) throw new Error(t("error.badOrigin"));
     if (await command("git", ["status", "--porcelain", "--untracked-files=all"], { capture: true, timeout: 15_000 })) {
-      throw new Error("服务器存在未提交的本地修改，请先处理后再更新。");
+      throw new Error(t("error.dirty"));
     }
     const apps = JSON.parse(await command("pm2", ["jlist"], { capture: true, timeout: 15_000 }));
     const matches = apps.filter((app) => app.name === appName);
     if (matches.length !== 1 || !["fork", "fork_mode"].includes(matches[0].pm2_env?.exec_mode) || matches[0].pm2_env.status !== "online") {
-      throw new Error("自动更新需要一个正在运行的 PM2 fork 模式站点进程。");
+      throw new Error(t("error.noProcess"));
     }
     const app = matches[0];
     const runningRoot = await realpath(app.pm2_env.pm_cwd);
     if (runningRoot !== root && !within(path.join(root, ".updates", "releases"), runningRoot)) {
-      throw new Error("PM2 进程目录不属于当前站点。");
+      throw new Error(t("error.foreignCwd"));
     }
     const expectedScript = await realpath(path.join(runningRoot, "node_modules", "next", "dist", "bin", "next"));
-    if (await realpath(app.pm2_env.pm_exec_path) !== expectedScript) throw new Error("PM2 启动入口不是当前站点的 Next.js。");
+    if (await realpath(app.pm2_env.pm_exec_path) !== expectedScript) throw new Error(t("error.foreignScript"));
     previous = processConfig(app);
     currentRevision = environment.SITE_CURRENT_REVISION || app.pm2_env.env?.SITE_DEPLOYED_REVISION || await command("git", ["rev-parse", "HEAD"], { cwd: runningRoot, capture: true, timeout: 15_000 });
-    if (!SHA.test(currentRevision)) throw new Error("无法确认当前部署版本。");
+    if (!SHA.test(currentRevision)) throw new Error(t("error.unknownRevision"));
     const currentHead = await command("git", ["rev-parse", "HEAD"], { cwd: runningRoot, capture: true, timeout: 15_000 });
-    if (currentHead !== currentRevision) throw new Error("当前运行版本与 Git 工作目录不一致，请先重新部署。");
+    if (currentHead !== currentRevision) throw new Error(t("error.revisionMismatch"));
     liveDatabase = databaseFile(environment.DATABASE_URL || previous.env.DATABASE_URL, runningRoot);
-    if (!(await stat(liveDatabase)).isFile()) throw new Error("站点数据库文件无效。");
+    if (!(await stat(liveDatabase)).isFile()) throw new Error(t("error.badDatabase"));
     liveDatabase = await realpath(liveDatabase);
-    if (within(path.join(updates, "releases"), liveDatabase)) throw new Error("数据库必须位于共享持久化目录中。");
+    if (within(path.join(updates, "releases"), liveDatabase)) throw new Error(t("error.databaseInRelease"));
     port = Number(environment.PORT || previous.env.PORT || 3000);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("站点端口配置无效。");
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(t("error.badPort"));
     const releases = path.join(updates, "releases");
     await mkdir(releases, { recursive: true, mode: 0o700 });
     const release = path.join(releases, jobId);
     const buildDatabase = path.join(release, ".update-build.db");
     liveBackup = path.join(updates, `database-${jobId}.db`);
-    await progress("fetch", "正在获取仓库更新…");
+    await progress("fetch", t("progress.fetch"));
     await command("git", ["clone", "--shared", "--no-checkout", "--", root, release]);
     await command("git", ["remote", "set-url", "origin", origin], { cwd: release });
     await command("git", ["fetch", "--no-tags", "origin", branch], { cwd: release, timeout: 120_000 });
     const fetched = await command("git", ["rev-parse", "FETCH_HEAD"], { cwd: release, capture: true });
-    if (fetched !== targetRevision) throw new Error("仓库版本已变化，请重新检查更新。");
+    if (fetched !== targetRevision) throw new Error(t("error.revisionChanged"));
     try { await command("git", ["merge-base", "--is-ancestor", currentRevision, targetRevision], { cwd: release }); }
-    catch { throw new Error("仓库更新与当前版本历史不兼容，已停止更新。"); }
-    if (targetRevision === currentRevision) throw new Error("当前已经是最新版本。");
+    catch { throw new Error(t("error.notAncestor")); }
+    if (targetRevision === currentRevision) throw new Error(t("error.alreadyLatest"));
     if (environment.SITE_UPDATE_REQUIRE_SIGNED === "true") {
       // 需要服务器上配置好可信的 GPG 公钥或 SSH allowedSignersFile。
       try { await command("git", ["verify-commit", targetRevision], { cwd: release, timeout: 30_000 }); }
-      catch { throw new Error("目标版本缺少可信签名，已停止更新。"); }
+      catch { throw new Error(t("error.unsigned")); }
     }
     await command("git", ["checkout", "--detach", targetRevision], { cwd: release });
     for (const filename of [".env", ".env.local", ".env.production", ".env.production.local"]) {
@@ -278,23 +291,23 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
     const uploads = path.join(root, "public", "uploads");
     await mkdir(uploads, { recursive: true });
     const releaseUploads = path.join(release, "public", "uploads");
-    if (await exists(releaseUploads)) throw new Error("新版本包含上传目录，无法安全共享现有文件。");
+    if (await exists(releaseUploads)) throw new Error(t("error.uploadsInRelease"));
     await link(uploads, releaseUploads, "dir");
     const buildEnvironment = { ...environment, NODE_ENV: "production", DATABASE_URL: `file:${buildDatabase}`, SITE_DEPLOYED_REVISION: targetRevision, SITE_UPDATE_ROOT: root };
-    await progress("install", "正在安装新版本依赖…");
+    await progress("install", t("progress.install"));
     await command("npm", ["ci", "--include=dev"], { cwd: release, env: buildEnvironment });
     const prisma = path.join(release, "node_modules", "prisma", "build", "index.js");
     await command(process.execPath, [prisma, "generate"], { cwd: release, env: buildEnvironment });
-    await progress("build", "正在使用数据库副本构建新版本，站点继续运行…");
+    await progress("build", t("progress.build"));
     await backup(liveDatabase, buildDatabase, runningRoot);
     await command(process.execPath, [prisma, "migrate", "deploy"], { cwd: release, env: buildEnvironment });
     await command("npm", ["run", "build"], { cwd: release, env: buildEnvironment });
     // Recheck before stopping: an operator may have edited the source during the build.
     if (await command("git", ["status", "--porcelain", "--untracked-files=all"], { capture: true })) {
-      throw new Error("构建期间检测到服务器本地修改，更新已取消。");
+      throw new Error(t("error.changedDuringBuild"));
     }
     await writeConfig(previousConfig, previous);
-    await progress("activate", "构建成功，正在备份数据库并切换版本…");
+    await progress("activate", t("progress.activate"));
     activationStarted = true;
     await command("pm2", ["stop", appName], { timeout: 30_000 });
     await backup(liveDatabase, liveBackup, runningRoot);
@@ -312,38 +325,38 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
     // PM2 reload can retain the old script/cwd. Recreate only this named process.
     await command("pm2", ["delete", appName], { timeout: 30_000 });
     await command("pm2", ["start", activeConfig, "--only", appName, "--update-env"], { timeout: 30_000 });
-    await progress("health", "正在验证新版本运行状态…");
+    await progress("health", t("progress.health"));
     await checkHealth(targetRevision, port);
     const onlineApps = JSON.parse(await command("pm2", ["jlist"], { capture: true, timeout: 15_000 }));
     if (!onlineApps.some((entry) => entry.name === appName && entry.pm2_env.status === "online" && entry.pm2_env.pm_cwd === release)) {
-      throw new Error("新版本 PM2 进程未正常运行。");
+      throw new Error(t("error.notOnline"));
     }
     await command("pm2", ["save"], { timeout: 30_000 });
     for (const suffix of ["", "-wal", "-shm"]) await rm(`${buildDatabase}${suffix}`, { force: true });
     try {
       await prune(updates, { protect: [release, previous.cwd, liveBackup, previousConfig] });
     } catch (pruneError) { logError(`[site-update:${jobId}] prune`, pruneError); }
-    await progress("complete", "更新成功，站点已运行最新版本。", "success");
+    await progress("complete", t("progress.complete"), "success");
     await notify(notifyDatabase(), root, {
       event: "site-update.success",
-      title: "网站已更新到新版本",
-      lines: [`新版本：${targetRevision.slice(0, 7)}`, `原版本：${currentRevision.slice(0, 7)}`],
+      title: t("updated"),
+      lines: [t("newRevision", { rev: targetRevision.slice(0, 7) }), t("oldRevision", { rev: currentRevision.slice(0, 7) })],
     });
     return { success: true, release };
   } catch (error) {
     logError(`[site-update:${jobId}] ${phase}`, error);
     const failedPhase = phase;
     if (activationStarted && previous) {
-      try { await progress("rollback", "新版本切换失败，正在恢复原版本…"); }
+      try { await progress("rollback", t("progress.rollback")); }
       catch (statusError) { logError(`[site-update:${jobId}] rollback status`, statusError); }
       try {
         try { await command("pm2", ["delete", appName], { timeout: 30_000 }); }
         catch {
           const apps = JSON.parse(await command("pm2", ["jlist"], { capture: true, timeout: 15_000 }));
-          if (apps.some((entry) => entry.name === appName)) throw new Error("无法停止进程，不能安全恢复数据库。");
+          if (apps.some((entry) => entry.name === appName)) throw new Error(t("error.cantStop"));
         }
         if (migrationsStarted) {
-          if (!(await exists(liveBackup))) throw new Error("回滚数据库备份缺失。");
+          if (!(await exists(liveBackup))) throw new Error(t("error.noBackup"));
           await rm(`${liveDatabase}-wal`, { force: true });
           await rm(`${liveDatabase}-shm`, { force: true });
           await copyFile(liveBackup, liveDatabase);
@@ -353,7 +366,7 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
         await checkHealth(currentRevision, port);
         const restoredApps = JSON.parse(await command("pm2", ["jlist"], { capture: true, timeout: 15_000 }));
         if (!restoredApps.some((entry) => entry.name === appName && entry.pm2_env.status === "online" && entry.pm2_env.pm_cwd === previous.cwd)) {
-          throw new Error("原版本 PM2 进程未正常恢复。");
+          throw new Error(t("error.notRestored"));
         }
         await command("pm2", ["save"], { timeout: 30_000 });
       } catch (rollbackError) {
@@ -361,19 +374,19 @@ export async function performUpdate({ root, targetRevision, jobId }, dependencie
         logError(`[site-update:${jobId}] rollback`, rollbackError);
       }
     }
-    const preflightMessage = error instanceof Error ? error.message : "部署检查失败。";
+    const preflightMessage = error instanceof Error ? error.message : t("error.checkFailed");
     const message = rollbackFailed
-      ? "更新失败且自动恢复未完成，请检查服务器 .updates/worker.log；数据库备份已保留。"
+      ? t("failed.unrecovered")
       : activationStarted
-        ? "更新失败，已恢复原版本。详细原因见服务器 .updates/worker.log。"
+        ? t("failed.restored")
         : ["preflight", "fetch"].includes(failedPhase)
-          ? preflightMessage.startsWith("git ") || preflightMessage.startsWith("pm2 ") ? "部署检查失败，请检查服务器 .updates/worker.log。" : preflightMessage
-          : "新版本构建失败，原站点继续运行。详细原因见服务器 .updates/worker.log。";
+          ? preflightMessage.startsWith("git ") || preflightMessage.startsWith("pm2 ") ? t("failed.check") : preflightMessage
+          : t("failed.build");
     await progress("failed", message, "error");
     await notify(notifyDatabase(), root, {
       event: "site-update.failed",
-      title: rollbackFailed ? "网站更新失败，自动恢复未完成，请尽快处理" : "网站更新失败",
-      lines: [message, `目标版本：${targetRevision.slice(0, 7)}`, `失败阶段：${failedPhase}`],
+      title: rollbackFailed ? t("updateFailedUnrecovered") : t("updateFailed"),
+      lines: [message, t("targetRevision", { rev: targetRevision.slice(0, 7) }), t("failedPhase", { phase: t(`phase.${failedPhase}`) })],
     });
     return { success: false, rollbackFailed };
   } finally {

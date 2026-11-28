@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
 import { shareImageVersion, type ShareCard } from "@/lib/share-image";
 import { renderShareImage } from "@/lib/share-image-render";
+import { messagesFor } from "@/lib/i18n/messages";
 
 /**
  * 文章分享图：/og/tutorials/<id>?v=<内容版本>。只给已发布的文章生成。
@@ -18,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
   if (!tutorial) return new Response("Not Found", { status: 404 });
 
-  const { siteName, logoText, brand } = await getSettings();
+  const { siteName, logoText, brand, locale } = await getSettings();
   const card: ShareCard = {
     title: tutorial.title,
     categoryName: tutorial.category.name,
@@ -26,6 +27,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     siteName,
     logoText,
     accent: brand.accentColor || undefined,
+    // 和文章页 shareImage() 里的一致，否则版本号对不上
+    cta: messagesFor(locale).site.share.articleCta,
   };
   const version = shareImageVersion(card);
   try {

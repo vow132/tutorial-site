@@ -7,6 +7,7 @@ import Pagination from "@/components/pagination";
 import Reveal from "@/components/reveal";
 import { getSettings } from "@/lib/settings";
 import { pageMetadata, pageSuffix, withPage } from "@/lib/seo";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 const PAGE_SIZE = 9;
 
@@ -17,14 +18,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { page: pageStr } = await searchParams;
   // 与页面相同的页码收敛规则（结果有缓存）：?page=999 的规范地址指向最后一页。
-  const [{ page, total }, settings] = await Promise.all([
+  const [{ page, total }, settings, { m, f, plural }] = await Promise.all([
     getPublishedTutorialPage({ page: Number(pageStr) || 1, pageSize: PAGE_SIZE }),
     getSettings(),
+    getSiteI18n(),
   ]);
-  const description = `${settings.siteName}全部 ${total} 篇图文教程，按发布时间排列，持续更新。`;
+  const description = plural(total, m.site.tutorials.description, { site: settings.siteName });
   return pageMetadata({
-    title: `全部教程${pageSuffix(page)}`,
-    description: page > 1 ? `${description}（第 ${page} 页）` : description,
+    title: `${m.site.tutorials.title}${pageSuffix(page, m.site.pageSuffix)}`,
+    description: page > 1 ? `${description}${f(m.site.pageInDescription, { page })}` : description,
     path: withPage("/tutorials", page),
   });
 }
@@ -37,25 +39,27 @@ export default async function TutorialsPage({
   const { page: pageStr } = await searchParams;
 
   // 页码收敛到合法区间，避免 ?page=999 渲染出误导性的空状态；结果有缓存。
-  const [{ total, totalPages, page, tutorials }, tags] = await Promise.all([
+  const [{ total, totalPages, page, tutorials }, tags, { m, plural }] = await Promise.all([
     getPublishedTutorialPage({ page: Number(pageStr) || 1, pageSize: PAGE_SIZE }),
     getPublishedTags(),
+    getSiteI18n(),
   ]);
+  const t = m.site.tutorials;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-14">
       <Reveal fade={false}>
         <h1 className="text-3xl font-extrabold text-ink md:text-4xl">
-          全部教程
+          {t.title}
         </h1>
-        <p className="mt-3 text-sm text-ink-2">共 {total} 篇，持续更新中</p>
+        <p className="mt-3 text-sm text-ink-2">{plural(total, t.intro)}</p>
         {tags.length > 0 && (
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="text-xs font-medium text-ink-3">热门标签</span>
-            <TagChips label="热门标签" showCount tags={tags.slice(0, 12)} />
+            <span className="text-xs font-medium text-ink-3">{t.popularTags}</span>
+            <TagChips label={t.popularTags} showCount tags={tags.slice(0, 12)} />
             {tags.length > 12 && (
               <IntentLink href="/tags" className="text-xs font-medium text-accent-ink hover:underline">
-                全部 {tags.length} 个 →
+                {plural(tags.length, t.allTagsLink)}
               </IntentLink>
             )}
           </div>
@@ -64,11 +68,11 @@ export default async function TutorialsPage({
 
       {tutorials.length === 0 ? (
         <div className="mt-16 rounded-3xl border border-dashed border-line bg-surface/60 py-20 text-center text-ink-3">
-          暂无教程，敬请期待
+          {t.empty}
         </div>
       ) : (
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <h2 className="sr-only">教程列表</h2>
+          <h2 className="sr-only">{t.listHeading}</h2>
           {tutorials.map((t, i) => (
             <Reveal key={t.id} delay={Math.min(i, 5) * 0.05}>
               <TutorialCard
@@ -86,7 +90,7 @@ export default async function TutorialsPage({
         </div>
       )}
 
-      <Pagination page={page} totalPages={totalPages} basePath="/tutorials" />
+      <Pagination page={page} totalPages={totalPages} basePath="/tutorials" labels={m.site.pagination} />
     </div>
   );
 }

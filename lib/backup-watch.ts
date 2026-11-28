@@ -1,4 +1,6 @@
-import { getAlertConfig, getAlertStatus, notifyNow, updateAlertStatus } from "@/lib/alerts";
+import { alertSite, getAlertConfig, getAlertStatus, notifyNow, updateAlertStatus } from "@/lib/alerts";
+import { format } from "@/lib/i18n/format";
+import { INTL_LOCALE } from "@/lib/i18n/locales";
 import { getBackupStatus, shouldRemindBackup } from "@/lib/backup-status";
 
 const FIRST_CHECK_MS = 10 * 60 * 1000;
@@ -13,14 +15,13 @@ export async function checkBackupFreshness(now = Date.now()) {
     return false;
   }
   await updateAlertStatus({ backupReminderAt: new Date(now).toISOString() });
+  // 定时器在请求之外：网站语言直接读库（alertSite()），不能用依赖 Next 缓存的 getSettings()
+  const { locale, m } = await alertSite();
+  const t = m.admin.alerts;
   const latest = backup.latest
-    ? `最近一次备份：${backup.latest.at.toLocaleString("zh-CN", { hour12: false })}（${backup.latest.name}）`
-    : "还没有任何备份";
-  await notifyNow("backup.stale", "超过 2 天没有新的数据库备份", [
-    latest,
-    `备份目录：${backup.directory}`,
-    "请检查服务器 crontab 里的 npm run backup 是否还在执行，或在后台「账号安全 → 安全告警」关闭备份提醒。",
-  ]).catch(() => {});
+    ? format(t.latestBackup, { time: backup.latest.at.toLocaleString(INTL_LOCALE[locale], { hour12: false }), name: backup.latest.name })
+    : t.noBackup;
+  await notifyNow("backup.stale", t.titles.backupStale, [latest, format(t.backupDir, { dir: backup.directory }), t.backupHint]).catch(() => {});
   return true;
 }
 

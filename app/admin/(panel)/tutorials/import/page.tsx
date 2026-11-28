@@ -4,13 +4,19 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { buildCategoryTree, flattenCategoryTree } from "@/lib/categories";
 import BulkImport from "./bulk-import";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { rich } from "@/lib/i18n/rich";
 
-export const metadata: Metadata = { title: "批量导入" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.bulkImport.metaTitle };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
   await requireAdminPage("import");
+  const t = (await getAdminI18n()).m.admin.bulkImport;
   const rows = await prisma.category.findMany({
     orderBy: [{ order: "asc" }, { id: "asc" }],
     select: { id: true, name: true, slug: true, parentId: true, order: true },
@@ -26,16 +32,22 @@ export default async function ImportPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-ink">批量导入</h1>
-          <p className="mt-1 text-sm text-ink-3">从 Hexo、Hugo、Jekyll、Obsidian 等 Markdown 文件夹，或者 WordPress 导出文件搬家过来</p>
+          <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+          <p className="mt-1 text-sm text-ink-3">{t.intro}</p>
         </div>
         <Link href="/admin/tutorials" className="text-sm text-accent-ink hover:underline">
-          ← 返回教程管理
+          {t.back}
         </Link>
       </div>
       {categories.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-line bg-surface p-5 text-sm text-ink-2">
-          还没有分类，请先到 <Link href="/admin/categories" className="text-accent-ink hover:underline">分类管理</Link> 建一个。
+          {rich(t.noCategories, {
+            link: (
+              <Link href="/admin/categories" className="text-accent-ink hover:underline">
+                {t.categoriesLink}
+              </Link>
+            ),
+          })}
         </p>
       ) : (
         <BulkImport categories={categories} />

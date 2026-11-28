@@ -2,64 +2,16 @@ import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import { displayIp, isDemoMode } from "@/lib/demo";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { rich } from "@/lib/i18n/rich";
 
-export const metadata: Metadata = { title: "安全日志" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.auditLog.metaTitle };
+}
 export const dynamic = "force-dynamic";
 
-const LABELS: Record<string, string> = {
-  "login.success": "登录成功",
-  "login.failed": "登录失败",
-  "login.totp_failed": "两步验证失败",
-  "login.locked": "登录被临时锁定",
-  "login.passkey": "通行密钥登录",
-  "login.passkey_failed": "通行密钥登录失败",
-  logout: "退出登录",
-  "session.revoke_others": "退出其他设备",
-  "session.revoke_all": "退出所有设备",
-  "account.update": "修改账号",
-  "account.reset_cli": "命令行重置账号",
-  "totp.enable": "开启两步验证",
-  "totp.disable": "关闭两步验证",
-  "passkey.add": "添加通行密钥",
-  "passkey.remove": "删除通行密钥",
-  "login.recovery_code": "用恢复码登录",
-  "recovery_codes.regenerate": "重新生成恢复码",
-  "tag.rename": "标签改名",
-  "tag.merge": "合并标签",
-  "tag.delete": "删除标签",
-  "about.update": "修改关于页面",
-  "alerts.update": "修改告警设置",
-  "tutorial.create": "新建教程",
-  "tutorial.update": "编辑教程",
-  "tutorial.delete": "删除教程",
-  "tutorial.publish": "发布教程",
-  "tutorial.unpublish": "撤回教程",
-  "tutorial.restore": "恢复历史版本",
-  "tutorial.import": "批量导入教程",
-  "sample.clear": "清除示例数据",
-  "series.create": "新建系列",
-  "series.update": "编辑系列",
-  "series.delete": "删除系列",
-  "series.add": "教程加入系列",
-  "series.remove": "教程移出系列",
-  "subscriber.delete": "删除订阅者",
-  "mail.settings": "修改发信设置",
-  "turnstile.settings": "修改人机验证设置",
-  "category.create": "新建分类",
-  "category.update": "编辑分类",
-  "category.delete": "删除分类",
-  "settings.update": "修改站点设置",
-  upload: "上传图片",
-  "site-update.start": "启动网站更新",
-  "site-update.denied": "网站更新被拒绝",
-  "account.display_name": "修改署名",
-  "user.create": "新建账号",
-  "user.update": "修改账号角色或署名",
-  "user.reset": "重置他人密码",
-  "user.delete": "删除账号",
-  "setup.complete": "完成安装",
-  "setup.failed": "安装码错误",
-};
+
 
 const WARNING = new Set([
   "login.failed",
@@ -75,10 +27,7 @@ const WARNING = new Set([
   "setup.failed",
 ]);
 
-const dateFormat = new Intl.DateTimeFormat("zh-CN", {
-  dateStyle: "short",
-  timeStyle: "medium",
-});
+const DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: "short", timeStyle: "medium" };
 
 function countRecentFailedLogins() {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -89,6 +38,8 @@ function countRecentFailedLogins() {
 
 export default async function AuditLogPage() {
   await requireAdminPage();
+  const { m, plural, date } = await getAdminI18n();
+  const t = m.admin.auditLog;
   const [entries, failedLogins, admins] = await Promise.all([
     prisma.auditLog.findMany({ orderBy: { id: "desc" }, take: 200 }),
     countRecentFailedLogins(),
@@ -97,39 +48,38 @@ export default async function AuditLogPage() {
   // 演示站：登录失败时访客随手填的用户名不显示（只显示真实存在的管理员名），IP 打码
   const demo = isDemoMode();
   const adminNames = new Set(admins.map((admin) => admin.username));
-  const actorOf = (actor: string | null) => (actor && demo && !adminNames.has(actor) ? "（访客填写，已隐藏）" : actor);
+  const actorOf = (actor: string | null) => (actor && demo && !adminNames.has(actor) ? t.hiddenActor : actor);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-ink">安全日志</h1>
+      <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
       <p className="mt-1 text-sm text-ink-3">
-        最近 200 条后台操作记录，保留一年。过去 24 小时登录失败 {failedLogins} 次
-        {failedLogins >= 20 ? "，数量偏高，建议确认已开启两步验证。" : "。"}
+        {t.intro} {plural(failedLogins, failedLogins >= 20 ? t.failedHigh : t.failed)}
       </p>
 
       <div className="mt-6 overflow-x-auto rounded-3xl border border-line bg-surface">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-line text-xs text-ink-3">
             <tr>
-              <th className="px-5 py-3 font-medium">时间</th>
-              <th className="px-5 py-3 font-medium">操作</th>
-              <th className="px-5 py-3 font-medium">账号</th>
-              <th className="px-5 py-3 font-medium">IP</th>
-              <th className="px-5 py-3 font-medium">详情</th>
+              <th className="px-5 py-3 font-medium">{t.colTime}</th>
+              <th className="px-5 py-3 font-medium">{t.colAction}</th>
+              <th className="px-5 py-3 font-medium">{t.colActor}</th>
+              <th className="px-5 py-3 font-medium">{t.colIp}</th>
+              <th className="px-5 py-3 font-medium">{t.colDetail}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {entries.map((entry) => (
               <tr key={entry.id}>
                 <td className="whitespace-nowrap px-5 py-3 text-ink-3">
-                  {dateFormat.format(entry.createdAt)}
+                  {date(entry.createdAt, DATE_TIME)}
                 </td>
                 <td
                   className={`whitespace-nowrap px-5 py-3 font-medium ${
                     WARNING.has(entry.action) ? "text-red-500" : "text-ink"
                   }`}
                 >
-                  {LABELS[entry.action] ?? entry.action}
+                  {t.actions[entry.action] ?? entry.action}
                 </td>
                 <td className="px-5 py-3 text-ink-2">{actorOf(entry.actor) ?? "—"}</td>
                 <td className="whitespace-nowrap px-5 py-3 text-ink-3">{displayIp(entry.ip) ?? "—"}</td>
@@ -139,7 +89,7 @@ export default async function AuditLogPage() {
             {entries.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-5 py-10 text-center text-ink-3">
-                  暂无记录
+                  {t.empty}
                 </td>
               </tr>
             )}
@@ -147,7 +97,7 @@ export default async function AuditLogPage() {
         </table>
       </div>
       <p className="mt-3 text-xs text-ink-3">
-        IP 列需要在反向代理后设置 <code>TRUST_PROXY=true</code>（接在 Cloudflare 后面时见 README「接入 Cloudflare」）才会记录。
+        {rich(t.ipNote, { env: <code>TRUST_PROXY=true</code> })}
       </p>
     </div>
   );

@@ -11,6 +11,7 @@ import { ReadMark, SeriesProgress } from "@/components/reading-history";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
 import { decodeSegment } from "@/lib/url";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 /** 和文章页一样是 ISR 缓存页：数据来自带缓存标签的 getPublishedSeries()，后台改动时随标签失效。 */
 export const revalidate = 300;
@@ -29,10 +30,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const series = await findSeries(slug);
   if (!series) notFound();
-  const settings = await getSettings();
+  const [settings, { m, f, plural }] = await Promise.all([getSettings(), getSiteI18n()]);
   return pageMetadata({
-    title: `${series.title}（系列教程）`,
-    description: series.description || `${settings.siteName}的系列教程「${series.title}」，共 ${series.tutorials.length} 篇，按顺序阅读。`,
+    title: f(m.site.series.pageTitle, { title: series.title }),
+    description: series.description || plural(series.tutorials.length, m.site.series.pageDescription, { site: settings.siteName, title: series.title }),
     path: seriesPath(series.slug),
     index: series.tutorials.length >= MIN_INDEXABLE_SERIES_TUTORIALS,
   });
@@ -43,6 +44,8 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
   const series = await findSeries(slug);
   if (!series) notFound();
   const url = absoluteUrl(seriesPath(series.slug));
+  const [{ m, f, plural }, { locale }] = await Promise.all([getSiteI18n(), getSettings()]);
+  const tx = m.site.series;
   const groups = groupByChapter(series.tutorials);
   // 只给有章节名的组编号：第 1 章、第 2 章…
   const chapterNumbers = new Map(groups.filter((group) => group.chapter).map((group, index) => [group, index + 1]));
@@ -58,26 +61,26 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
               name: series.title,
               url,
               ...(series.description ? { description: series.description } : {}),
-              inLanguage: "zh-CN",
+              inLanguage: locale,
               hasPart: series.tutorials.map((t) => ({
                 "@type": "Article",
                 headline: t.title,
                 url: absoluteUrl(`/tutorials/${encodeURIComponent(t.slug)}`),
               })),
             },
-            breadcrumbJsonLd([{ name: "首页", path: "/" }, { name: "系列教程", path: "/series" }, { name: series.title }]),
+            breadcrumbJsonLd([{ name: m.site.nav.home, path: "/" }, { name: tx.title, path: "/series" }, { name: series.title }]),
           ],
         }}
       />
       <Reveal fade={false}>
         <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink-3">
-          <IntentLink href="/" className="transition-colors hover:text-accent">首页</IntentLink>
+          <IntentLink href="/" className="transition-colors hover:text-accent">{m.site.nav.home}</IntentLink>
           <span>/</span>
-          <IntentLink href="/series" className="transition-colors hover:text-accent">系列教程</IntentLink>
+          <IntentLink href="/series" className="transition-colors hover:text-accent">{tx.title}</IntentLink>
           <span>/</span>
           <span className="text-ink-2">{series.title}</span>
         </nav>
-        <p className="text-xs font-medium text-accent-ink">系列教程 · 共 {series.tutorials.length} 篇</p>
+        <p className="text-xs font-medium text-accent-ink">{plural(series.tutorials.length, tx.label)}</p>
         <h1 className="mt-2 text-3xl font-extrabold text-ink md:text-4xl">{series.title}</h1>
         {series.description && <p className="mt-3 text-base leading-relaxed text-ink-2">{series.description}</p>}
       </Reveal>
@@ -85,13 +88,13 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
       {/* 阅读进度和「继续阅读」：只记在本浏览器里（lib/reading-history.ts） */}
       <SeriesProgress tutorials={groups.flatMap((group) => group.items)} />
 
-      <h2 className="sr-only">本系列教程（按阅读顺序）</h2>
+      <h2 className="sr-only">{tx.listHeading}</h2>
       <div className="mt-10 space-y-10">
         {groups.map((group, groupIndex) => (
           <section key={`${groupIndex}-${group.chapter ?? ""}`} aria-label={group.chapter ?? undefined}>
             {group.chapter && (
               <h3 className="mb-3 flex items-baseline gap-3 text-lg font-bold text-ink">
-                <span className="text-sm font-semibold text-accent-ink tabular-nums">第 {chapterNumbers.get(group)} 章</span>
+                <span className="text-sm font-semibold text-accent-ink tabular-nums">{f(tx.chapter, { n: chapterNumbers.get(group) ?? 0 })}</span>
                 {group.chapter}
               </h3>
             )}
@@ -110,7 +113,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
                         {t.number}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="sr-only">第 {t.number} 篇：</span>
+                        <span className="sr-only">{f(tx.itemNumber, { n: t.number })}</span>
                         <span className="flex items-start gap-1.5">
                           <span className="font-semibold text-ink group-hover:text-accent-ink">{t.title}</span>
                           <ReadMark id={t.id} />
@@ -120,7 +123,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
                           <span className="cat-text" style={categoryTextStyle(t.category.color)}>
                             {t.category.name}
                           </span>
-                          <span>{t.views} 次阅读</span>
+                          <span>{plural(t.views, m.site.views)}</span>
                         </span>
                       </span>
                     </IntentLink>

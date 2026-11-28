@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { SITE_REPOSITORY, type SiteUpdateStatus, type UpdateJob } from "./site-update-types";
+import { SITE_REPOSITORY, type SiteUpdateStatus, type UpdateJob, type UpdateMessageCode } from "./site-update-types";
+import { format } from "./i18n/format";
+import { admin as zh } from "./i18n/messages/zh-CN/admin";
 import { getDatabaseUrl } from "./database-url";
 
 const exec = promisify(execFile);
@@ -24,14 +26,24 @@ export function updateRoot(): string {
   return path.resolve(process.env.SITE_UPDATE_ROOT || process.cwd());
 }
 
-const DOCKER_MESSAGE = "Docker 部署不用一键更新：在服务器上执行 docker compose pull && docker compose up -d 即可（自己构建镜像的按 README 重新构建）。";
+/** 状态说明：code 给界面按后台语言显示（m.admin.update.messages），message 是中文原文 */
+type Vars = NonNullable<SiteUpdateStatus["vars"]>;
+function say(code: UpdateMessageCode, vars?: Vars) {
+  const hint = vars?.hint ? zh.update.messages[vars.hint] : "";
+  return { code, ...(vars ? { vars } : {}), message: format(zh.update.messages[code], { rev: vars?.rev ?? "", hint }) };
+}
 
-function environmentRestriction(): string | null {
-  if (process.env.DEPLOY_MODE === "docker") return DOCKER_MESSAGE;
-  if (process.env.NODE_ENV !== "production" || process.platform !== "linux") {
-    return "一键更新需要 Linux 服务器上的 PM2 生产部署；本地开发环境仅检测更新。";
+/** 带 code 的错误：接口按管理员的语言返回文字 */
+export class UpdateError extends Error {
+  constructor(readonly code: UpdateMessageCode, options?: ErrorOptions) {
+    super(zh.update.messages[code], options);
   }
-  if (process.env.SITE_AUTO_UPDATE === "false") return "服务器已关闭一键更新。";
+}
+
+function environmentRestriction(): UpdateMessageCode | null {
+  if (process.env.DEPLOY_MODE === "docker") return "docker";
+  if (process.env.NODE_ENV !== "production" || process.platform !== "linux") return "notProduction";
+  if (process.env.SITE_AUTO_UPDATE === "false") return "disabled";
   return null;
 }
 
@@ -46,7 +58,7 @@ export async function readUpdateJob(): Promise<UpdateJob | undefined> {
     return value as UpdateJob;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw new Error("无法读取更新状态，请检查服务器 .updates 目录的权限。", { cause: error });
+    throw new UpdateError("readStatus", { cause: error });
   }
 }
 
@@ -72,10 +84,10 @@ async function github(resource: string): Promise<unknown> {
     headers, cache: "no-store", signal: AbortSignal.timeout(12_000), redirect: "error",
   });
   if (response.status === 403 || response.status === 429) {
-    throw new Error("GitHub 请求受限，请稍后重试，或在服务器配置 GITHUB_TOKEN。服务器时间与令牌权限也会影响检测。" );
+    throw new UpdateError("githubLimited");
   }
-  if (response.status === 404) throw new Error("GitHub 找不到当前分支或版本，请检查 SITE_UPDATE_BRANCH 和仓库访问权限。" );
-  if (!response.ok) throw new Error("GitHub 暂时无法检测更新，请稍后重试。" );
+  if (response.status === 404) throw new UpdateError("githubNotFound");
+  if (!response.ok) throw new UpdateError("githubDown");
   return response.json();
 }
 
@@ -90,28 +102,29 @@ async function checkRepository(): Promise<SiteUpdateStatus> {
   const checkedAt = new Date().toISOString();
   const restriction = environmentRestriction();
   const base = { currentRevision, latestRevision: null, checkedAt, canUpdate: !restriction };
-  if (!currentRevision) return { ...base, state: "unavailable", canUpdate: false, message: "无法识别运行版本，请从 Git 仓库构建并部署网站。" };
+  if (!currentRevision) return { ...base, state: "unavailable", canUpdate: false, ...say("unknownRevision") };
   const branch = process.env.SITE_UPDATE_BRANCH || "master";
   try {
     const commit = await github(`commits/${encodeURIComponent(branch)}`) as { sha?: string };
-    if (!commit.sha || !REVISION.test(commit.sha)) throw new Error("GitHub 返回的版本信息无效，请稍后重试。" );
+    if (!commit.sha || !REVISION.test(commit.sha)) throw new UpdateError("invalidGithub");
     const comparison = commit.sha === currentRevision ? undefined :
       await github(`compare/${currentRevision}...${commit.sha}`) as { status?: string };
     const state = compareState(currentRevision, commit.sha, comparison?.status);
-    const message = state === "available"
-      ? `发现新版本 ${commit.sha.slice(0, 7)}。${restriction || "点击黄色圆点并输入密码即可更新。"}`
-      : state === "current" ? "当前已是最新版本。"
-      : "运行版本与仓库分支已分叉，无法自动更新，请先由维护者处理版本差异。";
-    return { ...base, latestRevision: commit.sha, state, canUpdate: !restriction && state === "available", message };
+    const text = state === "available"
+      ? say("available", { rev: commit.sha.slice(0, 7), hint: restriction ?? "availableHint" })
+      : state === "current" ? say("current")
+      : say("diverged");
+    return { ...base, latestRevision: commit.sha, state, canUpdate: !restriction && state === "available", ...text };
   } catch (error) {
-    return { ...base, state: "error", canUpdate: false, message: error instanceof Error ? error.message : "检测失败，请稍后重试。" };
+    const text = error instanceof UpdateError ? say(error.code) : error instanceof Error ? { message: error.message } : say("checkFailed");
+    return { ...base, state: "error", canUpdate: false, ...text };
   }
 }
 
 export async function getSiteUpdateStatus(): Promise<SiteUpdateStatus> {
   // Docker 镜像里没有 git 仓库，也不该由容器自己替换自己
   if (process.env.DEPLOY_MODE === "docker") {
-    return { state: "unavailable", message: DOCKER_MESSAGE, canUpdate: false, currentRevision: null, latestRevision: null, checkedAt: null };
+    return { state: "unavailable", ...say("docker"), canUpdate: false, currentRevision: null, latestRevision: null, checkedAt: null };
   }
   let job = await readUpdateJob();
   const currentRevision = runningRevision();
@@ -125,12 +138,12 @@ export async function getSiteUpdateStatus(): Promise<SiteUpdateStatus> {
   // A worker can stop after switching the service but before recording success.
   // The exact running build is authoritative, including after manual recovery.
   if (job && job.state !== "success" && currentRevision === job.targetRevision) {
-    job = { ...job, state: "success", phase: "complete", message: "当前运行版本已更新完成。" };
+    job = { ...job, state: "success", phase: "complete", message: zh.update.messages.completed };
   }
   if (job?.state === "running") {
     return {
       state: "error",
-      message: "更新进程已中断，请查看服务器 .updates/worker.log 后重试。",
+      ...say("interrupted"),
       currentRevision, latestRevision: job.targetRevision, checkedAt: job.updatedAt,
       canUpdate: !environmentRestriction(), job,
     };
@@ -149,7 +162,8 @@ export async function getSiteUpdateStatus(): Promise<SiteUpdateStatus> {
     value = await pending.promise;
   }
   if (job?.state === "error" && value.state !== "current") {
-    return { ...value, state: "error", message: job.message, canUpdate: value.state === "available" && value.canUpdate, job };
+    // 更新进程写的失败原因（没有 code）原样显示
+    return { ...value, state: "error", code: undefined, vars: undefined, message: job.message, canUpdate: value.state === "available" && value.canUpdate, job };
   }
   return { ...value, ...(job ? { job } : {}) };
 }
@@ -161,7 +175,7 @@ export function startSiteUpdate(): Promise<SiteUpdateStatus> {
 
 async function launchUpdate(): Promise<SiteUpdateStatus> {
   const restriction = environmentRestriction();
-  if (restriction) throw new Error(restriction);
+  if (restriction) throw new UpdateError(restriction);
   const root = updateRoot();
   const directory = path.join(root, ".updates");
   const lock = path.join(directory, "update.lock");
@@ -176,8 +190,8 @@ async function launchUpdate(): Promise<SiteUpdateStatus> {
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   try { await mkdir(lock, { mode: 0o700 }); }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error("另一个更新请求正在准备，请稍后查看进度。" );
-    throw new Error("无法创建更新任务，请检查服务器目录权限。", { cause: error });
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new UpdateError("busy");
+    throw new UpdateError("lockFailed", { cause: error });
   }
   let launched = false;
   let job: UpdateJob | undefined;
@@ -185,13 +199,15 @@ async function launchUpdate(): Promise<SiteUpdateStatus> {
     // Always refresh on an explicit deployment request; a cached version is
     // useful for display but must not authorize deploying an outdated target.
     const status = await checkRepository();
-    if (status.state !== "available" || !status.canUpdate || !status.latestRevision) throw new Error(status.message);
+    if (status.state !== "available" || !status.canUpdate || !status.latestRevision) {
+      throw status.code ? new UpdateError(status.vars?.hint && status.vars.hint !== "availableHint" ? status.vars.hint : status.code) : new Error(status.message);
+    }
     const { stdout: remote } = await exec("git", ["remote", "get-url", "origin"], { cwd: root, timeout: 10_000 });
     if (!/^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)vow132\/tutorial-site(?:\.git)?\s*$/i.test(remote)) {
-      throw new Error("服务器 origin 不是 vow132/tutorial-site，已停止更新。" );
+      throw new UpdateError("wrongOrigin");
     }
     const now = new Date().toISOString();
-    job = { jobId: randomUUID(), state: "running", phase: "preparing", message: "正在准备更新，新版本构建完成后将自动切换。", targetRevision: status.latestRevision, startedAt: now, updatedAt: now };
+    job = { jobId: randomUUID(), state: "running", phase: "preparing", message: zh.update.messages.preparing, targetRevision: status.latestRevision, startedAt: now, updatedAt: now };
     await writeFile(path.join(directory, "status.json"), JSON.stringify(job), { mode: 0o600 });
     const log = await open(path.join(directory, "worker.log"), "a", 0o600);
     try {
@@ -203,9 +219,9 @@ async function launchUpdate(): Promise<SiteUpdateStatus> {
       child.unref();
       launched = true;
     } finally { await log.close(); }
-    return { ...status, state: "updating", canUpdate: false, message: job.message, job };
+    return { ...status, state: "updating", canUpdate: false, ...say("preparing"), job };
   } catch (error) {
-    if (job) await writeFile(path.join(directory, "status.json"), JSON.stringify({ ...job, state: "error", message: "无法启动更新，请检查服务器配置和 .updates/worker.log。", updatedAt: new Date().toISOString() }), { mode: 0o600 });
+    if (job) await writeFile(path.join(directory, "status.json"), JSON.stringify({ ...job, state: "error", message: zh.update.messages.launchFailed, updatedAt: new Date().toISOString() }), { mode: 0o600 });
     throw error;
   } finally {
     if (!launched) await rm(lock, { recursive: true, force: true });

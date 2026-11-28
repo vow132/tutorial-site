@@ -3,6 +3,7 @@
 import { useCallback, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { TocItem } from "@/lib/article";
 import LabelButton from "@/components/label-button";
+import { useI18n } from "@/lib/i18n/client";
 
 const MOBILE_TOC_STORAGE_KEY = "toc:mobile-open";
 
@@ -140,6 +141,7 @@ function Caret({ className = "" }: { className?: string }) {
 /** 跟随滚动的文章目录（桌面端侧边栏），并高亮当前小节。 */
 export default function Toc({ items }: { items: TocItem[] }) {
   const [active, setActive] = useActiveHeading(items);
+  const { m } = useI18n();
 
   if (items.length === 0) return null;
 
@@ -151,9 +153,9 @@ export default function Toc({ items }: { items: TocItem[] }) {
 
   // 外层的侧栏（吸顶、滚动）由文章页提供：系列教程时上面还有「教程书」目录
   return (
-      <nav aria-label="本页目录">
+      <nav aria-label={m.reader.toc.title}>
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-3">
-          本页目录
+          {m.reader.toc.title}
         </p>
         <ul className="space-y-1 border-l border-line">
           {items.map((item) => (
@@ -188,6 +190,7 @@ export default function Toc({ items }: { items: TocItem[] }) {
 export function MobileToc({ items }: { items: TocItem[] }) {
   const [active, setActive] = useActiveHeading(items);
   const [open, setOpen] = useState(false);
+  const { m, f, plural } = useI18n();
   const toggleId = useId();
   const panelId = useId();
   const toggleRef = useRef<HTMLInputElement | null>(null);
@@ -276,20 +279,20 @@ export function MobileToc({ items }: { items: TocItem[] }) {
           </svg>
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-ink">本页目录</span>
+          <span className="block text-sm font-semibold text-ink">{m.reader.toc.title}</span>
           <span className="mobile-toc-current mt-0.5 block truncate text-xs text-ink-3">
-            当前：{activeText}
+            {f(m.reader.toc.current, { text: activeText })}
           </span>
         </span>
         <span className="shrink-0 rounded-full bg-paper px-2 py-0.5 text-[11px] text-ink-3">
-          {items.length} 节
+          {plural(items.length, m.reader.toc.sections)}
         </span>
         <Caret className="mobile-toc-caret shrink-0 text-ink-3 transition-transform duration-200" />
       </LabelButton>
 
       <nav
         id={panelId}
-        aria-label="本页目录"
+        aria-label={m.reader.toc.title}
         className="mobile-toc-panel hidden max-h-[60vh] overflow-y-auto overscroll-contain rounded-b-2xl border border-t-0 border-line bg-surface px-3 pb-3 pt-1"
       >
         <ul className="space-y-0.5 border-l border-line">

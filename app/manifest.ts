@@ -15,7 +15,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     name: settings.siteName,
     short_name: Array.from(settings.siteName).slice(0, 12).join(""),
     description: settings.siteDescription,
-    lang: "zh-CN",
+    lang: settings.locale,
     start_url: "/",
     scope: "/",
     display: "standalone",

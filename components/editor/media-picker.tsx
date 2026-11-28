@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 type Item = { name: string; url: string; preview: string };
 
@@ -14,6 +15,8 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: Item[]; page: number; pages: number } | null>(null);
   const [error, setError] = useState("");
+  const { m } = useAdminI18n();
+  const t = m.admin.media;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -29,18 +32,18 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
       try {
         const response = await fetch(`/api/admin/media?${new URLSearchParams({ q: query, page: String(page) })}`, { signal: controller.signal });
         const json = await response.json();
-        if (!response.ok) throw new Error(json.error || "加载失败");
+        if (!response.ok) throw new Error(json.error || t.loadFailed);
         setData(json);
         setError("");
       } catch (err) {
-        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "加载失败");
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : t.loadFailed);
       }
     }, 200);
     return () => {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [open, query, page]);
+  }, [open, query, page, t.loadFailed]);
 
   return (
     <dialog
@@ -51,7 +54,7 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
     >
       <div className="flex items-center gap-3 border-b border-line px-5 py-4">
         <h2 id="media-picker-title" className="text-base font-semibold">
-          从图片库插入
+          {t.pickerTitle}
         </h2>
         <input
           type="search"
@@ -60,12 +63,12 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
             setQuery(event.target.value);
             setPage(1);
           }}
-          placeholder="按文件名搜索"
-          aria-label="按文件名搜索"
+          placeholder={t.search}
+          aria-label={t.search}
           className="ml-auto h-9 w-48 rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-accent"
         />
         <button type="button" onClick={onClose} className="h-9 rounded-full px-3 text-sm text-ink-2 hover:bg-paper">
-          关闭
+          {m.admin.common.close}
         </button>
       </div>
       <div className="max-h-[60vh] overflow-y-auto p-5">
@@ -74,9 +77,9 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
             {error}
           </p>
         ) : !data ? (
-          <p className="text-sm text-ink-3">加载中…</p>
+          <p className="text-sm text-ink-3">{m.admin.common.loading}</p>
         ) : data.items.length === 0 ? (
-          <p className="text-sm text-ink-3">{query ? "没有找到文件名包含这个词的图片" : "还没有上传过图片"}</p>
+          <p className="text-sm text-ink-3">{query ? t.noMatch : t.emptyShort}</p>
         ) : (
           <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
             {data.items.map((item) => (
@@ -98,13 +101,13 @@ export default function MediaPicker({ open, onClose, onPick }: { open: boolean; 
       {data && data.pages > 1 && (
         <div className="flex items-center justify-center gap-3 border-t border-line px-5 py-3 text-sm">
           <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-full px-3 py-1 text-ink-2 hover:bg-paper disabled:opacity-40">
-            上一页
+            {t.prev}
           </button>
           <span className="text-ink-3 tabular-nums">
             {data.page} / {data.pages}
           </span>
           <button type="button" disabled={page >= data.pages} onClick={() => setPage(page + 1)} className="rounded-full px-3 py-1 text-ink-2 hover:bg-paper disabled:opacity-40">
-            下一页
+            {t.next}
           </button>
         </div>
       )}

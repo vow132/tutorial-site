@@ -1,6 +1,8 @@
 import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import http from "node:http";
 import https from "node:https";
+import { format } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages/types";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 
 /**
@@ -36,7 +38,32 @@ export function isPublicAddress(address: string): boolean {
   return !blocked.check(address, family === 4 ? "ipv4" : "ipv6");
 }
 
-export class RemoteImageError extends Error {}
+/** 下载失败的原因（文字按后台语言：m.admin.remoteImage，remoteImageMessage() 取） */
+export type RemoteImageProblem =
+  | "invalidUrl"
+  | "protocol"
+  | "credentials"
+  | "port"
+  | "private"
+  | "timeout"
+  | "failed"
+  | "redirects"
+  | "status"
+  | "tooLarge"
+  | "interrupted";
+
+export class RemoteImageError extends Error {
+  constructor(
+    readonly code: RemoteImageProblem,
+    readonly detail = "",
+  ) {
+    super(detail ? `${code}: ${detail}` : code);
+  }
+}
+
+export function remoteImageMessage(error: RemoteImageError, m: Messages): string {
+  return format(m.admin.remoteImage[error.code], { detail: error.detail });
+}
 
 export type RemoteImageOptions = {
   /** 最大字节数，默认 10MB */
@@ -58,11 +85,11 @@ function checkUrl(raw: string, ports: ReadonlySet<string>): URL {
   try {
     url = new URL(raw);
   } catch {
-    throw new RemoteImageError("图片地址无效");
+    throw new RemoteImageError("invalidUrl");
   }
-  if (url.protocol !== "http:" && url.protocol !== "https:") throw new RemoteImageError("只能下载 http / https 图片");
-  if (url.username || url.password) throw new RemoteImageError("图片地址不能带用户名密码");
-  if (!ports.has(url.port)) throw new RemoteImageError(`不支持端口 ${url.port}`);
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new RemoteImageError("protocol");
+  if (url.username || url.password) throw new RemoteImageError("credentials");
+  if (!ports.has(url.port)) throw new RemoteImageError("port", url.port);
   return url;
 }
 
@@ -71,7 +98,7 @@ function request(url: URL, isAllowed: (address: string) => boolean, deadline: nu
     const host = url.hostname.replace(/^\[|\]$/g, "");
     // IP 写的地址不会走 lookup，这里先查
     if (isIP(host) && !isAllowed(host)) {
-      reject(new RemoteImageError("不能下载内网或本机地址的图片"));
+      reject(new RemoteImageError("private"));
       return;
     }
     const lookup: LookupFunction = (hostname, options, callback) => {
@@ -79,7 +106,7 @@ function request(url: URL, isAllowed: (address: string) => boolean, deadline: nu
         const list = addresses as unknown as LookupAddress[];
         if (error) return callback(error, "", 4);
         if (!list?.length || list.some((item) => !isAllowed(item.address))) {
-          return callback(new RemoteImageError("不能下载内网或本机地址的图片") as NodeJS.ErrnoException, "", 4);
+          return callback(new RemoteImageError("private") as NodeJS.ErrnoException, "", 4);
         }
         if ((options as { all?: boolean }).all) return (callback as unknown as (e: null, all: LookupAddress[]) => void)(null, list);
         callback(null, list[0].address, list[0].family);
@@ -101,8 +128,8 @@ function request(url: URL, isAllowed: (address: string) => boolean, deadline: nu
       },
       resolve,
     );
-    req.on("timeout", () => req.destroy(new RemoteImageError("下载超时")));
-    req.on("error", (error) => reject(error instanceof RemoteImageError ? error : new RemoteImageError(`下载失败：${error.message}`)));
+    req.on("timeout", () => req.destroy(new RemoteImageError("timeout")));
+    req.on("error", (error) => reject(error instanceof RemoteImageError ? error : new RemoteImageError("failed", error.message)));
   });
 }
 
@@ -117,32 +144,32 @@ export async function fetchRemoteImage(raw: string, options: RemoteImageOptions 
     if (REDIRECTS.has(status)) {
       response.resume();
       const location = response.headers.location;
-      if (!location || hop >= maxRedirects) throw new RemoteImageError("跳转次数太多");
+      if (!location || hop >= maxRedirects) throw new RemoteImageError("redirects");
       url = checkUrl(new URL(location, url).href, ports);
       continue;
     }
     if (status !== 200) {
       response.resume();
-      throw new RemoteImageError(`对方网站返回 ${status}`);
+      throw new RemoteImageError("status", String(status));
     }
     if (Number(response.headers["content-length"] ?? 0) > maxBytes) {
       response.destroy();
-      throw new RemoteImageError("图片太大");
+      throw new RemoteImageError("tooLarge");
     }
     const chunks: Buffer[] = [];
     let size = 0;
-    const timer = setTimeout(() => response.destroy(new RemoteImageError("下载超时")), Math.max(1, deadline - Date.now()));
+    const timer = setTimeout(() => response.destroy(new RemoteImageError("timeout")), Math.max(1, deadline - Date.now()));
     try {
       for await (const chunk of response) {
         size += (chunk as Buffer).length;
         if (size > maxBytes) {
           response.destroy();
-          throw new RemoteImageError("图片太大");
+          throw new RemoteImageError("tooLarge");
         }
         chunks.push(chunk as Buffer);
       }
     } catch (error) {
-      throw error instanceof RemoteImageError ? error : new RemoteImageError("下载中断");
+      throw error instanceof RemoteImageError ? error : new RemoteImageError("interrupted");
     } finally {
       clearTimeout(timer);
     }

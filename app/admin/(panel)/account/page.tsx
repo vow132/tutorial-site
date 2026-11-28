@@ -12,19 +12,21 @@ import { getAlertConfig, getAlertStatus } from "@/lib/alerts";
 import AccountForm from "./account-form";
 import AlertsForm from "./alerts-form";
 import DisplayNameForm from "./display-name-form";
-import { can, readRole, ROLES } from "@/lib/roles";
+import { can, readRole } from "@/lib/roles";
+import { getAdminI18n } from "@/lib/i18n/server";
+import { rich } from "@/lib/i18n/rich";
 import Passkeys from "./passkeys";
 import { relyingParty } from "@/lib/passkeys";
 import { DisableTwoFactorForm, EnableTwoFactorForm, RegenerateRecoveryCodesForm } from "./two-factor-form";
 import { displayIp } from "@/lib/demo";
 
-export const metadata: Metadata = { title: "账号安全" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.account.metaTitle };
+}
 export const dynamic = "force-dynamic";
 
-const dateFormat = new Intl.DateTimeFormat("zh-CN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
 
 export default async function AdminAccountPage({
   searchParams,
@@ -35,6 +37,9 @@ export default async function AdminAccountPage({
   if (!current) redirect("/admin/login");
   const { admin, sessionId } = current;
   const { weak } = await searchParams;
+  const { m, f, plural, date } = await getAdminI18n();
+  const t = m.admin.account;
+  const formatTime = (value: Date | string) => date(value, DATE_TIME);
 
   const sessions = await prisma.adminSession.findMany({
     where: { adminId: admin.id, expiresAt: { gt: new Date() } },
@@ -68,21 +73,19 @@ export default async function AdminAccountPage({
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">账号安全</h1>
-        <p className="mt-1 text-sm text-ink-3">
-          你的角色是「{ROLES[readRole(admin.role)].label}」。修改用户名或密码后当前浏览器保持登录，其他设备需要重新登录。
-        </p>
+        <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+        <p className="mt-1 text-sm text-ink-3">{f(t.intro, { role: m.admin.roles[readRole(admin.role)].label })}</p>
       </div>
 
       {weak && (
         <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-700 dark:text-amber-300">
-          当前密码是默认密码或过于简单，很容易被撞库猜中，请立即修改为至少 10 位、不常见的密码，并建议开启两步验证。
+          {t.weak}
         </p>
       )}
 
       <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
-        <h2 className="text-lg font-bold text-ink">署名</h2>
-        <p className="mb-4 mt-1 text-sm text-ink-3">显示在你写的教程页上（作者）。留空就不显示，登录用户名不会出现在前台。</p>
+        <h2 className="text-lg font-bold text-ink">{t.bylineHeading}</h2>
+        <p className="mb-4 mt-1 text-sm text-ink-3">{t.bylineHint}</p>
         <DisplayNameForm initial={admin.displayName ?? ""} />
       </section>
 
@@ -92,7 +95,7 @@ export default async function AdminAccountPage({
 
       <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-ink">两步验证</h2>
+          <h2 className="text-lg font-bold text-ink">{t.twoFactor}</h2>
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               admin.totpSecret
@@ -100,7 +103,7 @@ export default async function AdminAccountPage({
                 : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
             }`}
           >
-            {admin.totpSecret ? "已开启" : "未开启"}
+            {admin.totpSecret ? t.on : t.off}
           </span>
         </div>
         {setup ? (
@@ -108,8 +111,7 @@ export default async function AdminAccountPage({
         ) : (
           <>
             <p className="mb-5 text-sm text-ink-2">
-              登录时除密码外还需要验证器中的 6 位数字。关闭前需要验证当前密码和验证码；
-              手机丢失时用恢复码登录，恢复码也用完时可在服务器上运行 <code>npm run admin:reset</code> 重置。
+              {rich(t.twoFactorHint, { command: <code>npm run admin:reset</code> })}
             </p>
             <div
               className={`mb-5 rounded-2xl border px-5 py-4 text-sm ${
@@ -118,16 +120,16 @@ export default async function AdminAccountPage({
                   : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200"
               }`}
             >
-              <p className="font-medium text-ink">恢复码：剩余 {recoveryCodes} 个</p>
+              <p className="font-medium text-ink">{f(t.recoveryLeft, { n: recoveryCodes })}</p>
               <p className="mt-1">
                 {recoveryCodes === 0
-                  ? "还没有可用的恢复码，手机丢失时只能到服务器上重置。建议现在生成一组并妥善保存。"
+                  ? t.recoveryNone
                   : recoveryCodes < 3
-                    ? "恢复码快用完了，建议重新生成一组（旧的会全部作废）。"
-                    : "每个恢复码只能用一次，用掉的会自动作废。"}
+                    ? t.recoveryLow
+                    : t.recoveryOk}
               </p>
               <details className="mt-3" open={recoveryCodes === 0}>
-                <summary className="cursor-pointer font-medium text-accent-ink">重新生成恢复码</summary>
+                <summary className="cursor-pointer font-medium text-accent-ink">{t.regenerate}</summary>
                 <div className="mt-4">
                   <RegenerateRecoveryCodesForm />
                 </div>
@@ -140,7 +142,7 @@ export default async function AdminAccountPage({
 
       <section id="passkeys" className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-ink">通行密钥</h2>
+          <h2 className="text-lg font-bold text-ink">{t.passkeys}</h2>
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               passkeys.length > 0
@@ -148,12 +150,11 @@ export default async function AdminAccountPage({
                 : "bg-paper text-ink-3"
             }`}
           >
-            {passkeys.length > 0 ? `已登记 ${passkeys.length} 个` : "未登记"}
+            {passkeys.length > 0 ? plural(passkeys.length, t.passkeysCount) : t.passkeysNone}
           </span>
         </div>
         <p className="mb-5 text-sm text-ink-3">
-          用指纹、面容、手机或安全密钥登录，不用输入密码，钓鱼网站也骗不走。通行密钥本身已包含设备 +
-          生物识别两重验证，用它登录时不再需要两步验证码；密码登录照常可用。
+          {t.passkeysHint}
         </p>
         <Passkeys
           passkeys={passkeys.map((row) => ({
@@ -170,7 +171,7 @@ export default async function AdminAccountPage({
       {isOwner && alertConfig && alertStatus && (
       <section id="alerts" className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-ink">安全告警</h2>
+          <h2 className="text-lg font-bold text-ink">{t.alerts}</h2>
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               alertConfig.channel !== "off"
@@ -178,16 +179,15 @@ export default async function AdminAccountPage({
                 : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
             }`}
           >
-            {alertConfig.channel !== "off" ? "已开启" : "未开启"}
+            {alertConfig.channel !== "off" ? t.on : t.off}
           </span>
         </div>
         <p className="mb-5 text-sm text-ink-3">
-          新设备登录、登录被锁定、修改密码或两步验证、网站更新结果、备份失败或过期时，
-          实时推送到你的手机。推送失败不影响登录等操作本身。
+          {t.alertsHint}
         </p>
         {alertConfig.locked && (
           <p className="mb-5 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-500 dark:text-red-400">
-            已保存的告警设置无法解密（服务器上的 AUTH_SECRET 或 DATA_ENCRYPTION_KEY 被更换过），告警目前不会推送。请重新填写并保存。
+            {t.alertsLocked}
           </p>
         )}
         {alertStatus.lastAt && (
@@ -198,8 +198,8 @@ export default async function AdminAccountPage({
                 : "bg-red-500/10 text-red-500 dark:text-red-400"
             }`}
           >
-            上次推送：{dateFormat.format(new Date(alertStatus.lastAt))}「{alertStatus.lastTitle}」
-            {alertStatus.lastOk ? " 成功" : ` 失败：${alertStatus.lastError ?? "未知原因"}`}
+            {f(t.lastPush, { time: formatTime(alertStatus.lastAt), title: alertStatus.lastTitle ?? "" })}
+            {alertStatus.lastOk ? t.lastPushOk : f(t.lastPushFailed, { error: alertStatus.lastError ?? t.unknownReason })}
           </p>
         )}
         <AlertsForm
@@ -216,21 +216,20 @@ export default async function AdminAccountPage({
       )}
 
       <section className="rounded-3xl border border-line bg-surface p-6 sm:p-8">
-        <h2 className="text-lg font-bold text-ink">登录设备</h2>
-        <p className="mt-1 text-sm text-ink-3">
-          每次登录都会生成一个可随时吊销的会话，有效期 7 天。看到不认识的设备请立即吊销并修改密码。
-        </p>
+        <h2 className="text-lg font-bold text-ink">{t.devices}</h2>
+        <p className="mt-1 text-sm text-ink-3">{t.devicesHint}</p>
         <ul className="mt-5 divide-y divide-line rounded-2xl border border-line">
           {sessions.map((session) => (
             <li key={session.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
               <span className="font-medium text-ink">
-                {describeAgent(session.userAgent)}
+                {describeAgent(session.userAgent, t)}
                 {session.id === sessionId && (
-                  <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">当前</span>
+                  <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">{t.current}</span>
                 )}
               </span>
               <span className="text-xs text-ink-3">
-                {session.ip ? `${displayIp(session.ip)} · ` : ""}登录于 {dateFormat.format(session.createdAt)}
+                {session.ip ? `${displayIp(session.ip)} · ` : ""}
+                {f(t.signedInAt, { time: formatTime(session.createdAt) })}
               </span>
             </li>
           ))}
@@ -242,7 +241,7 @@ export default async function AdminAccountPage({
               disabled={sessions.length <= 1}
               className="h-10 rounded-xl border border-line px-5 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:opacity-40"
             >
-              退出其他设备
+              {t.revokeOthers}
             </button>
           </form>
           <form action={logoutEverywhere}>
@@ -250,7 +249,7 @@ export default async function AdminAccountPage({
               type="submit"
               className="h-10 rounded-xl border border-red-500/40 px-5 text-sm font-medium text-red-500 transition-colors hover:bg-red-500/10"
             >
-              退出所有设备
+              {t.revokeAll}
             </button>
           </form>
         </div>

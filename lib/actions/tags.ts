@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/admin-auth";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { CACHE_TAGS } from "@/lib/public-data";
@@ -30,16 +31,18 @@ function revalidateTagPages(tutorialSlugs: string[], ...tagSlugs: string[]) {
  */
 export async function renameTag(_prev: TagFormState, formData: FormData): Promise<TagFormState> {
   const admin = await requireAuth("taxonomy");
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.tags;
   const id = Number(formData.get("id"));
   const name = normalizeTagName(String(formData.get("name") ?? ""));
-  if (!name) return { error: "请输入标签名" };
-  if (Array.from(name).length > MAX_TAG_LENGTH) return { error: `标签最多 ${MAX_TAG_LENGTH} 个字` };
+  if (!name) return { error: t.nameRequired };
+  if (Array.from(name).length > MAX_TAG_LENGTH) return { error: f(t.nameTooLong, { max: MAX_TAG_LENGTH }) };
   const slug = tagSlug(name);
-  if (!slug) return { error: "标签需要包含文字或数字" };
+  if (!slug) return { error: t.nameNoText };
 
   const tag = await prisma.tag.findUnique({ where: { id } });
-  if (!tag) return { error: "标签不存在或已被删除" };
-  if (tag.name === name) return { success: "没有变化" };
+  if (!tag) return { error: t.gone };
+  if (tag.name === name) return { success: t.unchanged };
 
   const tutorialSlugs = await tutorialSlugsWithTag(id);
   const target = await prisma.tag.findUnique({ where: { slug } });
@@ -67,7 +70,7 @@ export async function renameTag(_prev: TagFormState, formData: FormData): Promis
   await prisma.tag.update({ where: { id }, data: { name, slug } });
   await audit("tag.rename", { actor: admin.username, detail: `${tag.name} → ${name}` });
   revalidateTagPages(tutorialSlugs, tag.slug, slug);
-  return { success: "已保存" };
+  return { success: m.admin.common.saved };
 }
 
 /** 删除标签：只解除和教程的关联，教程本身不受影响。 */
@@ -78,6 +81,7 @@ export async function deleteTag(formData: FormData) {
   if (!tag) return;
   const tutorialSlugs = await tutorialSlugsWithTag(id);
   await prisma.tag.delete({ where: { id } });
-  await audit("tag.delete", { actor: admin.username, detail: `${tag.name}（${tutorialSlugs.length} 篇教程）` });
+  const { m, plural } = await getAdminI18n();
+  await audit("tag.delete", { actor: admin.username, detail: plural(tutorialSlugs.length, m.admin.auditDetail.withTutorials, { title: tag.name }) });
   revalidateTagPages(tutorialSlugs, tag.slug);
 }

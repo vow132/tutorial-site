@@ -284,7 +284,13 @@ export function resolveLocalImage(src: string, markdownPath: string, available: 
  * 解析 WordPress「工具 → 导出」得到的 XML。只取文章（post），跳过页面、附件、回收站和自动草稿。
  * 先把 CDATA 换成占位符再找标签，正文里出现的 </item> 之类不会把结构打乱。
  */
-export function parseWordPressExport(xml: string): ImportScan & { siteUrl: string } {
+/** 跳过的页面、没有标题的文章怎么称呼（后台语言：m.admin.bulkImport 里的 skippedPage / untitled） */
+export type WordPressLabels = { skippedPage: string; untitled: string };
+
+export function parseWordPressExport(
+  xml: string,
+  labels: WordPressLabels = { skippedPage: "页面「{title}」", untitled: "未命名文章 {id}" },
+): ImportScan & { siteUrl: string } {
   const cdata: string[] = [];
   const text = xml.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_m, inner: string) => `\u0000${cdata.push(inner) - 1}\u0000`);
   const restore = (value: string) => value.replace(/\u0000(\d+)\u0000/g, (_m, index: string) => cdata[Number(index)]);
@@ -308,7 +314,7 @@ export function parseWordPressExport(xml: string): ImportScan & { siteUrl: strin
     const id = valueOf(block, "wp:post_id");
     const title = valueOf(block, "title").trim();
     if (type !== "post") {
-      if (type === "page") skipped.push(`页面「${title || id}」`);
+      if (type === "page") skipped.push(labels.skippedPage.replace("{title}", title || id));
       continue;
     }
     if (!["publish", "draft", "pending", "private", "future"].includes(status)) continue;
@@ -331,7 +337,7 @@ export function parseWordPressExport(xml: string): ImportScan & { siteUrl: strin
     items.push({
       key: `wp-${id}`,
       source: `WordPress #${id}`,
-      title: title || `未命名文章 ${id}`,
+      title: title || labels.untitled.replace("{id}", id),
       slug,
       excerpt: excerpt ? Array.from(excerpt).slice(0, 500).join("") : autoExcerpt(content),
       content,

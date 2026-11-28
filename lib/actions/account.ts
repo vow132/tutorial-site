@@ -16,7 +16,8 @@ import { audit } from "@/lib/audit";
 import { passwordProblem } from "@/lib/password-policy";
 import { parseDisplayName, USERNAME_PATTERN } from "@/lib/roles";
 import { generateRecoveryCodes } from "@/lib/recovery-codes";
-import { LOCKED_TOTP_MESSAGE, sealTotpSecret, verifySecondFactor } from "@/lib/second-factor";
+import { sealTotpSecret, verifySecondFactor } from "@/lib/second-factor";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { readTotpSetup } from "@/lib/session";
 import { verifyTotp } from "@/lib/totp";
 
@@ -43,24 +44,26 @@ export async function updateAdminCredentials(
   const username = String(formData.get("username") ?? "").trim();
   const newPassword = String(formData.get("newPassword") ?? "");
   const confirmPasswordValue = String(formData.get("confirmPassword") ?? "");
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.account;
 
   const confirmError = await confirmCurrentPassword(current, currentPassword);
   if (confirmError) return { error: confirmError };
   if (!USERNAME_PATTERN.test(username)) {
-    return { error: "用户名需为 3-32 位字母、数字、下划线或连字符" };
+    return { error: t.badUsername };
   }
   if (newPassword) {
-    const problem = passwordProblem(newPassword, username);
+    const problem = passwordProblem(newPassword, username, m.admin.password);
     if (problem) return { error: problem };
   }
   if (newPassword !== confirmPasswordValue) {
-    return { error: "两次输入的新密码不一致" };
+    return { error: t.passwordMismatch };
   }
 
   if (username !== current.username) {
     const exists = await prisma.admin.findUnique({ where: { username } });
     if (exists && exists.id !== current.id) {
-      return { error: "该用户名已被占用" };
+      return { error: t.usernameTaken };
     }
   }
 
@@ -83,14 +86,14 @@ export async function updateAdminCredentials(
     await audit("account.update", {
       actor: updated.username,
       detail: [
-        username !== current.username ? `用户名 ${current.username} → ${username}` : "",
-        newPassword ? "已修改密码" : "",
-      ].filter(Boolean).join("；") || "无变化",
+        username !== current.username ? f(t.auditRenamed, { from: current.username, to: username }) : "",
+        newPassword ? t.auditPassword : "",
+      ].filter(Boolean).join("; ") || t.auditUnchanged,
     });
     revalidatePath("/admin/account");
-    return { success: "管理员账号已更新，其他设备上的登录已失效" };
+    return { success: t.updated };
   } catch {
-    return { error: "保存失败，请稍后重试" };
+    return { error: t.saveFailed };
   }
 }
 
@@ -99,15 +102,16 @@ export async function enableTotp(
   formData: FormData
 ): Promise<TwoFactorFormState> {
   const { admin } = await requireSession("account");
-  if (admin.totpSecret) return { error: "两步验证已经开启" };
+  const t = (await getAdminI18n()).m.admin.account;
+  if (admin.totpSecret) return { error: t.totpAlready };
 
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
   if (confirmError) return { error: confirmError };
 
   const secret = readTotpSetup(String(formData.get("setup") ?? ""), admin.id);
-  if (!secret) return { error: "设置已过期，请刷新页面重新扫码" };
+  if (!secret) return { error: t.totpSetupExpired };
   const step = verifyTotp(secret, String(formData.get("code") ?? ""), null);
-  if (step === null) return { error: "验证码不正确，请确认手机时间准确后重试" };
+  if (step === null) return { error: t.totpWrong };
 
   await prisma.admin.update({
     where: { id: admin.id },
@@ -116,7 +120,7 @@ export async function enableTotp(
   const recoveryCodes = await replaceRecoveryCodes(admin.id);
   await audit("totp.enable", { actor: admin.username });
   return {
-    success: "两步验证已开启，下次登录需要输入验证器中的 6 位数字",
+    success: t.totpEnabled,
     recoveryCodes,
   };
 }
@@ -126,14 +130,16 @@ export async function disableTotp(
   formData: FormData
 ): Promise<CredentialsFormState> {
   const { admin } = await requireSession("account");
-  if (!admin.totpSecret) return { error: "两步验证未开启" };
+  const { m } = await getAdminI18n();
+  const t = m.admin.account;
+  if (!admin.totpSecret) return { error: t.totpNotEnabled };
 
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
   if (confirmError) return { error: confirmError };
 
   const factor = await verifySecondFactor(admin, String(formData.get("code") ?? ""));
   if (!factor.ok) {
-    return { error: factor.reason === "locked" ? LOCKED_TOTP_MESSAGE : "验证码或恢复码不正确，或已被使用" };
+    return { error: factor.reason === "locked" ? m.admin.login.totpLocked : t.secondFactorWrong };
   }
 
   await prisma.$transaction([
@@ -145,7 +151,7 @@ export async function disableTotp(
   ]);
   await audit("totp.disable", { actor: admin.username });
   revalidatePath("/admin/account");
-  return { success: "两步验证已关闭" };
+  return { success: t.totpDisabled };
 }
 
 /** 重新生成恢复码（旧码全部作废）。需要当前密码 + 验证码或一个恢复码。 */
@@ -154,18 +160,20 @@ export async function regenerateRecoveryCodes(
   formData: FormData
 ): Promise<TwoFactorFormState> {
   const { admin } = await requireSession("account");
-  if (!admin.totpSecret) return { error: "请先开启两步验证" };
+  const { m } = await getAdminI18n();
+  const t = m.admin.account;
+  if (!admin.totpSecret) return { error: t.totpRequired };
 
   const confirmError = await confirmCurrentPassword(admin, String(formData.get("currentPassword") ?? ""));
   if (confirmError) return { error: confirmError };
   const factor = await verifySecondFactor(admin, String(formData.get("code") ?? ""));
   if (!factor.ok) {
-    return { error: factor.reason === "locked" ? LOCKED_TOTP_MESSAGE : "验证码或恢复码不正确，或已被使用" };
+    return { error: factor.reason === "locked" ? m.admin.login.totpLocked : t.secondFactorWrong };
   }
 
   const recoveryCodes = await replaceRecoveryCodes(admin.id);
   await audit("recovery_codes.regenerate", { actor: admin.username });
-  return { success: "已生成新的恢复码，旧的恢复码全部作废", recoveryCodes };
+  return { success: t.recoveryRegenerated, recoveryCodes };
 }
 
 export async function revokeOtherSessions() {
@@ -173,7 +181,8 @@ export async function revokeOtherSessions() {
   const { count } = await prisma.adminSession.deleteMany({
     where: { adminId: admin.id, NOT: { id: sessionId } },
   });
-  await audit("session.revoke_others", { actor: admin.username, detail: `${count} 个会话` });
+  const { m, plural } = await getAdminI18n();
+  await audit("session.revoke_others", { actor: admin.username, detail: plural(count, m.admin.account.auditSessions) });
   revalidatePath("/admin/account");
 }
 
@@ -188,13 +197,15 @@ export async function logoutEverywhere() {
 /** 改自己的署名（文章页显示的作者名）：所有角色都能改，写了署名的教程页随之刷新。 */
 export async function updateDisplayName(_prev: CredentialsFormState, formData: FormData): Promise<CredentialsFormState> {
   const { admin } = await requireSession("account");
-  const parsed = parseDisplayName(formData.get("displayName"));
+  const { m, f } = await getAdminI18n();
+  const t = m.admin.account;
+  const parsed = parseDisplayName(formData.get("displayName"), m.admin.validation);
   if ("error" in parsed) return { error: parsed.error };
-  if (parsed.value === (admin.displayName ?? null)) return { success: "署名没有变化" };
+  if (parsed.value === (admin.displayName ?? null)) return { success: t.bylineUnchanged };
   await prisma.admin.update({ where: { id: admin.id }, data: { displayName: parsed.value } });
-  await audit("account.display_name", { actor: admin.username, detail: parsed.value ?? "（不显示署名）" });
+  await audit("account.display_name", { actor: admin.username, detail: parsed.value ?? t.auditNoByline });
   // 署名出现在文章页（ISR）：作者的教程页全部失效
   revalidatePath("/tutorials/[slug]", "page");
   revalidatePath("/admin/account");
-  return { success: parsed.value ? `已保存，文章页会显示「${parsed.value}」` : "已清空，文章页不再显示署名" };
+  return { success: parsed.value ? f(t.bylineSaved, { name: parsed.value }) : t.bylineCleared };
 }

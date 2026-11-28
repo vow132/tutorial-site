@@ -47,6 +47,7 @@ const PUBLIC_ACTIONS: Record<string, string> = {
   "lib/actions/passkeys.ts#beginPasskeyLogin": "通行密钥登录第一步（带限流）",
   "lib/actions/passkeys.ts#finishPasskeyLogin": "通行密钥登录第二步（带限流，挑战只能用一次）",
   "lib/actions/setup.ts#completeSetup": "首次安装：没有任何账号时才可用，校验安装码并限流",
+  "lib/actions/locale.ts#setAdminLocale": "只写界面语言的 Cookie（登录页、安装页也要能切换），值限定为支持的语言",
 };
 
 const PAGE_GUARD = /\b(requireAdminPage|getCurrentSession)\(/;

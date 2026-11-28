@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setupHint } from "../lib/setup-code.mjs";
 import { databaseFile } from "./site-update.mjs";
+import { cliText, siteLocaleFrom } from "../lib/script-i18n.mjs";
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,10 +23,12 @@ try {
 }
 
 let admins = 0;
+let locale = null;
 try {
   const Database = require("better-sqlite3");
   const db = new Database(databaseFile(process.env.DATABASE_URL, root), { readonly: true, fileMustExist: true });
   try {
+    locale = siteLocaleFrom(db);
     admins = db.prepare('SELECT COUNT(*) AS n FROM "Admin"').get().n;
   } finally {
     db.close();
@@ -35,7 +38,12 @@ try {
 }
 
 if (admins > 0) {
-  console.log("ℹ️ 已经有后台账号，安装页已关闭。忘记密码请运行 npm run admin:reset（Docker：docker compose exec -u node app npm run admin:reset）。");
+  console.log(
+    cliText(locale)(
+      "ℹ️ 已经有后台账号，安装页已关闭。忘记密码请运行 npm run admin:reset（Docker：docker compose exec -u node app npm run admin:reset）。",
+      "ℹ️ An admin account already exists, so the setup page is closed. If you forgot the password, run npm run admin:reset (Docker: docker compose exec -u node app npm run admin:reset).",
+    ),
+  );
 } else {
   console.log(setupHint(process.env.SITE_URL || "http://localhost:3000"));
 }

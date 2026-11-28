@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { sendBeacon } from "./view-beacon";
 import { markTutorialRead } from "@/lib/reading-history";
+import { useI18n } from "@/lib/i18n/client";
 
 /** 读到正文末尾、并且在页面上停留了这么久，才算「读完」（快速划到底不算）。 */
 const MIN_READ_MS = 10_000;
@@ -16,6 +17,7 @@ const MIN_READ_MS = 10_000;
 export default function ReadingProgress({ target = ".article-body", tutorialId }: { target?: string; tutorialId?: number }) {
   const bar = useRef<HTMLDivElement>(null);
   const [showTop, setShowTop] = useState(false);
+  const { m } = useI18n();
 
   useEffect(() => {
     let frame = 0;
@@ -86,8 +88,8 @@ export default function ReadingProgress({ target = ".article-body", tutorialId }
       <button
         type="button"
         onClick={backToTop}
-        aria-label="回到顶部"
-        title="回到顶部"
+        aria-label={m.reader.article.backToTop}
+        title={m.reader.article.backToTop}
         inert={!showTop}
         className={`back-to-top print-hide fixed bottom-6 right-4 z-[60] flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-ink-2 shadow-capsule transition-[opacity,transform] duration-200 hover:text-accent-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:right-6 ${
           showTop ? "opacity-100" : "pointer-events-none translate-y-3 opacity-0"

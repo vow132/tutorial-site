@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { recentDays, siteDay } from "./site-day";
 import { helpfulSummary } from "./feedback";
+import { i18nFor } from "./i18n/core";
+
+const zh = i18nFor("zh-CN");
 
 test("days follow Beijing time, not the server's time zone", () => {
   // UTC 16:30 已经是北京时间第二天 00:30
@@ -20,7 +23,7 @@ test("recent days end today and cross month and year boundaries", () => {
 });
 
 test("helpful ratios are only shown once there are enough votes", () => {
-  assert.equal(helpfulSummary(0, 0).text, "暂无反馈");
-  assert.deepEqual(helpfulSummary(2, 1), { total: 3, ratio: null, text: "👍 2 · 👎 1" });
-  assert.deepEqual(helpfulSummary(12, 2), { total: 14, ratio: 86, text: "86% 有帮助（14 票）" });
+  assert.equal(helpfulSummary(0, 0, zh).text, "暂无反馈");
+  assert.deepEqual(helpfulSummary(2, 1, zh), { total: 3, ratio: null, text: "👍 2 · 👎 1" });
+  assert.deepEqual(helpfulSummary(12, 2, zh), { total: 14, ratio: 86, text: "86% 有帮助（14 票）" });
 });

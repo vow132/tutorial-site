@@ -1,7 +1,13 @@
 /**
  * 站点设置里后加的几组：首页「从这里开始」、文章页动效、赞助与打赏、品牌、顶部导航链接。
  * 纯函数（类型、默认值、读取、校验），lib/settings.ts、设置 Server Action 和单元测试共用。
+ * 校验函数的错误文字由调用方传入（t = m.admin.settingsErrors）；不传时返回键名。
  */
+
+import { textOrKey } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages/types";
+
+type SettingsErrors = Messages["admin"]["settingsErrors"];
 
 export type StartHere = {
   enabled: boolean;
@@ -47,12 +53,12 @@ export const defaultSupport: SupportSettings = {
 const str = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
 
 /** 从存储的 JSON 读出（字段缺失或类型不对时用默认值）。 */
-export function readStartHere(raw: unknown): StartHere {
+export function readStartHere(raw: unknown, fallback: StartHere = defaultStartHere): StartHere {
   const value = (raw && typeof raw === "object" ? raw : {}) as Partial<Record<keyof StartHere, unknown>>;
   return {
-    enabled: typeof value.enabled === "boolean" ? value.enabled : defaultStartHere.enabled,
-    title: str(value.title, defaultStartHere.title),
-    intro: str(value.intro, defaultStartHere.intro),
+    enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
+    title: str(value.title, fallback.title),
+    intro: str(value.intro, fallback.intro),
     seriesSlugs: Array.isArray(value.seriesSlugs)
       ? value.seriesSlugs.filter((slug): slug is string => typeof slug === "string").slice(0, MAX_START_HERE_SERIES)
       : [],
@@ -81,7 +87,7 @@ export const UPLOAD_IMAGE_PATH = /^\/uploads\/[\w-]+\.(?:webp|png|jpe?g|gif)$/i;
 /**
  * 校验后台提交的「赞助与打赏」。图片文件是否真的存在由调用方再查（需要文件系统）。
  */
-export function parseSupportInput(input: Record<keyof SupportSettings, string>): { data: SupportSettings } | { error: string } {
+export function parseSupportInput(input: Record<keyof SupportSettings, string>, t?: SettingsErrors): { data: SupportSettings } | { error: string } {
   const data: SupportSettings = {
     donationText: input.donationText.trim().slice(0, 40),
     wechatQr: input.wechatQr.trim(),
@@ -91,12 +97,12 @@ export function parseSupportInput(input: Record<keyof SupportSettings, string>):
     sponsorImage: input.sponsorImage.trim(),
   };
   for (const key of ["wechatQr", "alipayQr", "sponsorImage"] as const) {
-    if (data[key] && !UPLOAD_IMAGE_PATH.test(data[key])) return { error: "赞助与打赏的图片请用上传按钮上传" };
+    if (data[key] && !UPLOAD_IMAGE_PATH.test(data[key])) return { error: textOrKey(t, "supportImage") };
   }
   if (data.sponsorUrl && !/^(?:https?:\/\/[^\s<>"']+|\/[^\s<>"']*)$/i.test(data.sponsorUrl)) {
-    return { error: "赞助链接请填写 https:// 开头的网址" };
+    return { error: textOrKey(t, "sponsorUrl") };
   }
-  if ((data.sponsorUrl || data.sponsorImage) && !data.sponsorText) return { error: "设置了赞助链接或图片时，请填写赞助文字" };
+  if ((data.sponsorUrl || data.sponsorImage) && !data.sponsorText) return { error: textOrKey(t, "sponsorText") };
   return { data };
 }
 
@@ -148,7 +154,10 @@ export function readBrand(raw: unknown): BrandSettings {
   };
 }
 
-export function parseBrandInput(input: { logoImage: string; favicon: string; shareImage: string; accentColor: string; mascot: boolean }):
+export function parseBrandInput(
+  input: { logoImage: string; favicon: string; shareImage: string; accentColor: string; mascot: boolean },
+  t?: SettingsErrors,
+):
   | { data: BrandSettings }
   | { error: string } {
   const data: BrandSettings = {
@@ -159,10 +168,10 @@ export function parseBrandInput(input: { logoImage: string; favicon: string; sha
     mascot: input.mascot,
   };
   for (const key of ["logoImage", "favicon", "shareImage"] as const) {
-    if (data[key] && !UPLOAD_IMAGE_PATH.test(data[key])) return { error: "品牌图片请用上传按钮上传" };
+    if (data[key] && !UPLOAD_IMAGE_PATH.test(data[key])) return { error: textOrKey(t, "brandImage") };
   }
   if (data.accentColor === DEFAULT_ACCENT) data.accentColor = "";
-  if (data.accentColor && !/^#[0-9a-f]{6}$/.test(data.accentColor)) return { error: "主题色请填写 #RRGGBB 格式，例如 #0ea5e9" };
+  if (data.accentColor && !/^#[0-9a-f]{6}$/.test(data.accentColor)) return { error: textOrKey(t, "accentColor") };
   return { data };
 }
 
@@ -180,15 +189,15 @@ export const MAX_NAV_LABEL = 8;
 
 export const defaultNavLinks: NavLinks = { position: "after", links: [] };
 
-/** 站内路径（/about，不能是 //开头的协议相对地址）或 http(s) 网址；其余（javascript: 等）一律不收。 */
-export function navHrefProblem(href: string): string | null {
-  if (href.length > 500) return "太长";
-  if (href.startsWith("/")) return href.startsWith("//") || /\s/.test(href) ? "格式不对" : null;
+/** 站内路径（/about，不能是 //开头的协议相对地址）或 http(s) 网址；其余（javascript: 等）一律不收。返回问题的键（m.admin.settingsErrors.hrefProblems）。 */
+export function navHrefProblem(href: string): "tooLong" | "invalid" | "scheme" | null {
+  if (href.length > 500) return "tooLong";
+  if (href.startsWith("/")) return href.startsWith("//") || /\s/.test(href) ? "invalid" : null;
   try {
     const url = new URL(href);
-    return url.protocol === "https:" || url.protocol === "http:" ? null : "只能是 / 开头的站内地址或 http(s):// 网址";
+    return url.protocol === "https:" || url.protocol === "http:" ? null : "scheme";
   } catch {
-    return "只能是 / 开头的站内地址或 http(s):// 网址";
+    return "scheme";
   }
 }
 
@@ -207,21 +216,21 @@ export function readNavLinks(raw: unknown): NavLinks {
 }
 
 /** 后台表单的输入：整行留空的忽略，其余每行文字和地址都要填对。 */
-export function parseNavLinksInput(input: { position: string; links: unknown }): { data: NavLinks } | { error: string } {
-  if (!Array.isArray(input.links)) return { error: "导航链接数据格式有误" };
+export function parseNavLinksInput(input: { position: string; links: unknown }, t?: SettingsErrors): { data: NavLinks } | { error: string } {
+  if (!Array.isArray(input.links)) return { error: textOrKey(t, "navFormat") };
   const links: NavLink[] = [];
   for (const [index, row] of input.links.entries()) {
     const label = typeof row?.label === "string" ? row.label.trim() : "";
     const href = typeof row?.href === "string" ? row.href.trim() : "";
     if (!label && !href) continue;
-    const name = `第 ${index + 1} 个导航链接`;
-    if (!label) return { error: `${name}没有填文字` };
-    if (Array.from(label).length > MAX_NAV_LABEL) return { error: `${name}的文字最多 ${MAX_NAV_LABEL} 个字` };
-    if (!href) return { error: `${name}没有填地址` };
+    const n = index + 1;
+    if (!label) return { error: textOrKey(t, "navLabelMissing", { n }) };
+    if (Array.from(label).length > MAX_NAV_LABEL) return { error: textOrKey(t, "navLabelTooLong", { n, max: MAX_NAV_LABEL }) };
+    if (!href) return { error: textOrKey(t, "navHrefMissing", { n }) };
     const problem = navHrefProblem(href);
-    if (problem) return { error: `${name}的地址${problem}` };
+    if (problem) return { error: textOrKey(t, "navHref", { n, problem: t ? t.hrefProblems[problem] : problem }) };
     links.push({ label, href });
   }
-  if (links.length > MAX_NAV_LINKS) return { error: `导航链接最多 ${MAX_NAV_LINKS} 个` };
+  if (links.length > MAX_NAV_LINKS) return { error: textOrKey(t, "navTooMany", { max: MAX_NAV_LINKS }) };
   return { data: { position: input.position === "before" ? "before" : "after", links } };
 }

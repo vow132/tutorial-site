@@ -1,6 +1,8 @@
 /**
  * 教程标签的纯函数：名称规整、URL 别名、后台输入解析（编辑表单、Server Action、测试共用）。
  */
+import type { Messages } from "@/lib/i18n/messages/types";
+
 export const MAX_TAGS_PER_TUTORIAL = 8;
 export const MAX_TAG_LENGTH = 24;
 /** 标签页至少有这么多篇已发布教程才允许搜索引擎收录（避免大量单篇的薄内容页）。 */
@@ -30,19 +32,22 @@ export const tagPath = (slug: string) => `/tags/${encodeURIComponent(slug)}`;
 /**
  * 解析后台填写的标签（逗号、顿号、分号或换行分隔）。按别名去重，保留第一次出现的写法。
  */
-export function parseTagNames(input: string): { names: string[] } | { error: string } {
+export function parseTagNames(input: string, t?: Messages["admin"]["validation"]): { names: string[] } | { error: string } {
+  // t 不传时（只关心结果、不显示错误的调用方，比如批量导入清理原标签）错误文字是对应的键名
+  const say = (key: "tagTooLong" | "tagNoText" | "tooManyTags", vars: Record<string, string | number>) =>
+    t ? t[key].replace(/\{(\w+)\}/g, (match, name: string) => String(vars[name] ?? match)) : key;
   const names: string[] = [];
   const seen = new Set<string>();
   for (const part of input.split(/[,，、;；\n]+/)) {
     const name = normalizeTagName(part);
     if (!name) continue;
-    if (Array.from(name).length > MAX_TAG_LENGTH) return { error: `标签「${name}」太长，最多 ${MAX_TAG_LENGTH} 个字` };
+    if (Array.from(name).length > MAX_TAG_LENGTH) return { error: say("tagTooLong", { name, max: MAX_TAG_LENGTH }) };
     const slug = tagSlug(name);
-    if (!slug) return { error: `标签「${name}」需要包含文字或数字` };
+    if (!slug) return { error: say("tagNoText", { name }) };
     if (seen.has(slug)) continue;
     seen.add(slug);
     names.push(name);
   }
-  if (names.length > MAX_TAGS_PER_TUTORIAL) return { error: `每篇教程最多 ${MAX_TAGS_PER_TUTORIAL} 个标签` };
+  if (names.length > MAX_TAGS_PER_TUTORIAL) return { error: say("tooManyTags", { max: MAX_TAGS_PER_TUTORIAL }) };
   return { names };
 }

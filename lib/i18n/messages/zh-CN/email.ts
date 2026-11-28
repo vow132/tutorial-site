@@ -1,0 +1,25 @@
+/** 发给读者的邮件、公开接口返回给读者的提示（网站语言）。 */
+export const email = {
+  confirmSubject: "请确认订阅「{site}」的新教程提醒",
+  confirmText:
+    "你好！\n\n有人（希望是你）用这个邮箱订阅了「{site}」的新教程提醒。打开下面的链接确认订阅：\n\n{url}\n\n如果不是你本人操作，忽略这封邮件即可，不会再收到任何邮件。",
+  confirmHeading: "确认订阅新教程提醒",
+  confirmBody: "有人（希望是你）用这个邮箱订阅了「{site}」的新教程提醒。点下面的按钮确认，之后每有新教程发布会发一封邮件给你。",
+  confirmButton: "确认订阅",
+  confirmFooter: "如果不是你本人操作，忽略这封邮件即可，不会再收到任何邮件。",
+  newSubject: "新教程：{title}",
+  newIntro: "「{site}」发布了新教程：",
+  newReadMore: "阅读全文：{url}",
+  newUnsubscribe: "不想再收到？退订：{url}",
+  newLabel: "新教程",
+  newButton: "阅读全文",
+  newFooter: "你收到这封邮件是因为订阅了「{site}」的新教程提醒。{link}",
+  unsubscribeLink: "退订",
+  invalidEmail: "邮箱格式不对",
+  subscribeDisabled: "邮件订阅暂未开启",
+  tooFrequent: "操作太频繁了，请稍后再试",
+  sendFailed: "确认邮件没发出去，请稍后再试",
+  humanCheckFailed: "人机验证没通过，请重新验证后再提交",
+  unsubscribed: "已退订",
+  invalidLink: "链接无效",
+};

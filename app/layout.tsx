@@ -8,6 +8,9 @@ import { brandIconPath, siteIconVersion } from "@/lib/brand-icon";
 import { verificationMetadata } from "@/lib/search-verification";
 import ThemeBoot from "@/components/theme-boot";
 import { THEME_SCRIPT } from "@/lib/theme-script.mjs";
+import { I18nProvider } from "@/lib/i18n/client";
+import { OG_LOCALE } from "@/lib/i18n/locales";
+import { messagesFor } from "@/lib/i18n/messages";
 
 /**
  * 全站兜底 metadata。注意这里**不能**写 canonical：没覆盖它的页面（搜索、404）
@@ -29,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: "website",
       siteName: settings.siteName,
-      locale: "zh_CN",
+      locale: OG_LOCALE[settings.locale],
       title: settings.siteTitle,
       description: settings.siteDescription,
       images: [shareImage],
@@ -67,12 +70,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { brand } = await getSettings();
+  const { brand, locale } = await getSettings();
+  const m = messagesFor(locale);
   // 站点设置里选的主题色：覆盖 globals.css 的默认靛蓝（lib/brand.ts 自动算好对比度足够的变体）
   const accentStyle = brandCss(brand.accentColor);
   return (
     <html
-      lang="zh-CN"
+      lang={locale}
       className="h-full antialiased"
       data-theme="light"
       data-mascot={brand.mascot ? undefined : "off"}
@@ -88,7 +92,10 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full">
         <ThemeBoot />
-        {children}
+        {/* 前台浏览器端组件的文案（网站语言）；后台布局里再套一层管理员自己的语言 */}
+        <I18nProvider locale={locale} messages={{ common: m.common, reader: m.reader }}>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

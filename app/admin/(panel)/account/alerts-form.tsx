@@ -3,19 +3,10 @@
 import { startTransition, useActionState, useState } from "react";
 import { ALERT_CHANNELS, type AlertChannel } from "@/lib/alert-channels.mjs";
 import { saveAlertSettings, sendTestAlert, type AlertFormState } from "@/lib/actions/alerts";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
-
-const HINTS: Record<AlertChannel, string> = {
-  off: "关闭后不会推送任何消息，安全日志照常记录。",
-  dingtalk:
-    "群设置 → 机器人 → 添加「自定义」机器人，复制 Webhook。安全设置建议选「加签」并把密钥填在下面；选「自定义关键词」时请填网站名称。",
-  feishu: "群设置 → 群机器人 → 添加「自定义机器人」，复制 Webhook；开启「签名校验」时把密钥填在下面。",
-  wecom: "群聊 → 右上角 → 添加群机器人，复制 Webhook 地址。",
-  telegram: "向 @BotFather 发送 /newbot 得到 Token；先给机器人发一条消息或拉进群，再用 getUpdates 查到 Chat ID。国内服务器可能无法访问 Telegram。",
-  webhook: "以 POST 发送 JSON：{ event, title, lines, text, site, time }，可接入自建的通知服务。",
-};
 
 export type AlertFormInitial = {
   channel: AlertChannel;
@@ -46,6 +37,8 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
   const [testState, testAction, testing] = useActionState<AlertFormState, FormData>(sendTestAlert, {});
   const [last, setLast] = useState<"save" | "test" | null>(null);
   const sameChannel = channel === initial.channel;
+  const { m } = useAdminI18n();
+  const t = m.admin.alertsForm;
 
   return (
     <form
@@ -62,7 +55,7 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
     >
       <div>
         <label htmlFor="alert-channel" className="mb-1.5 block text-sm font-medium text-ink-2">
-          推送渠道
+          {t.channel}
         </label>
         <select
           id="alert-channel"
@@ -73,17 +66,17 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
         >
           {ALERT_CHANNELS.map((item) => (
             <option key={item.value} value={item.value}>
-              {item.label}
+              {m.admin.alertChannels[item.value]}
             </option>
           ))}
         </select>
-        <p className="mt-1.5 text-xs leading-relaxed text-ink-3">{HINTS[channel]}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-ink-3">{t.hints[channel]}</p>
       </div>
 
       {channel !== "off" && channel !== "telegram" && (
         <div>
           <label htmlFor="alert-url" className="mb-1.5 block text-sm font-medium text-ink-2">
-            Webhook 地址
+            {t.url}
           </label>
           <input
             id="alert-url"
@@ -100,14 +93,14 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
       {(channel === "dingtalk" || channel === "feishu") && (
         <div>
           <label htmlFor="alert-secret" className="mb-1.5 block text-sm font-medium text-ink-2">
-            {channel === "dingtalk" ? "加签密钥（SEC 开头，可选）" : "签名校验密钥（可选）"}
+            {channel === "dingtalk" ? t.dingtalkSecret : t.feishuSecret}
           </label>
           <input
             id="alert-secret"
             name="secret"
             type="password"
             autoComplete="off"
-            placeholder={sameChannel && initial.hasSecret ? "已设置，留空则不修改" : ""}
+            placeholder={sameChannel && initial.hasSecret ? t.keepSecret : ""}
             className={inputClass}
           />
         </div>
@@ -124,7 +117,7 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
               name="telegramToken"
               type="password"
               autoComplete="off"
-              placeholder={sameChannel && initial.hasTelegramToken ? "已设置，留空则不修改" : "123456:ABC…"}
+              placeholder={sameChannel && initial.hasTelegramToken ? t.keepSecret : "123456:ABC…"}
               className={inputClass}
             />
           </div>
@@ -136,7 +129,7 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
               id="alert-chat"
               name="telegramChatId"
               defaultValue={sameChannel ? initial.telegramChatId : ""}
-              placeholder="如 123456789 或 @channel"
+              placeholder={t.chatIdPlaceholder}
               autoComplete="off"
               className={inputClass}
             />
@@ -151,14 +144,13 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
           defaultChecked={initial.backupReminder}
           className="mt-0.5 h-4 w-4 accent-accent"
         />
-        <span>
-          备份提醒：超过 2 天没有新的数据库备份时提醒（每天最多一次）
-        </span>
+        <span>{t.backupReminder}</span>
       </label>
 
       <div>
         <label htmlFor="alert-password" className="mb-1.5 block text-sm font-medium text-ink-2">
-          当前密码<span className="ml-2 text-xs font-normal text-ink-3">保存时需要；只发测试消息可以不填</span>
+          {t.currentPassword}
+          <span className="ml-2 text-xs font-normal text-ink-3">{t.currentPasswordHint}</span>
         </label>
         <input
           id="alert-password"
@@ -179,7 +171,7 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
           disabled={saving}
           className="h-11 rounded-xl bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {saving ? "保存中…" : "保存告警设置"}
+          {saving ? m.admin.common.saving : t.submit}
         </button>
         {channel !== "off" && (
           <button
@@ -189,7 +181,7 @@ export default function AlertsForm({ initial }: { initial: AlertFormInitial }) {
             disabled={testing}
             className="h-11 rounded-xl border border-line px-6 text-sm font-medium text-ink-2 transition-colors hover:bg-paper hover:text-ink disabled:opacity-50"
           >
-            {testing ? "发送中…" : "发送测试消息"}
+            {testing ? t.sending : t.sendTest}
           </button>
         )}
       </div>

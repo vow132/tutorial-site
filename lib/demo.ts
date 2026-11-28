@@ -12,8 +12,6 @@
  * 要换内容时先关掉演示模式重启、写好或导入，再打开（见 README「演示站」）。
  */
 
-export const DEMO_READ_ONLY_MESSAGE = "这是演示站，只能看、不能保存修改。想完整体验，可以照 README 部署一份自己的。";
-
 /** 运行时读取（不要在模块顶层求值成常量：Docker 镜像是构建好再按 .env 运行的）。 */
 export function isDemoMode(): boolean {
   return process.env.DEMO_MODE?.trim() === "true";

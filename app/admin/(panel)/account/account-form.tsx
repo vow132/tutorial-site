@@ -5,6 +5,7 @@ import {
   updateAdminCredentials,
   type CredentialsFormState,
 } from "@/lib/actions/account";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-line bg-paper px-4 text-sm outline-none transition-colors focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60 focus:bg-surface";
@@ -14,12 +15,14 @@ export default function AccountForm({ username }: { username: string }) {
     CredentialsFormState,
     FormData
   >(updateAdminCredentials, {});
+  const { m } = useAdminI18n();
+  const t = m.admin.account;
 
   return (
     <form action={action} className="space-y-5" autoComplete="off">
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          登录用户名
+          {t.username}
         </label>
         <input
           name="username"
@@ -31,13 +34,13 @@ export default function AccountForm({ username }: { username: string }) {
           className={inputClass}
         />
         <p className="mt-1.5 text-xs text-ink-3">
-          3-32 位字母、数字、下划线或连字符
+          {t.usernameHint}
         </p>
       </div>
 
       <div className="border-t border-line pt-5">
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          当前密码 <span className="font-normal text-ink-3">（必填，用于确认身份）</span>
+          {t.currentPassword} <span className="font-normal text-ink-3">{t.currentPasswordHint}</span>
         </label>
         <input
           name="currentPassword"
@@ -50,7 +53,7 @@ export default function AccountForm({ username }: { username: string }) {
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          新密码 <span className="font-normal text-ink-3">（不修改则留空）</span>
+          {t.newPassword} <span className="font-normal text-ink-3">{t.newPasswordHint}</span>
         </label>
         <input
           name="newPassword"
@@ -58,13 +61,13 @@ export default function AccountForm({ username }: { username: string }) {
           minLength={10}
           autoComplete="new-password"
           className={inputClass}
-          placeholder="至少 10 位，避免常见密码"
+          placeholder={t.newPasswordPlaceholder}
         />
       </div>
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-ink-2">
-          确认新密码
+          {t.confirmPassword}
         </label>
         <input
           name="confirmPassword"
@@ -91,7 +94,7 @@ export default function AccountForm({ username }: { username: string }) {
         disabled={pending}
         className="h-11 rounded-xl bg-btn px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "保存中…" : "保存账号设置"}
+        {pending ? m.admin.common.saving : t.submit}
       </button>
     </form>
   );

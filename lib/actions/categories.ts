@@ -3,10 +3,12 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/admin-auth";
+import { getAdminI18n } from "@/lib/i18n/server";
 import { audit } from "@/lib/audit";
 import { MAX_CATEGORY_LEVELS } from "@/lib/categories";
 import { CACHE_TAGS } from "@/lib/public-data";
 import { clearSearchCache } from "@/lib/search";
+import type { Messages } from "@/lib/i18n/messages";
 
 export type CategoryFormState = { error?: string; success?: string };
 
@@ -20,19 +22,21 @@ function revalidate() {
   revalidatePath("/admin/tutorials");
 }
 
-function parseParentId(formData: FormData) {
+type Text = Messages["admin"]["categories"];
+
+function parseParentId(formData: FormData, t: Text) {
   const value = String(formData.get("parentId") ?? "").trim();
   if (!value) return { parentId: null };
   const parentId = Number(value);
   return Number.isInteger(parentId) && parentId > 0
     ? { parentId }
-    : { parentId: null, error: "父分类参数不正确" };
+    : { parentId: null, error: t.badParent };
 }
 
-function normalizeLinkUrl(rawValue: string) {
+function normalizeLinkUrl(rawValue: string, t: Text) {
   const value = rawValue.trim();
   if (!value) return { linkUrl: null };
-  if (value.length > 500) return { linkUrl: null, error: "跳转链接过长" };
+  if (value.length > 500) return { linkUrl: null, error: t.linkTooLong };
 
   if (value.startsWith("/") && !value.startsWith("//")) {
     return { linkUrl: value };
@@ -49,7 +53,7 @@ function normalizeLinkUrl(rawValue: string) {
 
   return {
     linkUrl: null,
-    error: "跳转链接需填写 /站内路径 或完整的 http(s) 地址",
+    error: t.linkInvalid,
   };
 }
 
@@ -113,38 +117,39 @@ function validateParent(
   categories: CategoryRelation[],
   categoryId: number | null,
   parentId: number | null,
+  t: Text,
 ) {
   if (parentId === null) return null;
   const parent = categories.find((category) => category.id === parentId);
-  if (!parent) return "选择的父分类不存在";
+  if (!parent) return t.parentMissing;
 
   if (categoryId !== null) {
-    if (categoryId === parentId) return "分类不能成为自己的父分类";
+    if (categoryId === parentId) return t.parentSelf;
     if (descendantIds(categories, categoryId).has(parentId)) {
-      return "不能把分类移动到自己的子分类下面";
+      return t.parentDescendant;
     }
   }
 
   const newDepth = categoryDepth(categories, parentId) + 1;
   const childHeight = categoryId === null ? 0 : subtreeHeight(categories, categoryId);
   if (newDepth + childHeight >= MAX_CATEGORY_LEVELS) {
-    return `分类最多支持 ${MAX_CATEGORY_LEVELS} 级，请选择更上层的父分类`;
+    return t.tooDeep.replace("{max}", String(MAX_CATEGORY_LEVELS));
   }
 
   return null;
 }
 
-function readCommonFields(formData: FormData) {
+function readCommonFields(formData: FormData, t: Text) {
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const icon = String(formData.get("icon") ?? "").trim();
   const color = String(formData.get("color") ?? "#6366f1").trim();
-  const link = normalizeLinkUrl(String(formData.get("linkUrl") ?? ""));
+  const link = normalizeLinkUrl(String(formData.get("linkUrl") ?? ""), t);
 
-  if (!name) return { error: "请输入分类名称" };
-  if (name.length > 60) return { error: "分类名称不能超过 60 个字符" };
-  if (description.length > 300) return { error: "分类描述不能超过 300 个字符" };
-  if (!/^#[0-9a-f]{6}$/i.test(color)) return { error: "主题色格式不正确" };
+  if (!name) return { error: t.nameRequired };
+  if (name.length > 60) return { error: t.nameTooLong };
+  if (description.length > 300) return { error: t.descriptionTooLong };
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return { error: t.colorInvalid };
   if (link.error) return { error: link.error };
 
   return {
@@ -163,26 +168,27 @@ export async function createCategory(
   formData: FormData,
 ): Promise<CategoryFormState> {
   const admin = await requireAuth("taxonomy");
+  const t = (await getAdminI18n()).m.admin.categories;
 
-  const common = readCommonFields(formData);
+  const common = readCommonFields(formData, t);
   if (common.error || !common.data) return { error: common.error };
 
   const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
   if (!/^[a-z0-9-]+$/.test(slug)) {
-    return { error: "Slug 只能包含小写字母、数字和连字符" };
+    return { error: t.slugInvalid };
   }
-  if (slug.length > 80) return { error: "Slug 不能超过 80 个字符" };
+  if (slug.length > 80) return { error: t.slugTooLong };
 
-  const parent = parseParentId(formData);
+  const parent = parseParentId(formData, t);
   if (parent.error) return { error: parent.error };
 
   const [exists, categories] = await Promise.all([
     prisma.category.findUnique({ where: { slug }, select: { id: true } }),
     prisma.category.findMany({ select: { id: true, parentId: true } }),
   ]);
-  if (exists) return { error: "Slug 已被占用" };
+  if (exists) return { error: t.slugTaken };
 
-  const parentError = validateParent(categories, null, parent.parentId);
+  const parentError = validateParent(categories, null, parent.parentId, t);
   if (parentError) return { error: parentError };
 
   const maxOrder = await prisma.category.aggregate({
@@ -197,9 +203,9 @@ export async function createCategory(
       order: (maxOrder._max.order ?? 0) + 1,
     },
   });
-  await audit("category.create", { actor: admin.username, detail: `${common.data.name}（${slug}）` });
+  await audit("category.create", { actor: admin.username, detail: `${common.data.name} (${slug})` });
   revalidate();
-  return { success: "分类已创建" };
+  return { success: t.created };
 }
 
 export async function updateCategory(
@@ -207,24 +213,25 @@ export async function updateCategory(
   formData: FormData,
 ): Promise<CategoryFormState> {
   const admin = await requireAuth("taxonomy");
+  const t = (await getAdminI18n()).m.admin.categories;
 
   const id = Number(formData.get("id"));
-  if (!Number.isInteger(id) || id <= 0) return { error: "分类参数不正确" };
+  if (!Number.isInteger(id) || id <= 0) return { error: t.badId };
 
-  const common = readCommonFields(formData);
+  const common = readCommonFields(formData, t);
   if (common.error || !common.data) return { error: common.error };
 
   const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
   if (!/^[a-z0-9-]+$/.test(slug)) {
-    return { error: "Slug 只能包含小写字母、数字和连字符" };
+    return { error: t.slugInvalid };
   }
-  if (slug.length > 80) return { error: "Slug 不能超过 80 个字符" };
+  if (slug.length > 80) return { error: t.slugTooLong };
 
-  const parent = parseParentId(formData);
+  const parent = parseParentId(formData, t);
   if (parent.error) return { error: parent.error };
 
   const orderValue = Number(formData.get("order") ?? 0);
-  if (!Number.isFinite(orderValue)) return { error: "排序值不正确" };
+  if (!Number.isFinite(orderValue)) return { error: t.orderInvalid };
   const order = Math.trunc(orderValue);
 
   const [current, categories, slugOwner] = await Promise.all([
@@ -233,11 +240,11 @@ export async function updateCategory(
     prisma.category.findUnique({ where: { slug }, select: { id: true } }),
   ]);
   if (!current || !categories.some((category) => category.id === id)) {
-    return { error: "分类不存在或已被删除" };
+    return { error: t.gone };
   }
-  if (slugOwner && slugOwner.id !== id) return { error: "Slug 已被其他分类占用" };
+  if (slugOwner && slugOwner.id !== id) return { error: t.slugTakenOther };
 
-  const parentError = validateParent(categories, id, parent.parentId);
+  const parentError = validateParent(categories, id, parent.parentId, t);
   if (parentError) return { error: parentError };
 
   await prisma.category.update({
@@ -249,13 +256,13 @@ export async function updateCategory(
       order,
     },
   });
-  await audit("category.update", { actor: admin.username, detail: `#${id} ${common.data.name}（${slug}）` });
+  await audit("category.update", { actor: admin.username, detail: `#${id} ${common.data.name} (${slug})` });
   if (current.slug !== slug) {
     revalidatePath(`/categories/${current.slug}`);
     revalidatePath(`/categories/${slug}`);
   }
   revalidate();
-  return { success: "已保存" };
+  return { success: (await getAdminI18n()).m.admin.common.saved };
 }
 
 export async function deleteCategory(
@@ -263,23 +270,25 @@ export async function deleteCategory(
   formData: FormData,
 ): Promise<CategoryFormState> {
   const admin = await requireAuth("taxonomy");
+  const { m, plural } = await getAdminI18n();
+  const t = m.admin.categories;
 
   const id = Number(formData.get("id"));
-  if (!Number.isInteger(id) || id <= 0) return { error: "参数错误" };
+  if (!Number.isInteger(id) || id <= 0) return { error: t.badId };
 
   const [tutorialCount, childCount] = await Promise.all([
     prisma.tutorial.count({ where: { categoryId: id } }),
     prisma.category.count({ where: { parentId: id } }),
   ]);
   if (tutorialCount > 0) {
-    return { error: `该分类下还有 ${tutorialCount} 篇教程，请先移动或删除它们` };
+    return { error: plural(tutorialCount, t.hasTutorials) };
   }
   if (childCount > 0) {
-    return { error: `该分类下还有 ${childCount} 个子分类，请先移动或删除它们` };
+    return { error: plural(childCount, t.hasChildren) };
   }
 
   const deleted = await prisma.category.delete({ where: { id } });
   await audit("category.delete", { actor: admin.username, detail: `#${id} ${deleted.name}` });
   revalidate();
-  return { success: "分类已删除" };
+  return { success: t.deleted };
 }

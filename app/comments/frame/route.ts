@@ -3,6 +3,7 @@ import { commentEmbed, commentFrameCsp, commentFrameHtml, commentPagePath } from
 import { isDemoMode } from "@/lib/demo";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
+import { messagesFor } from "@/lib/i18n/messages";
 
 /**
  * 评论区小页面：文章页文末的 iframe（components/comments.tsx）加载它。
@@ -20,15 +21,16 @@ export async function GET(request: Request) {
   // 演示站的后台对所有人开放，访客写的字不能经由本站展示给别人
   if (isDemoMode() || !slug || slug.length > 200) return notFound();
 
-  const { comments } = await getSettings();
+  const { comments, locale } = await getSettings();
   if (comments.provider === "none") return notFound();
   const tutorial = await prisma.tutorial.findFirst({ where: { slug, published: true }, select: { title: true } });
   if (!tutorial) return notFound();
-  const embed = commentEmbed(comments, { path: commentPagePath(slug), title: tutorial.title }, theme);
+  const embed = commentEmbed(comments, { path: commentPagePath(slug), title: tutorial.title }, theme, locale);
   if (!embed) return notFound();
 
   const nonce = randomBytes(16).toString("base64");
-  return new Response(commentFrameHtml(embed, nonce, theme), {
+  const t = messagesFor(locale).site.comments;
+  return new Response(commentFrameHtml(embed, nonce, theme, { lang: locale, title: t.frameTitle, loadFailed: t.loadFailed }), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": commentFrameCsp(embed, nonce),

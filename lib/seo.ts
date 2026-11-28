@@ -4,6 +4,9 @@ import { SITE_URL, absoluteUrl } from "@/lib/site-url";
 import { SHARE_IMAGE_SIZE, siteShareCard, siteShareImagePath } from "@/lib/share-image";
 import { uploadedImage } from "@/lib/article";
 import { assetUrl } from "@/lib/asset-url";
+import { OG_LOCALE } from "@/lib/i18n/locales";
+import { messagesFor } from "@/lib/i18n/messages";
+import { format } from "@/lib/i18n/format";
 
 /**
  * 没有配图的页面用的默认分享图：后台「站点设置 → 品牌」上传了就用上传的，
@@ -14,7 +17,8 @@ export async function defaultShareImage(settings: SiteSettings): Promise<SeoImag
   if (uploaded) {
     return { url: assetUrl(settings.brand.shareImage, settings.assetHost), width: uploaded.width, height: uploaded.height, alt: settings.siteTitle };
   }
-  return { url: siteShareImagePath(siteShareCard(settings)), ...SHARE_IMAGE_SIZE, alt: settings.siteTitle };
+  const cta = messagesFor(settings.locale).site.share.siteCta;
+  return { url: siteShareImagePath(siteShareCard(settings, cta)), ...SHARE_IMAGE_SIZE, alt: settings.siteTitle };
 }
 
 export const RSS_FEED = { "application/rss+xml": absoluteUrl("/feed.xml") };
@@ -26,8 +30,9 @@ export function withPage(path: string, page: number) {
   return page > 1 ? `${path}?page=${page}` : path;
 }
 
-export function pageSuffix(page: number) {
-  return page > 1 ? ` · 第 ${page} 页` : "";
+/** 分页标题的后缀，template 取自字典的 site.pageSuffix（「 · 第 {page} 页」） */
+export function pageSuffix(page: number, template: string) {
+  return page > 1 ? format(template, { page }) : "";
 }
 
 /** 站内资源路径转绝对地址；外站地址原样返回。 */
@@ -67,7 +72,7 @@ export async function pageMetadata({
 
   const common = {
     siteName: settings.siteName,
-    locale: "zh_CN",
+    locale: OG_LOCALE[settings.locale],
     url: path,
     title: shareTitle,
     description,

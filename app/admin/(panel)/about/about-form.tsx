@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import dynamic from "next/dynamic";
 import { updateAbout, type AboutFormState } from "@/lib/actions/about";
 import { submitKeepingValues } from "@/lib/form-submit";
+import { useAdminI18n } from "@/lib/i18n/client";
 
 const RichTextEditor = dynamic(() => import("@/components/editor/rich-text-editor"), {
   ssr: false,
@@ -12,12 +13,14 @@ const RichTextEditor = dynamic(() => import("@/components/editor/rich-text-edito
 
 export default function AboutForm({ title, content, mediaLibrary = false }: { title: string; content: string; mediaLibrary?: boolean }) {
   const [state, action, pending] = useActionState<AboutFormState, FormData>(updateAbout, {});
+  const { m } = useAdminI18n();
+  const t = m.admin.about;
   return (
     // 保存后保留当前内容（React 19 的 form action 默认会重置表单）
     <form onSubmit={submitKeepingValues(action)} className="space-y-5">
       <div>
         <label htmlFor="about-title" className="mb-1.5 block text-sm font-medium text-ink-2">
-          页面标题
+          {t.title}
         </label>
         <input
           id="about-title"
@@ -29,10 +32,8 @@ export default function AboutForm({ title, content, mediaLibrary = false }: { ti
       </div>
       <div>
         <span className="mb-1.5 block text-sm font-medium text-ink-2">
-          正文
-          <span className="ml-2 text-xs font-normal text-ink-3">
-            介绍网站、作者和联系方式；清空后前台不显示关于页面
-          </span>
+          {t.content}
+          <span className="ml-2 text-xs font-normal text-ink-3">{t.contentHint}</span>
         </span>
         <RichTextEditor name="content" initialContent={content} mediaLibrary={mediaLibrary} />
       </div>
@@ -49,7 +50,7 @@ export default function AboutForm({ title, content, mediaLibrary = false }: { ti
         disabled={pending}
         className="rounded-full bg-btn px-7 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "保存中…" : "保存关于页面"}
+        {pending ? m.admin.common.saving : t.submit}
       </button>
     </form>
   );

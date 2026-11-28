@@ -9,14 +9,16 @@ import { breadcrumbJsonLd, pageMetadata } from "@/lib/seo";
 import { getSettings } from "@/lib/settings";
 import { absoluteUrl } from "@/lib/site-url";
 import { rewriteAssetHtml } from "@/lib/asset-url";
+import { getSiteI18n } from "@/lib/i18n/server";
 
 /** 静态缓存页：后台保存时立即失效（lib/actions/about.ts），另有每小时一次的兜底刷新。 */
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [about, settings] = await Promise.all([getAbout(), getSettings()]);
+  const { m } = await getSiteI18n();
+  const [about, settings] = await Promise.all([getAbout(m.defaults.aboutTitle), getSettings()]);
   if (!hasAboutContent(about)) notFound();
-  const { html } = await processArticle(about.content);
+  const { html } = await processArticle(about.content, m.site.articleHtml);
   return pageMetadata({
     title: about.title,
     description: htmlToDescription(html) || settings.siteDescription,
@@ -25,9 +27,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const [about, settings] = await Promise.all([getAbout(), getSettings()]);
+  const { m } = await getSiteI18n();
+  const [about, settings] = await Promise.all([getAbout(m.defaults.aboutTitle), getSettings()]);
   if (!hasAboutContent(about)) notFound();
-  const { html } = await processArticle(about.content);
+  const { html } = await processArticle(about.content, m.site.articleHtml);
   const site = { "@type": "Organization", name: settings.siteName, url: absoluteUrl("/") };
 
   return (
@@ -40,11 +43,11 @@ export default async function AboutPage() {
               name: about.title,
               url: absoluteUrl("/about"),
               description: htmlToDescription(html) || settings.siteDescription,
-              inLanguage: "zh-CN",
+              inLanguage: settings.locale,
               about: site,
               ...(about.updatedAt ? { dateModified: about.updatedAt } : {}),
             },
-            breadcrumbJsonLd([{ name: "首页", path: "/" }, { name: about.title }]),
+            breadcrumbJsonLd([{ name: m.site.nav.home, path: "/" }, { name: about.title }]),
           ],
         }}
       />

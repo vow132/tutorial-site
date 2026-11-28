@@ -4,12 +4,17 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import { createSeries } from "@/lib/actions/series";
 import { prisma } from "@/lib/prisma";
 import SeriesForm from "./series-form";
+import { getAdminI18n } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "教程系列" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { m } = await getAdminI18n();
+  return { title: m.admin.series.metaTitle };
+}
 export const dynamic = "force-dynamic";
 
 export default async function AdminSeriesPage() {
   await requireAdminPage("taxonomy");
+  const t = (await getAdminI18n()).m.admin.series;
   const [series, published] = await Promise.all([
     prisma.series.findMany({
       orderBy: { createdAt: "desc" },
@@ -21,29 +26,26 @@ export default async function AdminSeriesPage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-ink">教程系列</h1>
-      <p className="mt-1 text-sm text-ink-3">
-        把几篇教程按顺序组成一个系列（如「从零搭建博客」第 1–5 篇）。文章页会显示系列目录和本系列的上一篇/下一篇，
-        每个系列还有自己的页面。
-      </p>
+      <h1 className="text-2xl font-bold text-ink">{t.heading}</h1>
+      <p className="mt-1 text-sm text-ink-3">{t.intro}</p>
 
       <section className="mt-6 rounded-3xl border border-line bg-surface p-5 sm:p-6" aria-labelledby="new-series">
-        <h2 id="new-series" className="mb-4 text-base font-semibold text-ink">新建系列</h2>
-        <SeriesForm action={createSeries} submitLabel="创建系列" />
+        <h2 id="new-series" className="mb-4 text-base font-semibold text-ink">{t.newHeading}</h2>
+        <SeriesForm action={createSeries} submitLabel={t.create} />
       </section>
 
       {series.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-dashed border-line bg-surface/60 py-12 text-center text-sm text-ink-3">
-          还没有系列
+          {t.empty}
         </div>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-line text-left text-xs text-ink-3">
               <tr>
-                <th className="px-4 py-3 font-medium">名称</th>
-                <th className="px-4 py-3 font-medium">教程数（已发布 / 全部）</th>
-                <th className="px-4 py-3 font-medium">前台</th>
+                <th className="px-4 py-3 font-medium">{t.colName}</th>
+                <th className="px-4 py-3 font-medium">{t.colCount}</th>
+                <th className="px-4 py-3 font-medium">{t.colPublic}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -70,7 +72,7 @@ export default async function AdminSeriesPage() {
                           /series/{item.slug}
                         </Link>
                       ) : (
-                        <span className="text-xs text-ink-3">还没有已发布的教程</span>
+                        <span className="text-xs text-ink-3">{t.noPublished}</span>
                       )}
                     </td>
                   </tr>

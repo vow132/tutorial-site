@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/admin-auth";
 import { getMediaLibrary } from "@/lib/media";
 import { can } from "@/lib/roles";
+import { getAdminI18n } from "@/lib/i18n/server";
 
 /**
  * 图片库列表（只读），给编辑器的「从图片库插入」用。按文件名搜索、分页。
@@ -9,8 +10,9 @@ import { can } from "@/lib/roles";
  */
 export async function GET(request: Request) {
   const admin = await getCurrentAdmin();
-  if (!admin) return NextResponse.json({ error: "登录已过期，请重新登录" }, { status: 401 });
-  if (!can(admin.role, "media")) return NextResponse.json({ error: "你的账号没有这个权限" }, { status: 403 });
+  const { m } = await getAdminI18n();
+  if (!admin) return NextResponse.json({ error: m.admin.sessionExpired }, { status: 401 });
+  if (!can(admin.role, "media")) return NextResponse.json({ error: m.admin.forbidden }, { status: 403 });
   const params = new URL(request.url).searchParams;
   const library = await getMediaLibrary({ query: params.get("q") ?? "", page: Number(params.get("page")) || 1 });
   return NextResponse.json(
