@@ -61,8 +61,7 @@
     "node": ">=22.12"
   },
   "overrides": {
-    "effect": "3.22.4",
-    "minimatch@>=7.0.0 <11.0.1": "11.0.8"
+    "effect": "3.22.4"
   },
   "allowScripts": {
     "@prisma/engines": true,
