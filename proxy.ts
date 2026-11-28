@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { adminContentSecurityPolicy } from "@/lib/csp.mjs";
-import { DEFAULT_SEGMENT, isReaderPage, READER_LOCALE_COOKIE, readerRewritePath, readerSegment } from "@/lib/i18n/reader";
+import { DEFAULT_SEGMENT, isAdminPath, isReaderPage, READER_LOCALE_COOKIE, readerRewritePath, readerSegment } from "@/lib/i18n/reader";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 const LOOPBACK = /^(?:127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/;
@@ -28,7 +28,7 @@ function isLocalHealthCheck(request: NextRequest) {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/admin")) return adminProxy(request);
+  if (isAdminPath(pathname)) return adminProxy(request);
   if (!isReaderPage(pathname)) return NextResponse.next();
 
   // 前台页面：按读者选的语言改写到 app/[lang] 下对应的那份（lib/i18n/reader.ts），浏览器里的网址不变。
@@ -50,7 +50,7 @@ function adminProxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 登录页和首次安装页（还没有任何账号时用，页面自己校验安装码）不需要登录
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login" && pathname !== "/admin/setup") {
+  if (pathname !== "/admin/login" && pathname !== "/admin/setup") {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
     if (!verifySession(token)) {
       const url = new URL("/admin/login", request.url);

@@ -26,14 +26,6 @@ export function addToReadingHistory(history: number[], id: number): number[] {
   return [...history.filter((item) => item !== id), id].slice(-READING_HISTORY_LIMIT);
 }
 
-export function readReadingHistory(): Set<number> {
-  try {
-    return new Set(parseReadingHistory(localStorage.getItem(READING_HISTORY_KEY)));
-  } catch {
-    return new Set();
-  }
-}
-
 export function markTutorialRead(id: number) {
   try {
     const next = addToReadingHistory(parseReadingHistory(localStorage.getItem(READING_HISTORY_KEY)), id);

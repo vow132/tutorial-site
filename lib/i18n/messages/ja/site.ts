@@ -58,7 +58,6 @@ export const site: Messages["site"] = {
     prev: "← 前の記事{note}",
     next: "次の記事{note} →",
     related: "関連チュートリアル",
-    tocTitle: "このページの目次",
     seriesTitle: "シリーズ",
     bookTitle: "目次",
     bookPosition: "{label} · 第 {index} / {total} 回",

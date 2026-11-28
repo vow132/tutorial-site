@@ -63,7 +63,6 @@ export const site: Messages["site"] = {
     prev: "← Предыдущий{note}",
     next: "Следующий{note} →",
     related: "Похожие уроки",
-    tocTitle: "На этой странице",
     seriesTitle: "Серия",
     bookTitle: "Содержание",
     bookPosition: "{label} · часть {index} из {total}",

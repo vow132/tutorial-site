@@ -6,7 +6,6 @@ export const reader: Messages["reader"] = {
   language: { label: "Language" },
   error: {
     title: "Something went wrong",
-    siteMessage: "The site can't be displayed right now. Please try again later; if it keeps happening, contact the site owner.",
     pageMessage: "This content failed to load. Please try again; if it keeps happening, contact the site owner.",
     digest: "Error ID: {id}",
     retry: "Try again",

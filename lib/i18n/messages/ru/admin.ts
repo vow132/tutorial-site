@@ -1036,6 +1036,7 @@ export const admin: Messages["admin"] = {
     colDetail: "Подробности",
     empty: "Записей пока нет",
     hiddenActor: "(введено посетителем, скрыто)",
+    schedulerActor: "Отложенная публикация",
     ipNote: "Столбец IP заполняется, только если за обратным прокси задан {env} (за Cloudflare см. раздел «Cloudflare» в README).",
     actions: {
       "login.success": "Вход",

@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { audit } from "@/lib/audit";
+import { audit, SCHEDULER_ACTOR } from "@/lib/audit";
 import { revalidatePublic } from "@/lib/revalidate-public";
 import { publishDueTutorials, schedulerToken } from "@/lib/scheduled-publish";
 import { notifyNewTutorial } from "@/lib/subscription-notify";
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (published.length > 0) {
     revalidatePublic(...published.map((tutorial) => tutorial.slug));
     for (const tutorial of published) {
-      await audit("tutorial.publish", { actor: "定时发布", detail: `#${tutorial.id} ${tutorial.title}` });
+      await audit("tutorial.publish", { actor: SCHEDULER_ACTOR, detail: `#${tutorial.id} ${tutorial.title}` });
       notifyNewTutorial(tutorial.id);
     }
   }

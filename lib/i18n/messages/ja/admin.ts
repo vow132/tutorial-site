@@ -1011,6 +1011,7 @@ export const admin: Messages["admin"] = {
     colDetail: "詳細",
     empty: "記録はまだありません",
     hiddenActor: "（訪問者の入力のため非表示）",
+    schedulerActor: "予約公開",
     ipNote: "IP 列は、リバースプロキシの背後で {env} を設定した場合にのみ記録されます（Cloudflare の背後にある場合は README の「Cloudflare」参照）。",
     actions: {
       "login.success": "ログイン成功",
