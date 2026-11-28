@@ -51,6 +51,8 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "off",
+    // 测试按中文界面写（首次安装页按浏览器语言显示，其他页面跟网站语言）；多语言另见 e2e/i18n.spec.ts
+    locale: "zh-CN",
   },
   projects: DEMO
     ? [{ name: "demo", testMatch: /demo\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } }]
