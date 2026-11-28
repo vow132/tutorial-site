@@ -169,6 +169,11 @@ test("scheduled tutorials go live by themselves", async ({ page, request }) => {
     await page.goto("/admin/tutorials");
     await expect(page.getByRole("row").filter({ hasText: title }).getByRole("button", { name: "已发布" })).toBeVisible();
     expect(await (await request.get("/tutorials")).text()).toContain(title);
+    // 安全日志里操作人是「定时发布」（按后台语言显示，库里存的不是某种语言的文字）
+    await page.goto("/admin/audit");
+    const entry = page.getByRole("row").filter({ hasText: title }).filter({ hasText: "定时发布" });
+    await expect(entry).toHaveCount(1);
+    await expect(entry).not.toContainText("@scheduler");
   } finally {
     await remove(page, title);
   }

@@ -6,7 +6,6 @@ export const reader: Messages["reader"] = {
   language: { label: "表示言語 · Language" },
   error: {
     title: "エラーが発生しました",
-    siteMessage: "現在サイトを表示できません。しばらくしてから再度お試しください。繰り返し発生する場合はサイト管理者にご連絡ください。",
     pageMessage: "コンテンツを読み込めませんでした。もう一度お試しください。繰り返し発生する場合はサイト管理者にご連絡ください。",
     digest: "エラー番号：{id}",
     retry: "再試行",

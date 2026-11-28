@@ -2,6 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { alertForAudit, alertSite, notifyInBackground } from "@/lib/alerts";
 import { getClientIp, getUserAgent } from "@/lib/client-ip";
 
+/**
+ * 定时发布（不是哪个管理员）写日志时的操作人，安全日志页按后台语言显示成「定时发布」。
+ * 管理员用户名不能带 @（USERNAME_PATTERN），不会撞上；「定时发布」是 1.6.0 及以前直接写进去的中文。
+ */
+export const SCHEDULER_ACTOR = "@scheduler";
+const SCHEDULER_ACTORS = new Set([SCHEDULER_ACTOR, "定时发布"]);
+export const isSchedulerActor = (actor: string | null) => actor !== null && SCHEDULER_ACTORS.has(actor);
+
 const RETENTION_DAYS = 365;
 const PRUNE_EVERY = 200;
 let writesSincePrune = 0;

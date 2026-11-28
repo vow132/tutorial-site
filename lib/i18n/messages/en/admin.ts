@@ -1011,6 +1011,7 @@ export const admin: Messages["admin"] = {
     colDetail: "Details",
     empty: "No entries yet",
     hiddenActor: "(entered by a visitor, hidden)",
+    schedulerActor: "Scheduled publishing",
     ipNote: "The IP column is only recorded when {env} is set behind a reverse proxy (behind Cloudflare, see “Cloudflare” in the README).",
     actions: {
       "login.success": "Signed in",

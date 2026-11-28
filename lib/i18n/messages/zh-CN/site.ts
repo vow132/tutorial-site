@@ -58,7 +58,6 @@ export const site = {
     prev: "← 上一篇{note}",
     next: "下一篇{note} →",
     related: "相关教程",
-    tocTitle: "本页目录",
     seriesTitle: "系列教程",
     bookTitle: "教程目录",
     bookPosition: "{label} · 第 {index} / {total} 篇",

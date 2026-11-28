@@ -1011,6 +1011,7 @@ export const admin = {
     colDetail: "详情",
     empty: "暂无记录",
     hiddenActor: "（访客填写，已隐藏）",
+    schedulerActor: "定时发布",
     ipNote: "IP 列需要在反向代理后设置 {env}（接在 Cloudflare 后面时见 README「接入 Cloudflare」）才会记录。",
     actions: {
       "login.success": "登录成功",

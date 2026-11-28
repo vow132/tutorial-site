@@ -7,7 +7,6 @@ export const reader = {
   language: { label: "界面语言 · Language" },
   error: {
     title: "页面出错了",
-    siteMessage: "网站暂时无法显示，请稍后重试；如果反复出现，请联系站长。",
     pageMessage: "内容加载失败，请重试；如果反复出现，请联系站长。",
     digest: "错误编号：{id}",
     retry: "重试",

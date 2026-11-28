@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireAdminPage } from "@/lib/admin-auth";
+import { isSchedulerActor } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { displayIp, isDemoMode } from "@/lib/demo";
 import { getAdminI18n } from "@/lib/i18n/server";
@@ -10,8 +11,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: m.admin.auditLog.metaTitle };
 }
 export const dynamic = "force-dynamic";
-
-
 
 const WARNING = new Set([
   "login.failed",
@@ -48,7 +47,10 @@ export default async function AuditLogPage() {
   // 演示站：登录失败时访客随手填的用户名不显示（只显示真实存在的管理员名），IP 打码
   const demo = isDemoMode();
   const adminNames = new Set(admins.map((admin) => admin.username));
-  const actorOf = (actor: string | null) => (actor && demo && !adminNames.has(actor) ? t.hiddenActor : actor);
+  const actorOf = (actor: string | null) => {
+    if (isSchedulerActor(actor)) return t.schedulerActor;
+    return actor && demo && !adminNames.has(actor) ? t.hiddenActor : actor;
+  };
 
   return (
     <div>

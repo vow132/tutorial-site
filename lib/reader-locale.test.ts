@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_SEGMENT,
+  isAdminPath,
   isReaderPage,
   READER_SEGMENTS,
   readerCookieAssignment,
@@ -38,6 +39,12 @@ test("public pages are rewritten by reader language; admin, APIs and generated f
   // 只排除整段匹配的前缀，不误伤以这些词开头的前台地址
   assert.equal(isReaderPage("/uploads-guide"), true);
   assert.equal(isReaderPage("/feed.xml.bak"), true);
+  assert.equal(isReaderPage("/administrator"), true);
+});
+
+test("only /admin and /admin/… are admin paths", () => {
+  for (const path of ["/admin", "/admin/", "/admin/login", "/admin/tutorials/1"]) assert.equal(isAdminPath(path), true, path);
+  for (const path of ["/administrator", "/admin-guide", "/tutorials/admin", "/"]) assert.equal(isAdminPath(path), false, path);
 });
 
 test("the cookie picks the segment; anything unknown falls back to the site language", () => {

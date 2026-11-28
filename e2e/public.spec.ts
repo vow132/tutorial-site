@@ -121,3 +121,10 @@ test("the health check reports status and the internal publish hook is hidden", 
   expect((await request.post("/api/internal/publish-due")).status()).toBe(404);
   expect((await request.post("/api/internal/publish-due", { headers: { "x-scheduler-token": "guess" } })).status()).toBe(404);
 });
+
+test("only /admin and /admin/… are the admin; look-alike addresses are ordinary 404s", async ({ request }) => {
+  expect((await request.get("/admin", { maxRedirects: 0 })).status()).toBe(307);
+  for (const path of ["/administrator", "/admin-guide"]) {
+    expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(404);
+  }
+});

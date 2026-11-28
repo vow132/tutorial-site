@@ -128,7 +128,7 @@ export default async function TutorialDetailPage({
 
   const tutorial = slug ? await getPublishedTutorial(slug) : null;
   if (!tutorial) notFound();
-  const { m, f, plural, date, locale } = await getReaderI18n();
+  const { m, f, plural, date } = await getReaderI18n();
 
   // 上一篇 / 下一篇：属于系列时按系列顺序，否则同分类内按时间
   const [categoryPrev, categoryNext, processed, settings, relatedCandidates, image, allSeries] = await Promise.all([
@@ -195,7 +195,8 @@ export default async function TutorialDetailPage({
             }
           : {}),
         ...(tutorial.tags.length ? { keywords: tutorial.tags.map(({ tag }) => tag.name).join(",") } : {}),
-        inLanguage: locale,
+        // 正文是站长用网站语言写的，不跟读者选的界面语言
+        inLanguage: settings.locale,
         // 有署名时作者是这个人，否则还是站点本身
         author: byline ? { "@type": "Person", name: byline } : site,
         publisher: site,
@@ -212,8 +213,9 @@ export default async function TutorialDetailPage({
   };
   // 修改日期与发布日期不是同一天时才显示「更新于」（阅读量计数不会改动 updatedAt）。
   const updated = formatDate(tutorial.updatedAt) !== formatDate(tutorial.createdAt);
+  // 阅读速度按正文的语言（网站语言）算：中文站的读者选了英文界面，正文仍是中文
   const words = tutorial.content.replace(/<[^>]+>/g, "").length;
-  const minutes = Math.max(1, Math.round(words / READING_CHARS_PER_MINUTE[locale]));
+  const minutes = Math.max(1, Math.round(words / READING_CHARS_PER_MINUTE[settings.locale]));
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-12" data-motion={settings.articleMotion}>

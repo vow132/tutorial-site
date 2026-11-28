@@ -117,6 +117,18 @@ test.describe.serial("interface languages", () => {
     const plain = await request.get("/tutorials", { headers: { cookie: "" } });
     expect(plain.headers()["x-accel-expires"]).toBeUndefined();
 
+    // 阅读时长按正文的语言（网站语言）算：读者换了界面语言，正文还是中文，分钟数不变
+    const slug = queryDatabase<{ slug: string }>(
+      'SELECT "slug" FROM "Tutorial" WHERE "published" = 1 ORDER BY length("content") DESC LIMIT 1',
+    )!.slug;
+    const minutes = async (cookie: string) => {
+      const html = await (await request.get(`/tutorials/${encodeURIComponent(slug)}`, { headers: { cookie } })).text();
+      return /(\d+)\s*(?:分钟读完|min read)/.exec(html)?.[1];
+    };
+    const siteMinutes = await minutes("");
+    expect(siteMinutes).toBeDefined();
+    expect(await minutes("reader_locale=en")).toBe(siteMinutes);
+
     // 选回网站语言：清掉 Cookie
     await page.goto("/");
     await Promise.all([page.waitForEvent("load"), page.getByRole("combobox", { name: "Language" }).selectOption("zh-CN")]);

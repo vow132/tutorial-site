@@ -40,6 +40,11 @@ export function isReaderPage(pathname: string): boolean {
   return !UNTRANSLATED.test(pathname);
 }
 
+/** 后台的地址：/admin 和 /admin/…（/administrator 这样的是前台的 404，不跳登录页） */
+export function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 /** 改写后的内部路径：/ → /default，/tutorials/x → /en/tutorials/x */
 export function readerRewritePath(segment: ReaderSegment, pathname: string): string {
   return pathname === "/" ? `/${segment}` : `/${segment}${pathname}`;
