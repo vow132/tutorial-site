@@ -55,7 +55,8 @@ function run(args) {
   const [cmd, rest] = command(args);
   const result = spawnSync(cmd, rest, { cwd: root, stdio: "inherit", env: process.env });
   if (result.status !== 0) {
-    console.error(`❌ ${args.join(" ")} 失败（退出码 ${result.status}）`);
+    // 这里还是 root、不打开数据库（以 root 打开会留下 root 所有的 -wal/-shm 文件），不知道网站语言，中英文都写
+    console.error(`❌ ${args.join(" ")} 失败（退出码 ${result.status}）/ failed (exit code ${result.status})`);
     process.exit(result.status ?? 1);
   }
 }
@@ -87,7 +88,9 @@ function dropBuildTimePages() {
   }
   rmSync(path.join(next, "server", "route-cache"), { recursive: true, force: true });
   rmSync(path.join(next, "cache", "fetch-cache"), { recursive: true, force: true });
-  if (removed) console.log("ℹ️ 已清除构建时用空库生成的页面，首次访问时按真实数据重新生成");
+  if (removed) {
+    console.log("ℹ️ 已清除构建时用空库生成的页面，首次访问时按真实数据重新生成 / Removed pages pre-rendered from the empty build database; they're regenerated from real data on first visit");
+  }
 }
 
 if (asRoot) for (const dir of writable) chownTree(dir);
@@ -96,7 +99,7 @@ dropBuildTimePages();
 const firstRun = !existsSync(dbFile);
 run(["node", "scripts/migrate.mjs"]);
 if (firstRun) {
-  console.log("ℹ️ 第一次启动：写入种子数据（管理员账号、示例分类和教程）");
+  console.log("ℹ️ 第一次启动：写入种子数据（管理员账号、示例分类和教程） / First start: writing seed data (admin account, sample categories and tutorials)");
   // prisma/seed.ts 构建镜像时打包成了 scripts/seed.mjs（scripts/docker-runtime.mjs）
   run(["node", "scripts/seed.mjs"]);
 }

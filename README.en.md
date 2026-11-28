@@ -83,7 +83,7 @@ pm2 update                                  # PM2 switches to the new Node and r
 
 Sites deployed with PM2 can update from the admin: the dot at the top right of the dashboard turns yellow when a new version is out; click it and enter your password again. The update runs in a separate process (download → install → migrate and build against a copy of the database → back up → switch → health check, with automatic rollback on failure); the site is only down for a few seconds during the switch, and seed data is never run. It requires Linux, a single PM2 process (named `教程网` by default, change it with `SITE_PM2_APP_NAME`), a Git deployment whose `origin` is this repository, and access to GitHub and npm from the server. Set `SITE_AUTO_UPDATE="false"` to turn it off.
 
-After the first one-click update PM2 starts the site from `.updates/active.config.cjs`; restart manually with `pm2 startOrReload .updates/active.config.cjs --update-env`. If you forked and changed the code, merge updates by hand as described in the [customization guide](docs/CUSTOMIZE.md) (Chinese).
+After the first one-click update PM2 starts the site from `.updates/active.config.cjs`; restart manually with `pm2 startOrReload .updates/active.config.cjs --update-env`. If you forked and changed the code, merge updates by hand as described in the [customization guide](docs/CUSTOMIZE.en.md).
 
 ## First-time setup
 
@@ -156,6 +156,7 @@ The interface comes in Simplified Chinese, English, Russian and Japanese:
 
 - **Site language** (“Site settings → Site language”): all public interface text, RSS, emails and alert messages use it. When you switch, the site name, home page texts and footer change to the new language's defaults if they still have default values; anything you edited is kept.
 - **Admin language**: each admin picks their own at the bottom of the sidebar (or on the sign-in page). It's stored in their browser and doesn't affect others or the public site.
+- **Server commands** (backup, restore, admin reset…) print Chinese for Chinese sites and English for sites in any other language; the deploy script and the Docker startup log are written in both.
 
 The language of the tutorials themselves is up to you. The sample tutorials are in Chinese and can be removed with one click from the dashboard.
 
@@ -210,7 +211,7 @@ Tests: `npm test` (unit tests); `npm run build && npm run test:e2e` (Playwright 
 
 ## Documentation
 
-- [Customization guide](docs/CUSTOMIZE.md) (Chinese): what the admin can change, which files to edit, keeping a fork up to date
+- [Customization guide](docs/CUSTOMIZE.en.md): what the admin can change, which files to edit, keeping a fork up to date
 - [CHANGELOG.md](CHANGELOG.md) (Chinese): release notes (the admin sidebar shows the running version)
-- [CONTRIBUTING.md](CONTRIBUTING.md) (Chinese): contributing
-- [SECURITY.md](SECURITY.md) (Chinese): reporting security issues privately
+- [CONTRIBUTING.en.md](CONTRIBUTING.en.md): contributing
+- [SECURITY.en.md](SECURITY.en.md): reporting security issues privately
