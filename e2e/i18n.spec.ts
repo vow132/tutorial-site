@@ -122,7 +122,8 @@ test.describe.serial("interface languages", () => {
     await Promise.all([page.waitForEvent("load"), page.getByRole("combobox", { name: "Language" }).selectOption("zh-CN")]);
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
     expect((await reader.cookies()).some((cookie) => cookie.name === "reader_locale")).toBe(false);
-    expect(errors).toEqual([]);
+    // 上面故意打开的 404 页会在控制台记一条「404 Not Found」，那条是预期的
+    expect(errors.filter((error) => !error.includes("/no-such-page"))).toEqual([]);
     await reader.close();
   });
 
